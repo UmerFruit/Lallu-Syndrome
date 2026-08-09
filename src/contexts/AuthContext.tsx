@@ -10,15 +10,19 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const state = getAuthState();
-    setUser(state.user);
-    setIsLoading(false);
-
+    const initializeAuth = async () => {
+      await getAuthState().then((state) => {
+        setUser(state.user);
+        setIsLoading(false);
+      })
+    };
+    initializeAuth(); 
+    
     const unsub = onAuthChange((state) => {
       setUser(state.user);
       setIsLoading(state.isLoading);

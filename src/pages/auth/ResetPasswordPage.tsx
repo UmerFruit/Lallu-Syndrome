@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -7,8 +7,6 @@ import { resetPassword } from '@/services/authService';
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const token = params.get('token') ?? '';
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string; form?: string }>({});
@@ -17,7 +15,7 @@ export function ResetPasswordPage() {
   const validate = (): boolean => {
     const e: typeof errors = {};
     if (!password) e.password = 'Password is required.';
-    else if (password.length < 8) e.password = 'Password must be at least 8 characters.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
     if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
     else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
     setErrors(e);
@@ -29,7 +27,7 @@ export function ResetPasswordPage() {
     if (!validate()) return;
     setLoading(true);
     try {
-      await resetPassword(token, password);
+      await resetPassword(password);
       navigate('/login');
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
@@ -58,7 +56,7 @@ export function ResetPasswordPage() {
           label="New password"
           isPassword
           name="password"
-          placeholder="At least 8 characters"
+          placeholder="At least 6 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={errors.password}

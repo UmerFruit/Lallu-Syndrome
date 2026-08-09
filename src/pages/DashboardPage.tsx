@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link} from 'react-router-dom';
 import type { Article } from '@/types';
 import { getAllArticles, deleteArticle } from '@/services/articleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer } from '@/components/layout/Navbar';
 import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
-import { Plus, Pencil, Trash2, FileText, ArrowUpRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText} from 'lucide-react';
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'published' | 'drafts'>('published');

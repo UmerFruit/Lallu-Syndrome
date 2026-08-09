@@ -1,79 +1,72 @@
 import type { User, AuthState } from '@/types';
-
-const AUTH_KEY = 'ls_auth_user';
+import { supabase } from '@/lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 type AuthCallback = (state: AuthState) => void;
-const listeners = new Set<AuthCallback>();
 
-function notify(state: AuthState) {
-  listeners.forEach((cb) => cb(state));
+function mapSupabaseUser(user: SupabaseUser): User {
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    name: user.user_metadata.name ?? '',
+    avatar: user.user_metadata.avatar,
+  };
 }
 
 export function onAuthChange(cb: AuthCallback): () => void {
-  listeners.add(cb);
-  cb(getAuthState());
-  return () => listeners.delete(cb);
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    cb({
+      user: session?.user ? mapSupabaseUser(session.user) : null,
+      isLoading: false
+    })
+  })
+  return () => subscription.unsubscribe();
 }
 
-export function getAuthState(): AuthState {
-  try {
-    const stored = localStorage.getItem(AUTH_KEY);
-    if (stored) {
-      const user = JSON.parse(stored) as User;
-      return { user, isLoading: false };
-    }
-  } catch {
-    // ignore
-  }
-  return { user: null, isLoading: false };
-}
-
-export async function login(email: string, _password: string): Promise<User> {
-  await simulateDelay(400);
-  if (!email.includes('@')) {
-    throw new Error('Invalid email or password.');
-  }
-  const user: User = {
-    id: crypto.randomUUID(),
-    email,
-    name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+export async function getAuthState(): Promise<AuthState> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return {
+    user: session?.user ? mapSupabaseUser(session.user) : null,
+    isLoading: false,
   };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-  notify({ user, isLoading: false });
-  return user;
 }
 
-export async function signup(name: string, email: string, _password: string): Promise<User> {
-  await simulateDelay(500);
-  if (!email.includes('@')) {
-    throw new Error('Please enter a valid email address.');
-  }
-  const user: User = {
-    id: crypto.randomUUID(),
-    email,
-    name,
-  };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-  notify({ user, isLoading: false });
-  return user;
+export async function login(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) { throw new Error(error.message);}
+
+  return data.user ? mapSupabaseUser(data.user) : null;
+}
+
+export async function signup(name: string, email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email, password,
+    options: { data: {name} }
+  });
+
+  if (error) { throw new Error(error.message);}
+
+  return data.user ? mapSupabaseUser(data.user) : null;
 }
 
 export async function forgotPassword(email: string): Promise<void> {
-  await simulateDelay(400);
-  if (!email.includes('@')) {
-    throw new Error('Please enter a valid email address.');
-  }
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email, { redirectTo: `${window.location.origin}/reset-password` }
+  );
+
+  if (error) { throw new Error(error.message);}
 }
 
-export async function resetPassword(_token: string, _password: string): Promise<void> {
-  await simulateDelay(500);
+export async function resetPassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) { throw new Error(error.message);}
 }
 
-export function logout(): void {
-  localStorage.removeItem(AUTH_KEY);
-  notify({ user: null, isLoading: false });
-}
+export async function logout(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
 
-function simulateDelay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  if (error) { throw new Error(error.message);}
 }

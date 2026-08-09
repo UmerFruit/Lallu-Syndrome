@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -27,7 +27,7 @@ export function SignupPage() {
     if (!email) e.email = 'Email is required.';
     else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
     if (!password) e.password = 'Password is required.';
-    else if (password.length < 8) e.password = 'Password must be at least 8 characters.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
     if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
     else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
     setErrors(e);
@@ -90,7 +90,7 @@ export function SignupPage() {
           label="Password"
           isPassword
           name="password"
-          placeholder="At least 8 characters"
+          placeholder="At least 6 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={errors.password}
