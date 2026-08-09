@@ -32,7 +32,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
     e.preventDefault();
     if (!content.trim() || !user) return;
     setSubmitting(true);
-    const newComment = await addComment(articleId, user.name, content.trim());
+    const newComment = await addComment(articleId, user.user_metadata.name, content.trim());
     setComments((prev) => [...prev, newComment]);
     setContent('');
     setSubmitting(false);
@@ -84,11 +84,11 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
       {user ? (
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="flex gap-3">
-            {user.avatar ? (
-              <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full flex-shrink-0" />
+            {user.user_metadata.avatar ? (
+              <img src={user.user_metadata.avatar} alt={user.user_metadata.name} className="w-9 h-9 rounded-full flex-shrink-0" />
             ) : (
               <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-                {user.name.charAt(0).toUpperCase()}
+                {user.user_metadata.name.charAt(0).toUpperCase()}
               </div>
             )}
             <div className="flex-1">
@@ -124,7 +124,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
   );
 }
 
-function CommentItem({ comment, replies }: { comment: Comment; replies: Comment[] }) {
+function CommentItem({ comment, replies }: Readonly<{ comment: Comment; replies: Comment[] }>) {
   return (
     <div className="space-y-4">
       <div className="flex gap-3">

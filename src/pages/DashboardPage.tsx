@@ -38,7 +38,7 @@ export function DashboardPage() {
             Dashboard
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {user ? `Signed in as ${user.name}` : 'Manage your writing.'}
+            {user ? `Signed in as ${user.user_metadata.name}` : 'Manage your writing.'}
           </p>
         </div>
         <Link

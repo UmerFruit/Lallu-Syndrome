@@ -1,3 +1,5 @@
+import type { User } from '@supabase/supabase-js';
+
 export type ArticleStatus = 'draft' | 'published';
 
 export type Author = {
@@ -37,13 +39,6 @@ export type Article = {
   readingTime: number;
   likes: number;
   status: ArticleStatus;
-};
-
-export type User = {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
 };
 
 export type AuthState = {

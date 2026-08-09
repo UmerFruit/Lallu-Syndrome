@@ -1,23 +1,14 @@
-import type { User, AuthState } from '@/types';
 import { supabase } from '@/lib/supabase';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { AuthState } from '@/types';
+import type { User } from '@supabase/supabase-js';
 
 type AuthCallback = (state: AuthState) => void;
-
-function mapSupabaseUser(user: SupabaseUser): User {
-  return {
-    id: user.id,
-    email: user.email ?? '',
-    name: user.user_metadata.name ?? '',
-    avatar: user.user_metadata.avatar,
-  };
-}
 
 export function onAuthChange(cb: AuthCallback): () => void {
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     cb({
-      user: session?.user ? mapSupabaseUser(session.user) : null,
+      user: session?.user ?? null,
       isLoading: false
     })
   })
@@ -27,7 +18,7 @@ export function onAuthChange(cb: AuthCallback): () => void {
 export async function getAuthState(): Promise<AuthState> {
   const { data: { session } } = await supabase.auth.getSession();
   return {
-    user: session?.user ? mapSupabaseUser(session.user) : null,
+    user: session?.user ?? null,
     isLoading: false,
   };
 }
@@ -37,7 +28,7 @@ export async function login(email: string, password: string) {
 
   if (error) { throw new Error(error.message);}
 
-  return data.user ? mapSupabaseUser(data.user) : null;
+  return data.user;
 }
 
 export async function signup(name: string, email: string, password: string) {
@@ -48,7 +39,7 @@ export async function signup(name: string, email: string, password: string) {
 
   if (error) { throw new Error(error.message);}
 
-  return data.user ? mapSupabaseUser(data.user) : null;
+  return data.user;
 }
 
 export async function forgotPassword(email: string): Promise<void> {
