@@ -1,0 +1,117 @@
+import { useState, type FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { signup } from '@/services/authService';
+
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    form?: string;
+  }>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = (): boolean => {
+    const e: typeof errors = {};
+    if (!name) e.name = 'Name is required.';
+    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
+    if (!email) e.email = 'Email is required.';
+    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
+    if (!password) e.password = 'Password is required.';
+    else if (password.length < 8) e.password = 'Password must be at least 8 characters.';
+    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
+    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      await signup(name, email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Create account"
+      subtitle="Start writing and publishing on Lallu Syndrome."
+      footer={
+        <>
+          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errors.form && (
+          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
+            {errors.form}
+          </div>
+        )}
+        <Input
+          label="Name"
+          type="text"
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+          autoComplete="name"
+          required
+        />
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          autoComplete="email"
+          required
+        />
+        <Input
+          label="Password"
+          isPassword
+          name="password"
+          placeholder="At least 8 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          autoComplete="new-password"
+          required
+        />
+        <Input
+          label="Confirm password"
+          isPassword
+          name="confirmPassword"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          error={errors.confirmPassword}
+          autoComplete="new-password"
+          required
+        />
+        <Button type="submit" className="w-full" loading={loading}>
+          Create account
+        </Button>
+      </form>
+    </AuthLayout>
+  );
+}
