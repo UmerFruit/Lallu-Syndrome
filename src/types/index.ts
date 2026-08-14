@@ -15,7 +15,7 @@ export type Comment = {
   avatar?: string;
   content: string;
   createdAt: string;
-  parentId?: string | null;
+  parentId: string | null;
 };
 
 export type Category = {

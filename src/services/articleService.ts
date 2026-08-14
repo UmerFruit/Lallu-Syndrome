@@ -4,10 +4,7 @@ import {
   getCategoryBySlug,
   getCategoryById,
 } from '@/services/categoryService';
-import { mockComments } from '@/data/mockData';
 
-const COMMENTS_KEY = 'ls_comments';
-const LIKES_KEY = 'ls_likes';
 
 type SupabaseArticle = {
   id: string;
@@ -28,6 +25,15 @@ type SupabaseProfile = {
   display_name: string;
   avatar_url: string | null;
   bio: string | null;
+};
+
+type SupabaseComment = {
+  id: string;
+  article_id: string;
+  parent_id: string | null;
+  author_id: string;
+  content: string;
+  created_at: string;
 };
 
 function createExcerpt(content: string): string {
@@ -87,8 +93,10 @@ async function getArticleTags(articleId: string): Promise<string[]> {
   return tags.map((tag) => tag.name);
 }
 
+
+
 async function hydrateArticle(article: SupabaseArticle): Promise<Article> {
-  const [category, profileResult, tags] = await Promise.all([
+  const [category, profileResult, tags, likes] = await Promise.all([
     getCategoryById(article.category_id),
     supabase
       .from('profiles')
@@ -96,6 +104,8 @@ async function hydrateArticle(article: SupabaseArticle): Promise<Article> {
       .eq('id', article.author_id)
       .single(),
     getArticleTags(article.id),
+    getArticleLikeCount(article.id),
+
   ]);
 
   const { data: profile, error: profileError } = profileResult;
@@ -110,56 +120,43 @@ async function hydrateArticle(article: SupabaseArticle): Promise<Article> {
     throw new Error(`Profile not found for author ${article.author_id}`);
   }
 
-  return mapSupabaseArticle(
+  const mappedArticle = mapSupabaseArticle(
     article,
     category,
     profile as SupabaseProfile,
     tags
   );
+
+  return {
+    ...mappedArticle,
+    likes,
+  };
 }
 
-async function getStoredComments(): Promise<Comment[]> {
-  try {
-    const stored = localStorage.getItem(COMMENTS_KEY);
+async function getArticleLikeCount(articleId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('article_likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('article_id', articleId);
 
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch {
-    // Ignore localStorage errors.
-  }
+  if (error) throw error;
 
-  return [...mockComments];
+  return count ?? 0;
 }
 
-function saveComments(comments: Comment[]): void {
-  try {
-    localStorage.setItem(COMMENTS_KEY, JSON.stringify(comments));
-  } catch {
-    // Ignore localStorage errors.
-  }
-}
-
-function getLikedArticles(): Set<string> {
-  try {
-    const stored = localStorage.getItem(LIKES_KEY);
-
-    if (stored) {
-      return new Set(JSON.parse(stored));
-    }
-  } catch {
-    // Ignore localStorage errors.
-  }
-
-  return new Set();
-}
-
-function saveLikedArticles(liked: Set<string>): void {
-  try {
-    localStorage.setItem(LIKES_KEY, JSON.stringify([...liked]));
-  } catch {
-    // Ignore localStorage errors.
-  }
+function mapSupabaseComment(
+  comment: SupabaseComment,
+  profile: Pick<SupabaseProfile, 'display_name' | 'avatar_url'>
+): Comment {
+  return {
+    id: comment.id,
+    articleId: comment.article_id,
+    author: profile.display_name,
+    avatar: profile.avatar_url ?? undefined,
+    content: comment.content,
+    createdAt: comment.created_at,
+    parentId: comment.parent_id,
+  };
 }
 
 export function calculateReadingTime(content: string): number {
@@ -467,54 +464,183 @@ export async function deleteArticle(id: string): Promise<boolean> {
 }
 
 export async function getComments(articleId: string): Promise<Comment[]> {
-  const comments = await getStoredComments();
+  const { data: comments, error } = await supabase
+    .from('comments')
+    .select(`
+      id,
+      article_id,
+      parent_id,
+      author_id,
+      content,
+      created_at,
+      profiles!comments_author_id_fkey (
+        display_name,
+        avatar_url
+      )
+    `)
+    .eq('article_id', articleId)
+    .order('created_at', { ascending: true });
 
-  return comments.filter((comment) => comment.articleId === articleId);
+  if (error) throw error;
+
+  return comments.map((comment) => {
+    const profile = Array.isArray(comment.profiles)
+      ? comment.profiles[0]
+      : comment.profiles;
+
+    if (!profile) {
+      throw new Error(`Profile not found for comment ${comment.id}`);
+    }
+
+    return mapSupabaseComment(
+      {
+        id: comment.id,
+        article_id: comment.article_id,
+        parent_id: comment.parent_id,
+        author_id: comment.author_id,
+        content: comment.content,
+        created_at: comment.created_at,
+      },
+      profile as Pick<SupabaseProfile, 'display_name' | 'avatar_url'>
+    );
+  });
 }
 
 export async function addComment(
   articleId: string,
-  author: string,
   content: string,
-  parentId?: string | null
+  parentId: string | null = null
 ): Promise<Comment> {
-  const comments = await getStoredComments();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  const newComment: Comment = {
-    id: crypto.randomUUID(),
-    articleId,
-    author,
-    content,
-    createdAt: new Date().toISOString(),
-    parentId: parentId ?? null,
-  };
+  if (authError) throw authError;
 
-  comments.push(newComment);
-  saveComments(comments);
+  if (!user) {
+    throw new Error('You must be logged in to comment.');
+  }
 
-  return newComment;
+  const { data: comment, error } = await supabase
+    .from('comments')
+    .insert({
+      article_id: articleId,
+      parent_id: parentId,
+      author_id: user.id,
+      content,
+    })
+    .select(`
+      id,
+      article_id,
+      parent_id,
+      author_id,
+      content,
+      created_at,
+      profiles!comments_author_id_fkey (
+        display_name,
+        avatar_url
+      )
+    `)
+    .single();
+
+  if (error) throw error;
+
+  const profile = Array.isArray(comment.profiles)
+    ? comment.profiles[0]
+    : comment.profiles;
+
+  if (!profile) {
+    throw new Error(`Profile not found for comment ${comment.id}`);
+  }
+
+  return mapSupabaseComment(
+    {
+      id: comment.id,
+      article_id: comment.article_id,
+      parent_id: comment.parent_id,
+      author_id: comment.author_id,
+      content: comment.content,
+      created_at: comment.created_at,
+    },
+    profile as Pick<SupabaseProfile, 'display_name' | 'avatar_url'>
+  );
 }
-
 export async function toggleLike(
   articleId: string
 ): Promise<{ liked: boolean; likes: number }> {
-  const liked = getLikedArticles();
-  const isCurrentlyLiked = liked.has(articleId);
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  if (isCurrentlyLiked) {
-    liked.delete(articleId);
-  } else {
-    liked.add(articleId);
+  if (authError) throw authError;
+
+  if (!user) {
+    throw new Error('You must be logged in to like an article.');
   }
 
-  saveLikedArticles(liked);
+  const { data: existingLike, error: existingLikeError } = await supabase
+    .from('article_likes')
+    .select('article_id')
+    .eq('article_id', articleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existingLikeError) throw existingLikeError;
+
+  if (existingLike) {
+    const { error: deleteError } = await supabase
+      .from('article_likes')
+      .delete()
+      .eq('article_id', articleId)
+      .eq('user_id', user.id);
+
+    if (deleteError) throw deleteError;
+
+    const likes = await getArticleLikeCount(articleId);
+
+    return {
+      liked: false,
+      likes,
+    };
+  }
+
+  const { error: insertError } = await supabase
+    .from('article_likes')
+    .insert({
+      article_id: articleId,
+      user_id: user.id,
+    });
+
+  if (insertError) throw insertError;
+
+  const likes = await getArticleLikeCount(articleId);
 
   return {
-    liked: !isCurrentlyLiked,
-    likes: 0,
+    liked: true,
+    likes,
   };
 }
 
 export async function isLiked(articleId: string): Promise<boolean> {
-  return getLikedArticles().has(articleId);
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) throw authError;
+
+  if (!user) { return false; }
+
+  const { data, error } = await supabase
+    .from('article_likes')
+    .select('article_id')
+    .eq('article_id', articleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data !== null;
 }
