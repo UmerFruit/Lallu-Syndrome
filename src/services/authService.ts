@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase';
 import type { AuthState } from '@/types';
-import type { User } from '@supabase/supabase-js';
 
 type AuthCallback = (state: AuthState) => void;
 

@@ -52,7 +52,7 @@ export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
             <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />
           </Link>
           <span className="font-mono text-xs text-text-muted">
-            {formatDate(article.publishedAt)}
+            {article.publishedAt && formatDate(article.publishedAt)}
           </span>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { ArticleContent } from '@/components/articles/ArticleContent';
+import { upload } from '@/services/storageService'
 import {
   ArrowLeft, Save, Eye, Settings as SettingsIcon,
   Maximize2, Minimize2, X, Check, ImagePlus, Upload,
@@ -134,25 +135,62 @@ export function ArticleEditorPage() {
     navigate('/dashboard');
   };
 
-  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCoverImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+
+    e.target.value = '';
+
+    const articleId = articleRef.current?.id ?? id;
+
+    if (!articleId || articleId === 'new') {
+      alert('Save the article before uploading a cover image.');
+      return;
+    }
+
+    try {
+      setSaveState('saving');
+
+      const result = await upload(articleId, file, 'cover');
+
+      setCoverImage(result.publicUrl);
+    } catch (error) {
+      console.error('Failed to upload cover image:', error);
+      alert('Failed to upload cover image. Please try again.');
+    } finally {
+      setSaveState('idle');
+    }
   };
 
-  const handleImageInsert = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInsert = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const imgMarkdown = `\n\n![${file.name}](${reader.result})\n\n`;
+
+    e.target.value = '';
+
+    const articleId = articleRef.current?.id ?? id;
+
+    if (!articleId || articleId === 'new') {
+      alert('Save the article before inserting an image.');
+      return;
+    }
+
+    try {
+      setSaveState('saving');
+
+      const result = await upload(articleId, file, 'content');
+
+      const imgMarkdown = `\n\n![${file.name}](${result.publicUrl})\n\n`;
+
       setContent((prev) => prev + imgMarkdown);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setSaveState('idle');
+    }
   };
 
   if (loading) {

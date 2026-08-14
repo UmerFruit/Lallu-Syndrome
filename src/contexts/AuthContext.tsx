@@ -16,13 +16,12 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      await getAuthState().then((state) => {
-        setUser(state.user);
-        setIsLoading(false);
-      })
+      const state = await getAuthState();
+      setUser(state.user);
+      setIsLoading(false);
     };
-    initializeAuth(); 
-    
+    initializeAuth();
+
     const unsub = onAuthChange((state) => {
       setUser(state.user);
       setIsLoading(state.isLoading);
@@ -30,9 +29,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     return unsub;
   }, []);
 
-  const logout = () => {
-    authLogout();
-    setUser(null);
+  const logout = async (): Promise<void> => {
+    await authLogout();
   };
 
   return (

@@ -1,40 +1,15 @@
-import type { Article, Comment, Category } from '@/types';
+import type { Article, Comment, Category, ArticleInput } from '@/types';
+import type { Database } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import {
   getCategoryBySlug,
   getCategoryById,
 } from '@/services/categoryService';
 
+type ArticleRow = Database['public']['Tables']['articles']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+type CommentRow = Database['public']['Tables']['comments']['Row'];
 
-type SupabaseArticle = {
-  id: string;
-  author_id: string;
-  category_id: number;
-  title: string;
-  slug: string;
-  content: string;
-  cover_image: string | null;
-  status: Article['status'];
-  reading_time: number | null;
-  published_at: string | null;
-  updated_at: string | null;
-  created_at: string;
-};
-
-type SupabaseProfile = {
-  display_name: string;
-  avatar_url: string | null;
-  bio: string | null;
-};
-
-type SupabaseComment = {
-  id: string;
-  article_id: string;
-  parent_id: string | null;
-  author_id: string;
-  content: string;
-  created_at: string;
-};
 
 function createExcerpt(content: string): string {
   return content.length > 150
@@ -43,9 +18,9 @@ function createExcerpt(content: string): string {
 }
 
 function mapSupabaseArticle(
-  article: SupabaseArticle,
+  article: ArticleRow,
   category: Category,
-  profile: SupabaseProfile,
+  profile: ProfileRow,
   tags: string[]
 ): Article {
   return {
@@ -93,9 +68,13 @@ async function getArticleTags(articleId: string): Promise<string[]> {
   return tags.map((tag) => tag.name);
 }
 
+async function hydrateArticles(
+  articles: ArticleRow[]
+): Promise<Article[]> {
+  return Promise.all(articles.map(hydrateArticle));
+}
 
-
-async function hydrateArticle(article: SupabaseArticle): Promise<Article> {
+async function hydrateArticle(article: ArticleRow): Promise<Article> {
   const [category, profileResult, tags, likes] = await Promise.all([
     getCategoryById(article.category_id),
     supabase
@@ -123,7 +102,7 @@ async function hydrateArticle(article: SupabaseArticle): Promise<Article> {
   const mappedArticle = mapSupabaseArticle(
     article,
     category,
-    profile as SupabaseProfile,
+    profile as ProfileRow,
     tags
   );
 
@@ -145,8 +124,8 @@ async function getArticleLikeCount(articleId: string): Promise<number> {
 }
 
 function mapSupabaseComment(
-  comment: SupabaseComment,
-  profile: Pick<SupabaseProfile, 'display_name' | 'avatar_url'>
+  comment: CommentRow,
+  profile: Pick<ProfileRow, 'display_name' | 'avatar_url'>
 ): Comment {
   return {
     id: comment.id,
@@ -188,9 +167,7 @@ export async function getArticles(): Promise<Article[]> {
 
   if (error) throw error;
 
-  return Promise.all(
-    data.map((article) => hydrateArticle(article as SupabaseArticle))
-  );
+  return hydrateArticles(data);
 }
 
 export async function getAllArticles(): Promise<Article[]> {
@@ -201,9 +178,7 @@ export async function getAllArticles(): Promise<Article[]> {
 
   if (error) throw error;
 
-  return Promise.all(
-    data.map((article) => hydrateArticle(article as SupabaseArticle))
-  );
+  return hydrateArticles(data);
 }
 
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
@@ -218,7 +193,7 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
     throw error;
   }
 
-  return hydrateArticle(data as SupabaseArticle);
+  return hydrateArticle(data);
 }
 
 export async function getArticleById(id: string): Promise<Article | null> {
@@ -233,7 +208,7 @@ export async function getArticleById(id: string): Promise<Article | null> {
     throw error;
   }
 
-  return hydrateArticle(data as SupabaseArticle);
+  return hydrateArticle(data);
 }
 
 export async function getArticlesByCategory(
@@ -253,10 +228,7 @@ export async function getArticlesByCategory(
     .order('published_at', { ascending: false });
 
   if (error) throw error;
-
-  return Promise.all(
-    data.map((article) => hydrateArticle(article as SupabaseArticle))
-  );
+return hydrateArticles(data);
 }
 
 export async function getLatestArticle(): Promise<Article | null> {
@@ -272,7 +244,7 @@ export async function getLatestArticle(): Promise<Article | null> {
 
   if (!data) return null;
 
-  return hydrateArticle(data as SupabaseArticle);
+  return hydrateArticle(data);
 }
 
 export async function getLatestArticles(
@@ -287,9 +259,7 @@ export async function getLatestArticles(
 
   if (error) throw error;
 
-  return Promise.all(
-    data.map((article) => hydrateArticle(article as SupabaseArticle))
-  );
+return hydrateArticles(data);
 }
 
 export async function getRelatedArticles(
@@ -311,9 +281,7 @@ export async function getRelatedArticles(
 
   if (error) throw error;
 
-  const related = await Promise.all(
-    data.map((item) => hydrateArticle(item as SupabaseArticle))
-  );
+  const related = await hydrateArticles(data);
 
   if (related.length >= count) return related;
 
@@ -329,14 +297,14 @@ export async function getRelatedArticles(
   if (additionalError) throw additionalError;
 
   const others = await Promise.all(
-    additional.map((item) => hydrateArticle(item as SupabaseArticle))
+    additional.map((item) => hydrateArticle(item as ArticleRow))
   );
 
   return [...related, ...others];
 }
 
 export async function createArticle(
-  data: Partial<Article>
+  data: Partial<ArticleInput>
 ): Promise<Article> {
   const {
     data: { user },
@@ -376,12 +344,12 @@ export async function createArticle(
 
   if (error) throw error;
 
-  return hydrateArticle(article as SupabaseArticle);
+  return hydrateArticle(article as ArticleRow);
 }
 
 export async function updateArticle(
   id: string,
-  data: Partial<Article>
+  data: Partial<ArticleInput>
 ): Promise<Article | null> {
   const {
     data: { user },
@@ -394,7 +362,7 @@ export async function updateArticle(
     throw new Error('You must be logged in to update an article.');
   }
 
-  const updateData: Record<string, unknown> = {};
+  const updateData: Database['public']['Tables']['articles']['Update'] = {};
 
   if (data.title !== undefined) {
     updateData.title = data.title;
@@ -437,7 +405,7 @@ export async function updateArticle(
 
   if (error) throw error;
 
-  return hydrateArticle(article as SupabaseArticle);
+  return hydrateArticle(article as ArticleRow);
 }
 
 export async function deleteArticle(id: string): Promise<boolean> {
@@ -501,7 +469,7 @@ export async function getComments(articleId: string): Promise<Comment[]> {
         content: comment.content,
         created_at: comment.created_at,
       },
-      profile as Pick<SupabaseProfile, 'display_name' | 'avatar_url'>
+      profile 
     );
   });
 }
@@ -563,7 +531,7 @@ export async function addComment(
       content: comment.content,
       created_at: comment.created_at,
     },
-    profile as Pick<SupabaseProfile, 'display_name' | 'avatar_url'>
+    profile 
   );
 }
 export async function toggleLike(
@@ -629,9 +597,8 @@ export async function isLiked(articleId: string): Promise<boolean> {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError) throw authError;
 
-  if (!user) { return false; }
+  if (authError || !user)  return false; 
 
   const { data, error } = await supabase
     .from('article_likes')

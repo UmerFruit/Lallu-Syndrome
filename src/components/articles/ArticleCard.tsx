@@ -38,7 +38,7 @@ export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
       </p>
 
       <time className="block font-mono text-xs text-text-muted">
-        {formatDate(article.publishedAt)}
+        {article.publishedAt && formatDate(article.publishedAt)}
       </time>
     </Link>
   );

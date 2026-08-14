@@ -43,7 +43,7 @@ export function ArticlePage() {
       setLiked(isL);
       setLoading(false);
       window.scrollTo(0, 0);
-    });
+    }).catch(() => { setError(true); setLoading(false); });
   }, [slug]);
 
   if (loading) {
@@ -112,7 +112,7 @@ export function ArticlePage() {
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-medium text-text-primary">{article.author.name}</span>
               <span className="font-mono text-xs text-text-muted">
-                  {formatDateLong(article.publishedAt ?? article.createdAt)}
+                {formatDateLong(article.publishedAt ?? article.createdAt)}
 
               </span>
             </div>

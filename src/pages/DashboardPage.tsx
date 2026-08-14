@@ -97,7 +97,7 @@ export function DashboardPage() {
                 <div className="flex items-center gap-3 mt-1">
                   <Badge variant="muted">{article.category}</Badge>
                   <span className="font-mono text-xs text-text-muted">
-                    {formatDate(article.publishedAt)}
+                    {article.publishedAt && formatDate(article.publishedAt)}
                   </span>
                   <span className="font-mono text-xs text-text-muted">
                     {article.readingTime} min
