@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import MDEditor from '@uiw/react-md-editor';
-import type { Article, ArticleStatus } from '@/types';
+import type { Article, ArticleStatus, Category } from '@/types';
 import { getArticleById, createArticle, updateArticle, calculateReadingTime, generateSlug } from '@/services/articleService';
-import { getCategories } from '@/services/articleService';
+import { getCategories } from '@/services/categoryService';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -22,7 +22,7 @@ export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme } = useTheme();
-  const categories = getCategories();
+  const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
 
   const [title, setTitle] = useState('');
@@ -42,6 +42,11 @@ export function ArticleEditorPage() {
 
   const articleRef = useRef<Article | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!isNew && id) {
@@ -200,9 +205,8 @@ export function ArticleEditorPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPreview((p) => !p)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                preview ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${preview ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
+                }`}
             >
               <Eye size={15} />
               Preview
@@ -219,9 +223,8 @@ export function ArticleEditorPage() {
             {!zenMode && (
               <button
                 onClick={() => setShowSettings((s) => !s)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
-                }`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
+                  }`}
               >
                 <SettingsIcon size={15} />
                 Settings

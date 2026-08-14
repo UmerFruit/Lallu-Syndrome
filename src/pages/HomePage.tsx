@@ -1,31 +1,37 @@
 import { useEffect, useState } from 'react';
-import type { Article } from '@/types';
+import type { Article, Category } from '@/types';
 import { getLatestArticle, getLatestArticles, getArticles } from '@/services/articleService';
-import { getCategories } from '@/services/articleService';
 import { PageContainer } from '@/components/layout/Navbar';
 import { FeaturedArticle } from '@/components/articles/FeaturedArticle';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { FeaturedArticleSkeleton, ArticleCardSkeleton } from '@/components/ui/Skeleton';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { getCategories } from '@/services/categoryService';
 
 export function HomePage() {
   const [featured, setFeatured] = useState<Article | null>(null);
   const [latest, setLatest] = useState<Article[]>([]);
   const [all, setAll] = useState<Article[]>([]);
-  const [categories] = useState(getCategories());
+  const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getLatestArticle(), getLatestArticles(4), getArticles()]).then(
-      ([feat, lat, allArts]) => {
+    Promise.all([
+      getLatestArticle(),
+      getLatestArticles(4),
+      getArticles(),
+      getCategories(),
+    ])
+      .then(([feat, lat, allArts, categoryResults]) => {
         setFeatured(feat);
-        setLatest(lat.filter((a) => feat === null || a.id !== feat.id).slice(0, 3));
+        setLatest(lat.filter((a) => a.id !== feat?.id).slice(0, 3));
         setAll(allArts);
+        setCategories(categoryResults);
         setLoading(false);
-      }
-    );
+      })
+      .catch(console.error);
   }, []);
 
   const filtered = activeCategory === 'all'
@@ -121,11 +127,10 @@ function CategoryButton({ label, active, onClick }: { label: string; active: boo
   return (
     <button
       onClick={onClick}
-      className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${
-        active
+      className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${active
           ? 'border-accent text-accent bg-accent/5'
           : 'border-border text-text-muted hover:text-text-secondary hover:border-text-muted'
-      }`}
+        }`}
     >
       {label}
     </button>

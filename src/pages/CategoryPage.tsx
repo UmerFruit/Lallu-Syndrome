@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { Article } from '@/types';
-import { getArticlesByCategory, getCategoryBySlug } from '@/services/articleService';
+import { getArticlesByCategory } from '@/services/articleService';
+import {  getCategoryBySlug } from '@/services/categoryService';
+
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';

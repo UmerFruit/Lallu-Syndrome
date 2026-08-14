@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Article } from '@/types';
-import { getArticles, getCategories } from '@/services/articleService';
+import { getArticles } from '@/services/articleService';
+import { getCategories } from '@/services/categoryService';
+
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';

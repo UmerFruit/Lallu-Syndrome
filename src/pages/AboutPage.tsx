@@ -1,6 +1,6 @@
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArrowUpRight } from 'lucide-react';
-import { getCategories } from '@/services/articleService';
+import { getCategories } from '@/services/categoryService';
 
 const PORTFOLIO_URL = 'https://umerfruit.dev';
 const GITHUB_URL = 'https://github.com/UmerFruit';
@@ -9,7 +9,7 @@ const LINKEDIN_URL = 'https://linkedin.com/in/umerfarooq';
 const AUTHOR_PHOTO = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTcmwbRhukHR-WaeLkoUZIJQzBr7khQNXlmA&s';
 
 export function AboutPage() {
-  const categories = getCategories();
+  const categories = async () => getCategories();
 
   return (
     <PageContainer className="py-8 md:py-12">

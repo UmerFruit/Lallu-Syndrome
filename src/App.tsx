@@ -16,6 +16,9 @@ import { SignupPage } from '@/pages/auth/SignupPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 
+
+import { getCategories, getCategoryById, getCategoryBySlug } from '@/services/categoryService';
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
