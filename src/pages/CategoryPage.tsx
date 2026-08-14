@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Article } from '@/types';
+import type { Article, Category } from '@/types';
 import { getArticlesByCategory } from '@/services/articleService';
-import {  getCategoryBySlug } from '@/services/categoryService';
+import { getCategoryBySlug } from '@/services/categoryService';
 
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
@@ -12,16 +12,20 @@ export function CategoryPage() {
   const { category } = useParams<{ category: string }>();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cat, setCat] = useState<Category | undefined>(undefined);
 
-  const cat = category ? getCategoryBySlug(category) : undefined;
 
   useEffect(() => {
     if (!category) return;
-    setLoading(true);
-    getArticlesByCategory(category).then((a) => {
-      setArticles(a);
+    Promise.all([
+      getArticlesByCategory(category),
+      getCategoryBySlug(category),
+    ]).then(([articlesResults, categoryResult]) => {
+      setArticles(articlesResults);
+      setCat(categoryResult);
       setLoading(false);
-    });
+    }).catch(console.error);
+
   }, [category]);
 
   if (!cat) {
@@ -39,9 +43,6 @@ export function CategoryPage() {
         <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight capitalize">
           {cat.name}
         </h1>
-        <p className="mt-2 text-text-secondary max-w-xl">
-          {cat.description}
-        </p>
       </div>
 
       {loading ? (

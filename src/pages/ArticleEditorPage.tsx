@@ -179,6 +179,7 @@ export function ArticleEditorPage() {
               </Link>
             ) : (
               <button
+                type="button"
                 onClick={() => setZenMode(false)}
                 className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
               >
@@ -204,6 +205,7 @@ export function ArticleEditorPage() {
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setPreview((p) => !p)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${preview ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
                 }`}
@@ -213,6 +215,7 @@ export function ArticleEditorPage() {
             </button>
             {!zenMode && (
               <button
+                type="button"
                 onClick={() => setZenMode(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors"
               >
@@ -222,6 +225,7 @@ export function ArticleEditorPage() {
             )}
             {!zenMode && (
               <button
+                type="button"
                 onClick={() => setShowSettings((s) => !s)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
                   }`}
@@ -230,11 +234,11 @@ export function ArticleEditorPage() {
                 Settings
               </button>
             )}
-            <Button variant="secondary" size="sm" onClick={handleSaveDraft}>
+            <Button type="button" variant="secondary" size="sm" onClick={handleSaveDraft}>
               <Save size={15} />
               Save
             </Button>
-            <Button size="sm" onClick={handlePublish}>
+            <Button type="button" size="sm" onClick={handlePublish}>
               Publish
             </Button>
           </div>
@@ -247,7 +251,7 @@ export function ArticleEditorPage() {
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted">Post Settings</h3>
-              <button onClick={() => setShowSettings(false)} className="text-text-muted hover:text-text-primary">
+              <button type="button" onClick={() => setShowSettings(false)} className="text-text-muted hover:text-text-primary">
                 <X size={16} />
               </button>
             </div>
@@ -263,8 +267,9 @@ export function ArticleEditorPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Category</label>
+                <label htmlFor="category" className="block text-sm font-medium text-text-secondary mb-1.5">Category</label>
                 <select
+                  id="category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
@@ -357,6 +362,7 @@ export function ArticleEditorPage() {
                   <img src={coverImage} alt="Cover" className="w-full h-48 object-cover" />
                 </div>
                 <button
+                  type="button"
                   onClick={() => setCoverImage('')}
                   className="absolute top-2 right-2 p-1.5 rounded bg-bg/80 text-text-secondary hover:text-accent transition-colors"
                   aria-label="Remove cover"

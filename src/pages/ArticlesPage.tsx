@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
-import type { Article } from '@/types';
+import type { Article,Category } from '@/types';
 import { getArticles } from '@/services/articleService';
 import { getCategories } from '@/services/categoryService';
 
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
-import { Link } from 'react-router-dom';
 
 export function ArticlesPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const categories = getCategories();
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    getArticles().then((a) => {
-      setArticles(a);
+     Promise.all([
+      getArticles(),
+      getCategories(),
+    ]).then(([articlesResults, categoriesResults]) => {
+      setArticles(articlesResults);
+      setCategories(categoriesResults);
       setLoading(false);
     });
   }, []);
@@ -69,9 +72,10 @@ export function ArticlesPage() {
   );
 }
 
-function CategoryButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function CategoryButton({ label, active, onClick }: Readonly<{ label: string; active: boolean; onClick: () => void }>) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${
         active

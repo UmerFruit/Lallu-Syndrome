@@ -1,15 +1,20 @@
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArrowUpRight } from 'lucide-react';
 import { getCategories } from '@/services/categoryService';
-
+import { useEffect, useState } from 'react';
+import type { Category } from '@/types';
 const PORTFOLIO_URL = 'https://umerfruit.dev';
 const GITHUB_URL = 'https://github.com/UmerFruit';
 const LINKEDIN_URL = 'https://linkedin.com/in/umerfarooq';
 
-const AUTHOR_PHOTO = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTcmwbRhukHR-WaeLkoUZIJQzBr7khQNXlmA&s';
+const Avatar_Photo = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTcmwbRhukHR-WaeLkoUZIJQzBr7khQNXlmA&s';
 
 export function AboutPage() {
-  const categories = async () => getCategories();
+   const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    getCategories().then(setCategories).catch(console.error);
+  }, []);
 
   return (
     <PageContainer className="py-8 md:py-12">
@@ -31,7 +36,7 @@ export function AboutPage() {
           </h2>
           <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
             <img
-              src={AUTHOR_PHOTO}
+              src={Avatar_Photo}
               alt="Umer Farooq"
               className="w-24 h-24 rounded-card object-cover flex-shrink-0"
             />
@@ -79,7 +84,6 @@ export function AboutPage() {
             {categories.map((cat) => (
               <li key={cat.slug} className="border-b border-border-subtle pb-3">
                 <span className="font-serif text-lg text-text-primary">{cat.name}</span>
-                <span className="block text-sm text-text-muted mt-0.5">{cat.description}</span>
               </li>
             ))}
           </ul>

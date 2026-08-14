@@ -17,7 +17,6 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 
 
-import { getCategories, getCategoryById, getCategoryBySlug } from '@/services/categoryService';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -27,7 +26,7 @@ function ScrollToTop() {
   return null;
 }
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
+function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
   const { user, isLoading } = useAuth();
   if (isLoading) {
     return (
@@ -40,7 +39,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function AppLayout({ children }: { children: ReactNode }) {
+function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-screen flex flex-col bg-bg">
       <Navbar />
@@ -50,13 +49,13 @@ function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function EditorLayout({ children }: { children: ReactNode }) {
+function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-screen bg-bg">{children}</div>
   );
 }
 
-function AuthLayoutShell({ children }: { children: ReactNode }) {
+function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-screen flex flex-col bg-bg">
       <Navbar />

@@ -123,9 +123,10 @@ export function HomePage() {
   );
 }
 
-function CategoryButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function CategoryButton({ label, active, onClick }: Readonly<{ label: string; active: boolean; onClick: () => void }>) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${active
           ? 'border-accent text-accent bg-accent/5'

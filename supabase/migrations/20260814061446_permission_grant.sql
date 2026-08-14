@@ -1,0 +1,1 @@
+grant select on public.profiles to anon, authenticated;

@@ -34,7 +34,8 @@ export type Article = {
   tags: string[];
   coverImage: string;
   author: Author;
-  publishedAt: string;
+  publishedAt?: string;
+  createdAt: string;
   updatedAt?: string;
   readingTime: number;
   likes: number;
