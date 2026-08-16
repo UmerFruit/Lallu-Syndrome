@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react';
 
 const PORTFOLIO_URL = 'https://umerfruit.dev';
 const GITHUB_URL = 'https://github.com/UmerFruit';
-const LINKEDIN_URL = 'https://linkedin.com/in/umerfarooq';
+const LINKEDIN_URL = 'https://www.linkedin.com/in/umer-farooq-242130277/';
 
 export function Footer() {
   return (

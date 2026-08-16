@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { ArticleContent } from '@/components/articles/ArticleContent';
-import { upload, deleteRemovedContentImages } from '@/services/storageService'
+import { upload, deleteRemovedContentImages, deleteCoverImage } from '@/services/storageService'
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   Maximize2, Minimize2, X, Check, ImagePlus,
@@ -108,10 +108,10 @@ export function ArticleEditorPage() {
   }, [title, content, category, tags, slug, coverImage, status, triggerAutosave, loading]);
 
   const handlePublish = async () => {
-    if (!coverImage) {
-      alert('Cover image is required for published articles.');
-      return;
-    }
+    // if (!coverImage) {
+    //   alert('Cover image is required for published articles.');
+    //   return;
+    // }
 
     const previousContent = articleRef.current?.content ?? '';
     const nextContent = content;
@@ -205,6 +205,10 @@ export function ArticleEditorPage() {
 
     try {
       setSaveState('saving');
+
+      if (coverImage) {
+        await deleteCoverImage(coverImage);
+      }
 
       const result = await upload(articleId, file, 'cover');
 
@@ -368,7 +372,7 @@ export function ArticleEditorPage() {
                   onChange={(e) => setTags(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
                 <select
@@ -402,7 +406,7 @@ export function ArticleEditorPage() {
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
             {title || 'Untitled'}
           </h1>
-          
+
           <div className="flex items-center gap-3 mb-8">
             <img src={AUTHOR.avatar} alt={AUTHOR.name} className="w-9 h-9 rounded-full" />
             <span className="text-sm font-medium text-text-primary">{AUTHOR.name}</span>
@@ -416,10 +420,7 @@ export function ArticleEditorPage() {
         </div>
       ) : (
         <div className={`relative mx-auto ${zenMode ? 'max-w-3xl px-6' : 'max-w-3xl px-4 sm:px-6'} py-8`}>
-          <div className="absolute top-6 right-4 sm:right-6 hidden sm:flex items-center gap-1 rounded-lg bg-elevated p-1">
-            <span className="px-2.5 py-1 rounded-md bg-surface text-xs font-medium text-text-primary">Rich</span>
-            <span className="px-2 py-1 rounded-md text-xs font-mono text-text-muted">MD</span>
-          </div>
+
 
           <div className="flex items-center gap-4 mb-5">
             <label className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
@@ -427,13 +428,6 @@ export function ArticleEditorPage() {
               Cover
               <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
             </label>
-            <button
-              type="button"
-              onClick={() => setContent((prev) => prev + '\n\n## ')}
-              className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary transition-colors"
-            >
-              Subheading
-            </button>
           </div>
 
           {coverImage && (
@@ -443,7 +437,18 @@ export function ArticleEditorPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setCoverImage('')}
+                onClick={async () => {
+                  try {
+                    if (coverImage) {
+                      await deleteCoverImage(coverImage);
+                    }
+
+                    setCoverImage('');
+                  } catch (error) {
+                    console.error('Failed to remove cover image:', error);
+                    alert('Failed to remove cover image. Please try again.');
+                  }
+                }}
                 className="absolute top-2 right-2 p-1.5 rounded bg-bg/80 text-text-secondary hover:text-accent transition-colors"
                 aria-label="Remove cover"
               >

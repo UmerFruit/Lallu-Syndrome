@@ -92,6 +92,8 @@ export function TiptapEditor({
       Markdown.configure({
         html: false,
         transformCopiedText: true,
+        transformPastedText: true,
+
       }),
       SlashCommand.configure({
         onImageUpload: openImagePicker,

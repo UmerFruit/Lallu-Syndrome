@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react';
 import type { Category } from '@/types';
 const PORTFOLIO_URL = 'https://umerfruit.dev';
 const GITHUB_URL = 'https://github.com/UmerFruit';
-const LINKEDIN_URL = 'https://linkedin.com/in/umerfarooq';
+const LINKEDIN_URL = 'https://www.linkedin.com/in/umer-farooq-242130277/';
 
-const Avatar_Photo = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTcmwbRhukHR-WaeLkoUZIJQzBr7khQNXlmA&s';
+const Avatar_Photo = 'https://pvbcyuflhlucnmcnlgfh.supabase.co/storage/v1/object/public/media/profile.png';
 
 export function AboutPage() {
    const [categories, setCategories] = useState<Category[]>([]);

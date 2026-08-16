@@ -5,8 +5,6 @@ import { useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-const PORTFOLIO_URL = 'https://umerfruit.dev';
-
 const navLinks = [
   { label: 'Articles', to: '/articles' },
   { label: 'About', to: '/about' },
@@ -48,16 +46,7 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
-          <a
-            href={PORTFOLIO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors duration-200 inline-flex items-center gap-0.5"
-          >
-            Portfolio
-            <ArrowUpRight size={14} />
-          </a>
-
+         
           {user ? (
             <>
               <Link
@@ -127,16 +116,6 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <a
-              href={PORTFOLIO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
-              onClick={() => setMobileOpen(false)}
-            >
-              Portfolio
-              <ArrowUpRight size={16} />
-            </a>
             {user ? (
               <>
                 <Link

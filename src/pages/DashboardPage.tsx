@@ -129,9 +129,10 @@ export function DashboardPage() {
   );
 }
 
-function TabButton({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+function TabButton({ label, count, active, onClick }: Readonly<{ label: string; count: number; active: boolean; onClick: () => void }>) {
   return (
     <button
+      type='button'
       onClick={onClick}
       className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${
         active

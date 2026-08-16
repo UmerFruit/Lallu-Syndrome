@@ -119,7 +119,7 @@ export function ArticlePage() {
         <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
           <img
             src={article.coverImage}
-            alt={article.title}
+            alt=""
             className="w-full h-auto"
           />
         </div>
