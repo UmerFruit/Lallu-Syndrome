@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams} from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import type { Article, ArticleStatus, Category } from '@/types';
 import { getArticleById, createArticle, updateArticle, calculateReadingTime, generateSlug } from '@/services/articleService';
@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { ArticleContent } from '@/components/articles/ArticleContent';
-import { upload } from '@/services/storageService'
+import { upload, deleteRemovedContentImages } from '@/services/storageService'
 import {
-  ArrowLeft, Save, Eye, Settings as SettingsIcon,
+  ArrowLeft, Eye, Settings as SettingsIcon,
   Maximize2, Minimize2, X, Check, ImagePlus,
 } from 'lucide-react';
 
@@ -95,7 +95,10 @@ export function ArticleEditorPage() {
         }
       } else if (id) {
         const updated = await updateArticle(id, buildArticleData());
-        if (updated) articleRef.current = updated;
+
+        if (updated) {
+          articleRef.current = updated;
+        }
       }
       setSaveState('saved');
       setSavedTime(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
@@ -112,25 +115,81 @@ export function ArticleEditorPage() {
       alert('Cover image is required for published articles.');
       return;
     }
-    setStatus('published');
-    const data = { ...buildArticleData(), status: 'published' as ArticleStatus };
+
+    const previousContent = articleRef.current?.content ?? '';
+    const nextContent = content;
+
+    const data = {
+      ...buildArticleData(),
+      status: 'published' as ArticleStatus,
+    };
+
     if (isNew) {
       const created = await createArticle(data);
-      navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
-    } else if (id) {
-      await updateArticle(id, data);
+      articleRef.current = created;
+      navigate('/dashboard');
+      return;
     }
-    navigate('/dashboard');
+
+    if (id) {
+      const updated = await updateArticle(id, data);
+
+      if (updated) {
+        articleRef.current = updated;
+
+        try {
+          await deleteRemovedContentImages(previousContent, nextContent);
+        } catch (error) {
+          console.error('Failed to delete removed images:', error);
+        }
+      }
+
+      navigate('/dashboard');
+    }
   };
 
-  const handleSaveDraft = async () => {
-    if (isNew) {
-      const created = await createArticle(buildArticleData());
-      navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
-    } else if (id) {
-      await updateArticle(id, buildArticleData());
+  const handleSaveAndExit = async () => {
+    const previousContent = articleRef.current?.content ?? '';
+    const nextContent = content;
+    const data = buildArticleData();
+
+    try {
+      setSaveState('saving');
+
+      if (isNew) {
+        const created = await createArticle(data);
+        articleRef.current = created;
+
+        navigate('/dashboard');
+        return;
+      }
+
+      if (id) {
+        const updated = await updateArticle(id, data);
+
+        if (updated) {
+          articleRef.current = updated;
+
+          try {
+            await deleteRemovedContentImages(
+              previousContent,
+              nextContent
+            );
+          } catch (error) {
+            console.error(
+              'Failed to delete removed images:',
+              error
+            );
+          }
+        }
+
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Failed to save article:', error);
+      setSaveState('idle');
+      alert('Failed to save the article. Please try again.');
     }
-    navigate('/dashboard');
   };
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,13 +246,15 @@ export function ArticleEditorPage() {
         <div className="flex items-center justify-between h-14 px-4 sm:px-6">
           <div className="flex items-center gap-4">
             {!zenMode ? (
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+              <button
+                type="button"
+                onClick={handleSaveAndExit}
+                disabled={saveState === 'saving'}
+                className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
               >
                 <ArrowLeft size={16} />
-                Articles
-              </Link>
+                Save & Exit
+              </button>
             ) : (
               <button
                 type="button"
@@ -251,10 +312,6 @@ export function ArticleEditorPage() {
                 Settings
               </button>
             )}
-            <Button type="button" variant="secondary" size="sm" onClick={handleSaveDraft}>
-              <Save size={15} />
-              Save
-            </Button>
             <Button type="button" size="sm" onClick={handlePublish}>
               Publish
             </Button>
@@ -336,7 +393,7 @@ export function ArticleEditorPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor='reading-time'  className="block text-sm font-medium text-text-secondary mb-1.5">Reading time (auto)</label>
+                <label htmlFor='reading-time' className="block text-sm font-medium text-text-secondary mb-1.5">Reading time (auto)</label>
                 <div id='reading-time' className="px-3.5 py-2.5 rounded bg-elevated border border-border-subtle text-sm text-text-muted font-mono">
                   {readingTime} min
                 </div>

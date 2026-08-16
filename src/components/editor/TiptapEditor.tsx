@@ -35,6 +35,7 @@ export function TiptapEditor({
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        link: false,
       }),
       Placeholder.configure({
         placeholder: "Type '/' for commands...",

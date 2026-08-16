@@ -44,3 +44,44 @@ export function getPublicUrl(path: string): string {
         .getPublicUrl(path)
     return data["publicUrl"]
 }
+export function extractStorageImagePaths(content: string): string[] {
+    const publicUrlPrefix =
+        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+
+    const imageUrlRegex = /!\[[^\]]*]\(([^)]+)\)/g;
+
+    const paths: string[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = imageUrlRegex.exec(content)) !== null) {
+        const url = match[1];
+
+        if (url.startsWith(publicUrlPrefix)) {
+            paths.push(url.slice(publicUrlPrefix.length));
+        }
+    }
+
+    return [...new Set(paths)];
+}
+
+export async function deleteRemovedContentImages(
+    previousContent: string,
+    nextContent: string
+): Promise<void> {
+    const previousPaths = extractStorageImagePaths(previousContent);
+    const nextPaths = new Set(extractStorageImagePaths(nextContent));
+
+    const removedPaths = previousPaths.filter(
+        (path) => !nextPaths.has(path)
+    );
+
+    if (removedPaths.length === 0) return;
+
+    const { error } = await supabase.storage
+        .from(BUCKET)
+        .remove(removedPaths);
+
+    if (error) {
+        throw error;
+    }
+}
