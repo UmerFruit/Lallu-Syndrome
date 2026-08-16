@@ -9,7 +9,7 @@ type ArticleContentProps = {
 export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
   const html = useMemo(() => {
     const md = new MarkdownIt({
-      html: true,
+      html: false,
       linkify: true,
       typographer: true,
       highlight(str: string, lang: string): string {
