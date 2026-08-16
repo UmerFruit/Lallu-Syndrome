@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import MDEditor from '@uiw/react-md-editor';
+import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import type { Article, ArticleStatus, Category } from '@/types';
 import { getArticleById, createArticle, updateArticle, calculateReadingTime, generateSlug } from '@/services/articleService';
 import { getCategories } from '@/services/categoryService';
-import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -12,7 +11,7 @@ import { ArticleContent } from '@/components/articles/ArticleContent';
 import { upload } from '@/services/storageService'
 import {
   ArrowLeft, Save, Eye, Settings as SettingsIcon,
-  Maximize2, Minimize2, X, Check, ImagePlus, Upload,
+  Maximize2, Minimize2, X, Check, ImagePlus,
 } from 'lucide-react';
 
 const AUTHOR = { name: 'Umer Farooq', avatar: 'https://images.unsplash.com/photo-1500648767731-5ca545ace573?w=200&h=200&fit=crop&crop=faces&q=80' };
@@ -22,7 +21,6 @@ type SaveState = 'idle' | 'saving' | 'saved';
 export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { theme } = useTheme();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
 
@@ -162,35 +160,16 @@ export function ArticleEditorPage() {
       setSaveState('idle');
     }
   };
-
-  const handleImageInsert = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    e.target.value = '';
-
+  const uploadContentImage = async (file: File): Promise<string> => {
     const articleId = articleRef.current?.id ?? id;
 
     if (!articleId || articleId === 'new') {
-      alert('Save the article before inserting an image.');
-      return;
+      throw new Error('Save the article before inserting an image.');
     }
 
-    try {
-      setSaveState('saving');
+    const result = await upload(articleId, file, 'content');
 
-      const result = await upload(articleId, file, 'content');
-
-      const imgMarkdown = `\n\n![${file.name}](${result.publicUrl})\n\n`;
-
-      setContent((prev) => prev + imgMarkdown);
-    } catch (error) {
-      console.error('Failed to upload image:', error);
-      alert('Failed to upload image. Please try again.');
-    } finally {
-      setSaveState('idle');
-    }
+    return result.publicUrl;
   };
 
   if (loading) {
@@ -345,8 +324,9 @@ export function ArticleEditorPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
+                <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
                 <select
+                  id="status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as ArticleStatus)}
                   className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
@@ -356,8 +336,8 @@ export function ArticleEditorPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Reading time (auto)</label>
-                <div className="px-3.5 py-2.5 rounded bg-elevated border border-border-subtle text-sm text-text-muted font-mono">
+                <label htmlFor='reading-time'  className="block text-sm font-medium text-text-secondary mb-1.5">Reading time (auto)</label>
+                <div id='reading-time' className="px-3.5 py-2.5 rounded bg-elevated border border-border-subtle text-sm text-text-muted font-mono">
                   {readingTime} min
                 </div>
               </div>
@@ -391,31 +371,42 @@ export function ArticleEditorPage() {
           <ArticleContent content={content || 'Nothing written yet.'} />
         </div>
       ) : (
-        <div className={`mx-auto ${zenMode ? 'max-w-3xl px-6' : 'max-w-3xl px-4 sm:px-6'} py-8`}>
-          {/* Cover Image */}
-          <div className="mb-6">
-            {coverImage ? (
-              <div className="relative group">
-                <div className="overflow-hidden rounded-card border border-border-subtle">
-                  <img src={coverImage} alt="Cover" className="w-full h-48 object-cover" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCoverImage('')}
-                  className="absolute top-2 right-2 p-1.5 rounded bg-bg/80 text-text-secondary hover:text-accent transition-colors"
-                  aria-label="Remove cover"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center h-32 rounded-card border border-dashed border-border cursor-pointer hover:border-text-muted transition-colors">
-                <ImagePlus size={24} className="text-text-muted mb-2" />
-                <span className="text-sm text-text-muted">Add cover image</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-              </label>
-            )}
+        <div className={`relative mx-auto ${zenMode ? 'max-w-3xl px-6' : 'max-w-3xl px-4 sm:px-6'} py-8`}>
+          <div className="absolute top-6 right-4 sm:right-6 hidden sm:flex items-center gap-1 rounded-lg bg-elevated p-1">
+            <span className="px-2.5 py-1 rounded-md bg-surface text-xs font-medium text-text-primary">Rich</span>
+            <span className="px-2 py-1 rounded-md text-xs font-mono text-text-muted">MD</span>
           </div>
+
+          <div className="flex items-center gap-4 mb-5">
+            <label className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
+              <ImagePlus size={15} />
+              Cover
+              <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+            </label>
+            <button
+              type="button"
+              onClick={() => setContent((prev) => prev + '\n\n## ')}
+              className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary transition-colors"
+            >
+              Subheading
+            </button>
+          </div>
+
+          {coverImage && (
+            <div className="relative group mb-6">
+              <div className="overflow-hidden rounded-card border border-border-subtle">
+                <img src={coverImage} alt="Cover" className="w-full h-48 object-cover" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setCoverImage('')}
+                className="absolute top-2 right-2 p-1.5 rounded bg-bg/80 text-text-secondary hover:text-accent transition-colors"
+                aria-label="Remove cover"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
 
           {/* Title */}
           <input
@@ -423,8 +414,7 @@ export function ArticleEditorPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Article title"
-            className="w-full bg-transparent font-serif text-3xl md:text-4xl font-medium text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3"
-            aria-label="Article title"
+            className="w-full bg-transparent font-serif text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3" aria-label="Article title"
           />
 
           {/* Excerpt */}
@@ -449,23 +439,10 @@ export function ArticleEditorPage() {
               ))}
             </select>
             <span className="font-mono text-xs text-text-muted">{readingTime} min read</span>
-            <label className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
-              <Upload size={13} />
-              Insert image
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageInsert} />
-            </label>
           </div>
 
-          {/* Markdown Editor */}
-          <div data-color-mode={theme}>
-            <MDEditor
-              value={content}
-              onChange={(val) => setContent(val ?? '')}
-              height={zenMode ? 600 : 400}
-              preview="edit"
-              hideToolbar={false}
-            />
-          </div>
+          {/* Editor */}
+          <TiptapEditor value={content} onChange={setContent} onImageUpload={uploadContentImage} />
         </div>
       )}
     </div>

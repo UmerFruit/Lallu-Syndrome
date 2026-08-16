@@ -63,13 +63,16 @@
     width: 8px;
     height: 8px;
   }
+
   ::-webkit-scrollbar-track {
     background: var(--color-bg);
   }
+
   ::-webkit-scrollbar-thumb {
     background: var(--color-border);
     border-radius: 4px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-text-muted);
   }
@@ -79,72 +82,126 @@
   .article-prose {
     @apply text-text-secondary leading-[1.75] text-[1.0625rem];
   }
+
   .article-prose h1 {
     @apply font-serif text-3xl md:text-4xl font-medium text-text-primary mt-12 mb-4 leading-[1.2] tracking-tight;
   }
+
   .article-prose h2 {
     @apply font-serif text-2xl md:text-3xl font-medium text-text-primary mt-10 mb-3 leading-[1.25] tracking-tight;
   }
+
   .article-prose h3 {
     @apply font-serif text-xl md:text-2xl font-medium text-text-primary mt-8 mb-2 leading-[1.3] tracking-tight;
   }
+
   .article-prose p {
     @apply my-5;
   }
+
   .article-prose a {
     @apply text-text-primary underline decoration-accent decoration-2 underline-offset-2 hover:text-accent transition-colors duration-200;
   }
+
   .article-prose strong {
     @apply font-semibold text-text-primary;
   }
+
   .article-prose em {
     @apply italic;
   }
+
   .article-prose del {
     @apply text-text-muted;
   }
+
   .article-prose ul {
     @apply my-5 pl-6 list-disc space-y-2;
   }
+
   .article-prose ol {
     @apply my-5 pl-6 list-decimal space-y-2;
   }
+
   .article-prose li {
     @apply text-text-secondary;
   }
+
   .article-prose blockquote {
     @apply my-6 pl-5 border-l-2 border-accent text-text-primary italic font-serif text-lg leading-relaxed;
   }
+
   .article-prose code {
     @apply font-mono text-[0.875em] px-1.5 py-0.5 rounded bg-elevated text-text-primary;
   }
+
   .article-prose pre {
     @apply my-6 rounded-card overflow-hidden;
   }
+
   .article-prose pre code {
     @apply bg-transparent p-0 text-sm;
   }
+
   .article-prose img {
-    @apply rounded-card my-6 w-full;
+    @apply block rounded-card my-6 max-w-full h-auto;
   }
+
   .article-prose table {
     @apply my-6 w-full border-collapse text-sm;
   }
+
   .article-prose th {
     @apply text-left font-semibold text-text-primary border border-border px-4 py-2.5 bg-surface;
   }
+
   .article-prose td {
     @apply text-text-secondary border border-border px-4 py-2.5;
   }
+
   .article-prose hr {
     @apply my-10 border-border;
   }
+
+  .tiptap-code-block {
+    @apply my-6 overflow-hidden rounded-card border border-border bg-elevated;
+  }
+
+  .tiptap-code-block__header {
+    @apply flex items-center justify-between border-b border-border bg-surface px-3 py-2;
+  }
+
+  .tiptap-code-block__language {
+    @apply bg-transparent text-xs font-mono text-text-secondary outline-none;
+  }
+
+  .tiptap-code-block__actions {
+    @apply flex items-center gap-1;
+  }
+
+  .tiptap-code-block__action {
+    @apply inline-flex items-center justify-center rounded p-1.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
+  }
+
+  .tiptap-code-block__action--danger {
+    @apply hover:text-accent;
+  }
+
+  .tiptap-code-block__content {
+    @apply overflow-x-auto p-4 font-mono text-sm leading-relaxed text-text-primary;
+  }
+
+  .tiptap-code-block__content .ProseMirror {
+    @apply m-0 min-h-0 bg-transparent p-0 outline-none font-mono text-sm text-text-primary;
+  }
+  
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
   .text-pretty {
     text-wrap: pretty;
   }
@@ -155,29 +212,55 @@
   background: var(--color-surface);
   color: var(--color-text-secondary);
 }
-.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-link {
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-link {
   color: #c678dd;
 }
-.hljs-function .hljs-title, .hljs-title.class_, .hljs-title.function_ {
+
+.hljs-function .hljs-title,
+.hljs-title.class_,
+.hljs-title.function_ {
   color: #61afef;
 }
-.hljs-string, .hljs-attr, .hljs-symbol, .hljs-bullet, .hljs-addition {
+
+.hljs-string,
+.hljs-attr,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
   color: #98c379;
 }
-.hljs-comment, .hljs-quote {
+
+.hljs-comment,
+.hljs-quote {
   color: #7f7f7f;
   font-style: italic;
 }
-.hljs-number, .hljs-meta, .hljs-type {
+
+.hljs-number,
+.hljs-meta,
+.hljs-type {
   color: #d19a66;
 }
-.hljs-built_in, .hljs-builtin-name, .hljs-literal {
+
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal {
   color: #56b6c2;
 }
+
 .hljs-params {
   color: var(--color-text-secondary);
 }
-.hljs-variable, .hljs-template-variable, .hljs-name, .hljs-regexp {
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-name,
+.hljs-regexp {
   color: #e06c75;
 }
 
@@ -185,51 +268,31 @@
 .light .hljs {
   background: #f6f6f4;
 }
-.light .hljs-comment, .light .hljs-quote {
+
+.light .hljs-comment,
+.light .hljs-quote {
   color: #999;
 }
 
-/* Markdown editor overrides */
-.w-md-editor {
-  background-color: var(--color-surface) !important;
-  color: var(--color-text-primary) !important;
-  border-color: var(--color-border) !important;
+/* Tiptap — borderless, page-flush */
+.ProseMirror {
+  outline: none;
 }
-.w-md-editor-text {
-  background-color: var(--color-surface) !important;
-  color: var(--color-text-primary) !important;
-}
-.w-md-editor-text-pre {
-  background-color: var(--color-surface) !important;
-  color: var(--color-text-primary) !important;
-}
-.w-md-editor-text-input {
-  background-color: var(--color-surface) !important;
-  color: var(--color-text-primary) !important;
-}
-.w-md-editor-toolbar {
-  background-color: var(--color-elevated) !important;
-  border-color: var(--color-border) !important;
-}
-.w-md-editor-toolbar li button {
-  color: var(--color-text-secondary) !important;
-}
-.w-md-editor-toolbar li button:hover {
-  color: var(--color-accent) !important;
-}
-.w-md-editor-content {
-  background-color: var(--color-surface) !important;
-}
-.w-md-editor-preview {
-  background-color: var(--color-surface) !important;
-}
-.w-md-editor-preview .article-prose {
-  font-size: 1rem;
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-text-muted);
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
