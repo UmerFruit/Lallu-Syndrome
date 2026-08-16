@@ -39,10 +39,6 @@ export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
           </Link>
         </h2>
 
-        <p className="text-text-secondary leading-relaxed text-pretty">
-          {article.excerpt}
-        </p>
-
         <div className="flex items-center gap-3 pt-2">
           <Link
             to={`/articles/${article.slug}`}

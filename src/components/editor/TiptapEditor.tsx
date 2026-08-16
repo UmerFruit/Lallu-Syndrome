@@ -1,4 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react';
+import { useRef } from 'react';
+import type { Editor } from '@tiptap/core';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -31,6 +33,49 @@ export function TiptapEditor({
   onChange,
   onImageUpload
 }: Readonly<TiptapEditorProps>) {
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const openImagePicker = (targetEditor: Editor) => {
+    fileInputRef.current?.click();
+
+    const handleFileChange = async () => {
+      const file = fileInputRef.current?.files?.[0];
+
+      if (!file) return;
+
+      try {
+        const url = await onImageUpload(file);
+
+        targetEditor
+          .chain()
+          .focus()
+          .setImage({
+            src: url,
+            alt: file.name,
+          })
+          .run();
+      } catch (error) {
+        console.error('Failed to upload image:', error);
+        alert('Failed to upload image. Please try again.');
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+
+        fileInputRef.current?.removeEventListener(
+          'change',
+          handleFileChange
+        );
+      }
+    };
+
+    fileInputRef.current?.addEventListener(
+      'change',
+      handleFileChange,
+      { once: true }
+    );
+  };
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -48,9 +93,12 @@ export function TiptapEditor({
         html: false,
         transformCopiedText: true,
       }),
-      SlashCommand,
+      SlashCommand.configure({
+        onImageUpload: openImagePicker,
+      }),
       CodeBlock,
     ],
+
 
     content: value,
 
@@ -153,6 +201,7 @@ export function TiptapEditor({
     },
   });
 
+
   const setLink = () => {
     if (!editor) return;
 
@@ -181,6 +230,12 @@ export function TiptapEditor({
 
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+      />
       <BubbleMenu
         editor={editor}
         className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"

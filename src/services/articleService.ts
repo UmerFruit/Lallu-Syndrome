@@ -10,13 +10,6 @@ type ArticleRow = Database['public']['Tables']['articles']['Row'];
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
-
-function createExcerpt(content: string): string {
-return content.length > 150
-  ? `${content.substring(0, 150)}...`
-  : content;
-}
-
 function mapSupabaseArticle(
 article: ArticleRow,
 category: Category,
@@ -27,7 +20,6 @@ return {
   id: article.id,
   slug: article.slug,
   title: article.title,
-  excerpt: createExcerpt(article.content),
   content: article.content,
   category: category.slug,
   tags,

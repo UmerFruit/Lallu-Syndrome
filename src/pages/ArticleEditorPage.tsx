@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate, useParams} from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import type { Article, ArticleStatus, Category } from '@/types';
 import { getArticleById, createArticle, updateArticle, calculateReadingTime, generateSlug } from '@/services/articleService';
@@ -25,7 +25,6 @@ export function ArticleEditorPage() {
   const isNew = !id || id === 'new';
 
   const [title, setTitle] = useState('');
-  const [excerpt, setExcerpt] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('development');
   const [tags, setTags] = useState('');
@@ -53,7 +52,6 @@ export function ArticleEditorPage() {
         if (a) {
           articleRef.current = a;
           setTitle(a.title);
-          setExcerpt(a.excerpt);
           setContent(a.content);
           setCategory(a.category);
           setTags(a.tags.join(', '));
@@ -71,7 +69,6 @@ export function ArticleEditorPage() {
   const buildArticleData = useCallback((): Partial<Article> => {
     return {
       title: title || 'Untitled',
-      excerpt,
       content,
       category,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
@@ -81,7 +78,7 @@ export function ArticleEditorPage() {
       author: AUTHOR,
       readingTime,
     };
-  }, [title, excerpt, content, category, tags, slug, coverImage, status, readingTime]);
+  }, [title, content, category, tags, slug, coverImage, status, readingTime]);
 
   const triggerAutosave = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -108,7 +105,7 @@ export function ArticleEditorPage() {
   useEffect(() => {
     if (loading) return;
     triggerAutosave();
-  }, [title, excerpt, content, category, tags, slug, coverImage, status, triggerAutosave, loading]);
+  }, [title, content, category, tags, slug, coverImage, status, triggerAutosave, loading]);
 
   const handlePublish = async () => {
     if (!coverImage) {
@@ -371,15 +368,7 @@ export function ArticleEditorPage() {
                   onChange={(e) => setTags(e.target.value)}
                 />
               </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Excerpt"
-                  name="excerpt"
-                  placeholder="Short description for cards and SEO"
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                />
-              </div>
+              
               <div>
                 <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
                 <select
@@ -413,9 +402,7 @@ export function ArticleEditorPage() {
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
             {title || 'Untitled'}
           </h1>
-          <p className="text-lg text-text-secondary leading-relaxed mb-6">
-            {excerpt || 'No excerpt yet.'}
-          </p>
+          
           <div className="flex items-center gap-3 mb-8">
             <img src={AUTHOR.avatar} alt={AUTHOR.name} className="w-9 h-9 rounded-full" />
             <span className="text-sm font-medium text-text-primary">{AUTHOR.name}</span>
@@ -472,16 +459,6 @@ export function ArticleEditorPage() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Article title"
             className="w-full bg-transparent font-serif text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3" aria-label="Article title"
-          />
-
-          {/* Excerpt */}
-          <input
-            type="text"
-            value={excerpt}
-            onChange={(e) => setExcerpt(e.target.value)}
-            placeholder="Short description..."
-            className="w-full bg-transparent text-lg text-text-secondary placeholder:text-text-muted focus:outline-none mb-4"
-            aria-label="Short description"
           />
 
           {/* Category + Reading Time */}

@@ -50,7 +50,6 @@ export type Article = {
   id: string;
   slug: string;
   title: string;
-  excerpt: string;
   content: string;
   category: string;
   tags: string[];

@@ -93,10 +93,6 @@ export function ArticlePage() {
             {article.title}
           </h1>
 
-          <p className="text-lg text-text-secondary leading-relaxed text-pretty mb-6">
-            {article.excerpt}
-          </p>
-
           <div className="flex items-center gap-3">
             {article.author.avatar ? (
               <img

@@ -33,10 +33,6 @@ export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
         {article.title}
       </h3>
 
-      <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">
-        {article.excerpt}
-      </p>
-
       <time className="block font-mono text-xs text-text-muted">
         {article.publishedAt && formatDate(article.publishedAt)}
       </time>

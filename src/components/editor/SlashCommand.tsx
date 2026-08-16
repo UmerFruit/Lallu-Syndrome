@@ -1,22 +1,28 @@
 import { Extension } from '@tiptap/core';
+import type { Editor } from '@tiptap/core';
 import Suggestion, {
     type SuggestionOptions,
 } from '@tiptap/suggestion';
-import type { Editor } from '@tiptap/core';
 import { ReactRenderer } from '@tiptap/react';
 import tippy from 'tippy.js';
 import type { Instance as TippyInstance } from 'tippy.js';
-
-const getReferenceClientRect = (clientRect: (() => DOMRect | null) | null) => {
-  return () =>
-    clientRect?.() ??
-    new DOMRect(0, 0, 0, 0);
-};
 
 import {
     SlashCommandMenu,
     type SlashCommandMenuRef,
 } from './SlashCommandMenu';
+
+const getReferenceClientRect = (
+    clientRect: (() => DOMRect | null) | null
+) => {
+    return () =>
+        clientRect?.() ??
+        new DOMRect(0, 0, 0, 0);
+};
+
+type SlashCommandOptions = {
+    onImageUpload?: (editor: Editor) => void;
+};
 
 type CommandProps = {
     editor: Editor;
@@ -35,8 +41,10 @@ export type SlashCommandItem = {
 
 const getItems = ({
     query,
+    onImageUpload,
 }: {
     query: string;
+    onImageUpload?: (editor: Editor) => void;
 }): SlashCommandItem[] => {
     const items: SlashCommandItem[] = [
         {
@@ -89,6 +97,20 @@ const getItems = ({
                     .deleteRange(range)
                     .setHeading({ level: 3 })
                     .run();
+            },
+        },
+        {
+            title: 'Image',
+            description: 'Upload and insert an image',
+            keywords: ['image', 'picture', 'photo', 'upload', 'media'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .run();
+
+                onImageUpload?.(editor);
             },
         },
         {
@@ -171,16 +193,28 @@ const getItems = ({
     });
 };
 
-export const SlashCommand = Extension.create({
+export const SlashCommand = Extension.create<SlashCommandOptions>({
     name: 'slashCommand',
 
     addOptions() {
         return {
-            suggestion: {
+            onImageUpload: undefined,
+        };
+    },
+
+    addProseMirrorPlugins() {
+        return [
+            Suggestion<SlashCommandItem>({
+                editor: this.editor,
+
                 char: '/',
                 startOfLine: false,
 
-                items: getItems,
+                items: ({ query }) =>
+                    getItems({
+                        query,
+                        onImageUpload: this.options.onImageUpload,
+                    }),
 
                 command: ({
                     editor,
@@ -198,20 +232,28 @@ export const SlashCommand = Extension.create({
                 },
 
                 render: () => {
-                    let component: ReactRenderer<SlashCommandMenuRef> | null = null;
+                    let component: ReactRenderer<SlashCommandMenuRef> | null =
+                        null;
+
                     let popup: TippyInstance | null = null;
 
                     return {
                         onStart: (props) => {
-                            component = new ReactRenderer(SlashCommandMenu, {
-                                props,
-                                editor: props.editor,
-                            });
+                            component = new ReactRenderer(
+                                SlashCommandMenu,
+                                {
+                                    props,
+                                    editor: props.editor,
+                                }
+                            );
 
                             if (!props.clientRect) return;
 
                             popup = tippy(document.body, {
-                                getReferenceClientRect: getReferenceClientRect(props.clientRect),
+                                getReferenceClientRect:
+                                    getReferenceClientRect(
+                                        props.clientRect
+                                    ),
                                 appendTo: () => document.body,
                                 content: component.element,
                                 showOnCreate: true,
@@ -227,7 +269,10 @@ export const SlashCommand = Extension.create({
                             if (!props.clientRect) return;
 
                             popup?.setProps({
-                                getReferenceClientRect: getReferenceClientRect(props.clientRect),
+                                getReferenceClientRect:
+                                    getReferenceClientRect(
+                                        props.clientRect
+                                    ),
                             });
                         },
 
@@ -237,28 +282,21 @@ export const SlashCommand = Extension.create({
                                 return true;
                             }
 
-                            return component?.ref?.onKeyDown(props) ?? false;
+                            return (
+                                component?.ref?.onKeyDown(props) ?? false
+                            );
                         },
 
                         onExit: () => {
                             popup?.destroy();
                             component?.destroy();
+
                             popup = null;
                             component = null;
                         },
                     };
                 },
-
-            } satisfies Partial<SuggestionOptions<SlashCommandItem>>,
-        };
-    },
-
-    addProseMirrorPlugins() {
-        return [
-            Suggestion<SlashCommandItem>({
-                editor: this.editor,
-                ...this.options.suggestion,
-            }),
+            } satisfies Partial<SuggestionOptions<SlashCommandItem>>),
         ];
     },
 });
