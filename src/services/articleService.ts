@@ -1,107 +1,71 @@
-import type { Article, Comment, Category, ArticleInput } from '@/types';
+import type { Article, Comment, ArticleInput } from '@/types';
 import type { Database } from '@/types/database';
 import { supabase } from '@/lib/supabase';
-import {
-  getCategoryBySlug,
-  getCategoryById,
-} from '@/services/categoryService';
+import { getCategoryBySlug } from '@/services/categoryService';
 import { deleteArticleMedia } from './storageService';
+import type { QueryData } from '@supabase/supabase-js';
 
-type ArticleRow = Database['public']['Tables']['articles']['Row'];
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
-function mapSupabaseArticle(
-  article: ArticleRow,
-  category: Category,
-  profile: ProfileRow,
-  tags: string[]
-): Article {
+const ARTICLE_SELECT = `
+  *,
+  categories (slug),
+  profiles!articles_author_id_fkey (
+    display_name,
+    avatar_url,
+    bio
+  ),
+  article_tags (
+    tags (
+      name
+    )
+  ),
+  article_likes (
+    count
+  )
+`;
+
+const articleQuery = supabase
+  .from('articles')
+  .select(ARTICLE_SELECT);
+
+type ArticleWithRelations = QueryData<typeof articleQuery>[number];
+
+function mapSupabaseArticle(article: ArticleWithRelations): Article {
+  if (!article.categories) {
+    throw new Error(`Category not found for article ${article.id}`);
+  }
+
+  if (!article.profiles) {
+    throw new Error(`Profile not found for article ${article.id}`);
+  }
+
+  const tags = article.article_tags
+    .map((articleTag) => articleTag.tags?.name)
+    .filter((name): name is string => Boolean(name));
+
+  const likes = article.article_likes?.[0]?.count ?? 0;
+
   return {
     id: article.id,
     slug: article.slug,
     title: article.title,
     content: article.content,
-    category: category.slug,
+    category: article.categories.slug,
     tags,
     coverImage: article.cover_image ?? '',
     author: {
-      name: profile.display_name,
-      avatar: profile.avatar_url ?? undefined,
-      bio: profile.bio ?? undefined,
+      name: article.profiles.display_name,
+      avatar: article.profiles.avatar_url ?? undefined,
+      bio: article.profiles.bio ?? undefined,
     },
     publishedAt: article.published_at ?? undefined,
     createdAt: article.created_at,
     updatedAt: article.updated_at ?? undefined,
     readingTime: article.reading_time ?? 0,
-    likes: 0,
-    status: article.status,
-  };
-}
-
-async function getArticleTags(articleId: string): Promise<string[]> {
-  const { data: articleTags, error: articleTagsError } = await supabase
-    .from('article_tags')
-    .select('tag_id')
-    .eq('article_id', articleId);
-
-  if (articleTagsError) throw articleTagsError;
-
-  const tagIds = articleTags.map((tag) => tag.tag_id);
-
-  if (tagIds.length === 0) return [];
-
-  const { data: tags, error: tagsError } = await supabase
-    .from('tags')
-    .select('name')
-    .in('id', tagIds);
-
-  if (tagsError) throw tagsError;
-
-  return tags.map((tag) => tag.name);
-}
-
-async function hydrateArticles(
-  articles: ArticleRow[]
-): Promise<Article[]> {
-  return Promise.all(articles.map(hydrateArticle));
-}
-
-async function hydrateArticle(article: ArticleRow): Promise<Article> {
-  const [category, profileResult, tags, likes] = await Promise.all([
-    getCategoryById(article.category_id),
-    supabase
-      .from('profiles')
-      .select('display_name, avatar_url, bio')
-      .eq('id', article.author_id)
-      .single(),
-    getArticleTags(article.id),
-    getArticleLikeCount(article.id),
-
-  ]);
-
-  const { data: profile, error: profileError } = profileResult;
-
-  if (profileError) throw profileError;
-
-  if (!category) {
-    throw new Error(`Category not found for article ${article.id}`);
-  }
-
-  if (!profile) {
-    throw new Error(`Profile not found for author ${article.author_id}`);
-  }
-
-  const mappedArticle = mapSupabaseArticle(
-    article,
-    category,
-    profile as ProfileRow,
-    tags
-  );
-
-  return {
-    ...mappedArticle,
     likes,
+    status: article.status,
   };
 }
 
@@ -154,30 +118,30 @@ export function generateSlug(title: string): string {
 export async function getArticles(): Promise<Article[]> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('status', 'published')
     .order('published_at', { ascending: false });
 
   if (error) throw error;
 
-  return hydrateArticles(data);
+  return data.map(mapSupabaseArticle);
 }
 
 export async function getAllArticles(): Promise<Article[]> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  return hydrateArticles(data);
+  return data.map(mapSupabaseArticle);
 }
 
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('slug', slug)
     .single();
 
@@ -186,13 +150,13 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
     throw error;
   }
 
-  return hydrateArticle(data);
+  return mapSupabaseArticle(data);
 }
 
 export async function getArticleById(id: string): Promise<Article | null> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('id', id)
     .single();
 
@@ -201,12 +165,10 @@ export async function getArticleById(id: string): Promise<Article | null> {
     throw error;
   }
 
-  return hydrateArticle(data);
+  return mapSupabaseArticle(data);
 }
 
-export async function getArticlesByCategory(
-  categorySlug: string
-): Promise<Article[]> {
+export async function getArticlesByCategory(categorySlug: string): Promise<Article[]> {
   const category = await getCategoryBySlug(categorySlug);
 
   if (!category) {
@@ -215,19 +177,19 @@ export async function getArticlesByCategory(
 
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('status', 'published')
     .eq('category_id', category.id)
     .order('published_at', { ascending: false });
 
   if (error) throw error;
-  return hydrateArticles(data);
+  return data.map(mapSupabaseArticle);
 }
 
 export async function getLatestArticle(): Promise<Article | null> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(1)
@@ -237,35 +199,30 @@ export async function getLatestArticle(): Promise<Article | null> {
 
   if (!data) return null;
 
-  return hydrateArticle(data);
+  return mapSupabaseArticle(data);
 }
 
-export async function getLatestArticles(
-  count: number = 5
-): Promise<Article[]> {
+export async function getLatestArticles(count: number = 5): Promise<Article[]> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(count);
 
   if (error) throw error;
 
-  return hydrateArticles(data);
+  return data.map(mapSupabaseArticle);
 }
 
-export async function getRelatedArticles(
-  article: Article,
-  count: number = 3
-): Promise<Article[]> {
+export async function getRelatedArticles(article: Article, count: number = 3): Promise<Article[]> {
   const category = await getCategoryBySlug(article.category);
 
   if (!category) return [];
 
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('status', 'published')
     .neq('id', article.id)
     .eq('category_id', category.id)
@@ -274,13 +231,13 @@ export async function getRelatedArticles(
 
   if (error) throw error;
 
-  const related = await hydrateArticles(data);
+  const related = data.map(mapSupabaseArticle);
 
   if (related.length >= count) return related;
 
   const { data: additional, error: additionalError } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .eq('status', 'published')
     .neq('id', article.id)
     .neq('category_id', category.id)
@@ -289,9 +246,7 @@ export async function getRelatedArticles(
 
   if (additionalError) throw additionalError;
 
-  const others = await Promise.all(
-    additional.map((item) => hydrateArticle(item as ArticleRow))
-  );
+  const others = additional.map(mapSupabaseArticle);
 
   return [...related, ...others];
 }
@@ -332,12 +287,12 @@ export async function createArticle(
       status: data.status ?? 'draft',
       reading_time: calculateReadingTime(content),
     })
-    .select()
+    .select(ARTICLE_SELECT)
     .single();
 
   if (error) throw error;
 
-  return hydrateArticle(article as ArticleRow);
+  return mapSupabaseArticle(article);
 }
 
 export async function updateArticle(
@@ -393,12 +348,12 @@ export async function updateArticle(
     .update(updateData)
     .eq('id', id)
     .eq('author_id', user.id)
-    .select()
+    .select(ARTICLE_SELECT)
     .single();
 
   if (error) throw error;
 
-  return hydrateArticle(article as ArticleRow);
+  return mapSupabaseArticle(article);
 }
 
 export async function deleteArticle(id: string): Promise<boolean> {
