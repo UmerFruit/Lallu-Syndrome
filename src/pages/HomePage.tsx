@@ -38,6 +38,36 @@ export function HomePage() {
     ? all
     : all.filter((a) => a.category === activeCategory);
 
+  let articleGridContent: JSX.Element;
+
+  if (loading) {
+    articleGridContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+      </div>
+    );
+  } else if (filtered.length === 0) {
+    articleGridContent = <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
+  } else {
+    articleGridContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    );
+  }
+
+  let featuredContent: JSX.Element;
+
+  if (loading) {
+    featuredContent = <FeaturedArticleSkeleton />;
+  } else if (featured) {
+    featuredContent = <FeaturedArticle article={featured} />;
+  } else {
+    featuredContent = <p className="text-text-muted">Nothing here yet.</p>;
+  }
+
   return (
     <PageContainer className="py-8 md:py-12">
       {/* Intro */}
@@ -52,13 +82,7 @@ export function HomePage() {
 
       {/* Featured Article */}
       <section className="mb-16 md:mb-20">
-        {loading ? (
-          <FeaturedArticleSkeleton />
-        ) : featured ? (
-          <FeaturedArticle article={featured} />
-        ) : (
-          <p className="text-text-muted">Nothing here yet.</p>
-        )}
+        {featuredContent}
       </section>
 
       {/* Latest Posts */}
@@ -105,19 +129,7 @@ export function HomePage() {
 
       {/* Article Grid */}
       <section className="mb-12">
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
-          </div>
-        )}
+        {articleGridContent}
       </section>
     </PageContainer>
   );

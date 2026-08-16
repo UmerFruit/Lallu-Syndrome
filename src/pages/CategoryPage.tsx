@@ -37,6 +37,28 @@ export function CategoryPage() {
     );
   }
 
+  const renderArticles = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+        </div>
+      );
+    }
+
+    if (articles.length === 0) {
+      return <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {articles.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <PageContainer className="py-8 md:py-12">
       <div className="mb-8">
@@ -45,19 +67,7 @@ export function CategoryPage() {
         </h1>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-        </div>
-      ) : articles.length === 0 ? (
-        <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
-      )}
+      {renderArticles()}
     </PageContainer>
   );
 }

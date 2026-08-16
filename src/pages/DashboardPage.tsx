@@ -30,6 +30,76 @@ export function DashboardPage() {
     setArticles((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const articleListContent = (() => {
+    if (loading) {
+      return (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded border border-border-subtle bg-surface animate-pulse" />
+          ))}
+        </div>
+      );
+    }
+
+    if (displayed.length === 0) {
+      return (
+        <div className="py-16 text-center">
+          <FileText size={32} className="mx-auto text-text-muted mb-3" />
+          <p className="text-text-secondary">
+            {tab === 'drafts' ? 'No drafts. Go write something.' : 'No published articles yet.'}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {displayed.map((article) => (
+          <div
+            key={article.id}
+            className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface hover:border-border transition-colors duration-200 group"
+          >
+            <div className="flex-1 min-w-0">
+              <Link
+                to={`/articles/${article.slug}`}
+                className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1"
+              >
+                {article.title}
+              </Link>
+              <div className="flex items-center gap-3 mt-1">
+                <Badge variant="muted">{article.category}</Badge>
+                <span className="font-mono text-xs text-text-muted">
+                  {article.publishedAt && formatDate(article.publishedAt)}
+                </span>
+                <span className="font-mono text-xs text-text-muted">
+                  {article.readingTime} min
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link
+                to={`/dashboard/articles/${article.id}/edit`}
+                className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
+                aria-label="Edit article"
+              >
+                <Pencil size={16} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => handleDelete(article.id)}
+                className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
+                aria-label="Delete article"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  })();
+
   return (
     <PageContainer className="py-8 md:py-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -67,64 +137,7 @@ export function DashboardPage() {
       </div>
 
       {/* Article List */}
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded border border-border-subtle bg-surface animate-pulse" />
-          ))}
-        </div>
-      ) : displayed.length === 0 ? (
-        <div className="py-16 text-center">
-          <FileText size={32} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary">
-            {tab === 'drafts' ? 'No drafts. Go write something.' : 'No published articles yet.'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {displayed.map((article) => (
-            <div
-              key={article.id}
-              className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface hover:border-border transition-colors duration-200 group"
-            >
-              <div className="flex-1 min-w-0">
-                <Link
-                  to={`/articles/${article.slug}`}
-                  className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1"
-                >
-                  {article.title}
-                </Link>
-                <div className="flex items-center gap-3 mt-1">
-                  <Badge variant="muted">{article.category}</Badge>
-                  <span className="font-mono text-xs text-text-muted">
-                    {article.publishedAt && formatDate(article.publishedAt)}
-                  </span>
-                  <span className="font-mono text-xs text-text-muted">
-                    {article.readingTime} min
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Link
-                  to={`/dashboard/articles/${article.id}/edit`}
-                  className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
-                  aria-label="Edit article"
-                >
-                  <Pencil size={16} />
-                </Link>
-                <button
-                  onClick={() => handleDelete(article.id)}
-                  className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
-                  aria-label="Delete article"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {articleListContent}
     </PageContainer>
   );
 }

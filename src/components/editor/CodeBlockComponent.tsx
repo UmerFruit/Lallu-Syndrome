@@ -29,11 +29,7 @@ const LANGUAGES = [
   { value: 'rust', label: 'Rust' },
 ];
 
-export default function CodeBlockComponent({
-  node,
-  updateAttributes,
-  deleteNode,
-}: NodeViewProps) {
+export default function CodeBlockComponent({ node, updateAttributes, deleteNode }: Readonly<NodeViewProps>) {
   const [copied, setCopied] = useState(false);
 
   const language = (node.attrs.language as string) || 'text';

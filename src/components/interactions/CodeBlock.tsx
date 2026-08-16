@@ -6,7 +6,7 @@ type CodeBlockProps = {
   code: string;
 };
 
-export function CodeBlock({ language, code }: CodeBlockProps) {
+export function CodeBlock({ language, code }: Readonly<CodeBlockProps>) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -26,6 +26,7 @@ export function CodeBlock({ language, code }: CodeBlockProps) {
           {language || 'code'}
         </span>
         <button
+          type="button"
           onClick={handleCopy}
           className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors duration-200"
           aria-label="Copy code"

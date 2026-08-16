@@ -28,6 +28,28 @@ export function ArticlesPage() {
     ? articles
     : articles.filter((a) => a.category === activeCategory);
 
+  let articleContent;
+
+  if (loading) {
+    articleContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 9 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+      </div>
+    );
+  } else if (filtered.length === 0) {
+    articleContent = (
+      <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
+    );
+  } else {
+    articleContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <PageContainer className="py-8 md:py-12">
       <div className="mb-8">
@@ -55,19 +77,7 @@ export function ArticlesPage() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 9 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
-      )}
+      {articleContent}
     </PageContainer>
   );
 }

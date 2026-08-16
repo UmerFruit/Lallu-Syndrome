@@ -38,7 +38,7 @@ export function AuthLayout({ title, subtitle, children, footer }: Readonly<AuthL
   );
 }
 
-export function AuthLink({ to, children }: { to: string; children: ReactNode }) {
+export function AuthLink({ to, children }: Readonly<{ to: string; children: ReactNode }>) {
   return (
     <Link to={to} className="text-accent hover:text-accent-hover transition-colors font-medium">
       {children}
