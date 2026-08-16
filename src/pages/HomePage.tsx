@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Article, Category } from '@/types';
-import { getLatestArticle, getLatestArticles, getArticles } from '@/services/articleService';
+import { getArticles } from '@/services/articleService';
 import { PageContainer } from '@/components/layout/Navbar';
 import { FeaturedArticle } from '@/components/articles/FeaturedArticle';
 import { ArticleCard } from '@/components/articles/ArticleCard';
@@ -8,6 +8,7 @@ import { FeaturedArticleSkeleton, ArticleCardSkeleton } from '@/components/ui/Sk
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { getCategories } from '@/services/categoryService';
+import { CategoryButton } from '@/components/ui/CategoryButton';
 
 export function HomePage() {
   const [featured, setFeatured] = useState<Article | null>(null);
@@ -18,21 +19,26 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getLatestArticle(),
-      getLatestArticles(4),
-      getArticles(),
-      getCategories(),
-    ])
-      .then(([feat, lat, allArts, categoryResults]) => {
-        setFeatured(feat);
-        setLatest(lat.filter((a) => a.id !== feat?.id).slice(0, 3));
-        setAll(allArts);
-        setCategories(categoryResults);
-        setLoading(false);
-      })
-      .catch(console.error);
-  }, []);
+  async function loadHome() {
+    try {
+      const [allArts, categoryResults] = await Promise.all([
+        getArticles(),
+        getCategories(),
+      ]);
+
+      setFeatured(allArts[0] ?? null);
+      setLatest(allArts.slice(1, 4));
+      setAll(allArts);
+      setCategories(categoryResults);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  loadHome();
+}, []);
 
   const filtered = activeCategory === 'all'
     ? all
@@ -132,20 +138,5 @@ export function HomePage() {
         {articleGridContent}
       </section>
     </PageContainer>
-  );
-}
-
-function CategoryButton({ label, active, onClick }: Readonly<{ label: string; active: boolean; onClick: () => void }>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${active
-          ? 'border-accent text-accent bg-accent/5'
-          : 'border-border text-text-muted hover:text-text-secondary hover:border-text-muted'
-        }`}
-    >
-      {label}
-    </button>
   );
 }

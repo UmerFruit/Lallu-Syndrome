@@ -23,27 +23,40 @@ export function ArticlePage() {
   const [liked, setLiked] = useState(false);
 
   useEffect(() => {
-    if (!slug) return;
-    setLoading(true);
-    setError(false);
-    setArticle(null);
-
-    getArticleBySlug(slug).then(async (a) => {
-      if (!a) {
+    async function loadArticle() {
+      if (!slug) return;
+      try {
+        setLoading(true);
+        setError(false);
+        setArticle(null);
+        setRelated([]);
+        setLiked(false);
+        
+        const articleData = await getArticleBySlug(slug);
+        
+        if (!articleData) {
+          setError(true);
+          return;
+        }
+        
+        setArticle(articleData);
+        
+        const [relatedData, likedData] = await Promise.all([
+          getRelatedArticles(articleData, 3),
+          isLiked(articleData.id),
+        ]);
+        
+        setRelated(relatedData);
+        setLiked(likedData);
+        window.scrollTo(0, 0);
+      } catch {
         setError(true);
+      } finally {
         setLoading(false);
-        return;
       }
-      setArticle(a);
-      const [rel, isL] = await Promise.all([
-        getRelatedArticles(a, 3),
-        isLiked(a.id),
-      ]);
-      setRelated(rel);
-      setLiked(isL);
-      setLoading(false);
-      window.scrollTo(0, 0);
-    }).catch(() => { setError(true); setLoading(false); });
+    }
+    
+    loadArticle();
   }, [slug]);
 
   if (loading) {
