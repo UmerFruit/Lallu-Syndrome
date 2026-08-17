@@ -14,6 +14,7 @@ import {
   Maximize2, Minimize2, X, Check, ImagePlus,
 } from 'lucide-react';
 import { getLocalDateTime } from '@/utils/date';
+import Strands from '@/components/ui/Strands';
 
 const AUTHOR = { name: 'Umer Farooq', avatar: 'https://images.unsplash.com/photo-1500648767731-5ca545ace573?w=200&h=200&fit=crop&crop=faces&q=80' };
 
@@ -49,7 +50,7 @@ export function ArticleEditorPage() {
   
   const articleRef = useRef<Article | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const exitRequestedRef = useRef(false); // FIXED: Added missing ref
+  const exitRequestedRef = useRef(false);
 
   useEffect(() => {
     getCategories()
@@ -105,7 +106,6 @@ export function ArticleEditorPage() {
         const created = await createArticle(data);
         articleRef.current = created;
         
-        // Use replace router method to prevent stale "isNew" issues without unmounting
         navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } else {
         const articleId = articleRef.current?.id ?? id;
@@ -128,7 +128,6 @@ export function ArticleEditorPage() {
   useEffect(() => {
     if (loading || exitRequestedRef.current) return;
 
-    // FIXED: Properly attach the timeout to the ref so it can be cleared on exit
     saveTimer.current = setTimeout(() => {
       saveArticle();
     }, 2000);
@@ -140,10 +139,7 @@ export function ArticleEditorPage() {
     };
   }, [formData, saveArticle, loading]);
 
-  // FIXED: Removed duplicate triggerAutosave useEffect that referenced undefined variables
-
   const handlePublish = async () => {
-    // FIXED: Prefixed properties with formData
     if (!formData.coverImage) {
       alert('Cover image is required for published articles.');
       return;
@@ -189,7 +185,6 @@ export function ArticleEditorPage() {
   };
 
   const handleSaveAndExit = async () => {
-    // FIXED: Prefixed variables with formData
     const isEmpty =
       !formData.title.trim() &&
       !formData.content.trim() &&
@@ -239,7 +234,6 @@ export function ArticleEditorPage() {
 
       const result = await upload(articleId, file, 'cover');
       
-      // FIXED: Used handleChange instead of non-existent setCoverImage
       handleChange('coverImage', result.publicUrl);
     } catch (error) {
       console.error('Failed to upload cover image:', error);
@@ -271,8 +265,37 @@ export function ArticleEditorPage() {
   return (
     <div className={zenMode ? 'fixed inset-0 z-50 bg-bg overflow-y-auto' : ''}>
       {/* Top Bar */}
-      <header className={`sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle ${zenMode ? 'px-6' : ''}`}>
-        <div className="flex items-center justify-between h-14 px-4 sm:px-6">
+      <header className={`sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle relative overflow-hidden ${zenMode ? 'px-6' : ''}`}>
+        
+        {/* Render Strands dynamically when saving */}
+        {saveState === 'saving' && (
+          <div className="absolute inset-0 z-0 pointer-events-none opacity-40 flex items-center">
+            <div style={{ width: '100%', height: '600px', position: 'relative' }}>
+              <Strands
+                colors={["#ff0000","#000000","#4500ff"]}
+                count={4}
+                speed={0.4}
+                amplitude={1.6}
+                waviness={1.3}
+                thickness={3}
+                glow={0.8}
+                taper={3.4}
+                spread={1}
+                intensity={0.1}
+                saturation={1.75}
+                opacity={1}
+                scale={0.7}
+                glass={false}
+                refraction={1}
+                dispersion={1}
+                glassSize={1}
+                hueShift={0}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="relative z-10 flex items-center justify-between h-14 px-4 sm:px-6">
           <div className="flex items-center gap-4">
             {!zenMode ? (
               <button
@@ -482,7 +505,6 @@ export function ArticleEditorPage() {
                     if (formData.coverImage) {
                       await deleteCoverImage(formData.coverImage);
                     }
-                    // FIXED: Used handleChange instead of non-existent setCoverImage
                     handleChange('coverImage', '');
                   } catch (error) {
                     console.error('Failed to remove cover image:', error);
