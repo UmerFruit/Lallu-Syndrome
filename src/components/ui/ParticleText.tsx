@@ -1,4 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 export interface ParticleTextProps {
   text?: string;
   particleSize?: number;
@@ -84,7 +85,7 @@ const waitForFonts = async (font: string): Promise<void> => {
 
   try {
     await document.fonts.load(font);
-  } catch {}
+  } catch { }
 
   await document.fonts.ready;
 };
@@ -93,8 +94,8 @@ const ParticleText = ({
   text = 'React Bits',
   particleSize = 2,
   density = 4,
-  color = '#ffffff',
-  highlightColor = '#8b5cf6',
+  color,
+  highlightColor,
   scatter = 180,
   gatherDuration = 1600,
   stagger = 420,
@@ -111,7 +112,10 @@ const ParticleText = ({
 }: ParticleTextProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { theme } = useTheme();
+  const resolvedColor = color ?? (theme === 'dark' ? '#f8fafc' : '#151515');
 
+  const resolvedHighlightColor = highlightColor ?? (theme === 'dark' ? '#ffffff' : '#686868');
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -183,7 +187,7 @@ const ParticleText = ({
 
       if (glow && !reducedMotion) {
         ctx.shadowBlur = particleSize * 3;
-        ctx.shadowColor = highlightColor;
+        ctx.shadowColor = resolvedHighlightColor;
       } else {
         ctx.shadowBlur = 0;
       }
@@ -321,15 +325,15 @@ const ParticleText = ({
 
       const maxParticles = Math.max(900, Math.min(5200, Math.floor((width * height) / 90)));
       const stride = Math.max(1, Math.ceil(targets.length / maxParticles));
-      const baseRgb = hexToRgb(color);
-      const highlightRgb = hexToRgb(highlightColor);
+      const baseRgb = hexToRgb(resolvedColor);
+      const highlightRgb = hexToRgb(resolvedHighlightColor);
       const selected = targets.filter((_, index) => index % stride === 0);
 
       particles = selected.map((target, index) => {
         const seed = ((index * 9301 + 49297) % 233280) / 233280;
         const depth = 0.45 + (((index * 233 + 97) % 1000) / 1000) * 0.9;
         const blend = baseRgb && highlightRgb ? clamp(target.x / Math.max(1, width) + (seed - 0.5) * 0.35, 0, 1) : 0;
-        const particleColor = baseRgb && highlightRgb ? rgbToCss(mixRgb(baseRgb, highlightRgb, blend)) : color;
+        const particleColor = baseRgb && highlightRgb ? rgbToCss(mixRgb(baseRgb, highlightRgb, blend)) : resolvedColor;
         const angle = seed * Math.PI * 2;
         const distance = (reducedMotion ? 0 : scatter) * (0.35 + depth * 0.75);
         const startX = target.x + Math.cos(angle) * distance + (seed - 0.5) * scatter * 0.45;
@@ -428,8 +432,8 @@ const ParticleText = ({
     text,
     particleSize,
     density,
-    color,
-    highlightColor,
+    resolvedColor,
+    resolvedHighlightColor,
     scatter,
     gatherDuration,
     stagger,

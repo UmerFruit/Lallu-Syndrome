@@ -25,7 +25,7 @@ export function ArticleEditorPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
-  
+
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -36,18 +36,18 @@ export function ArticleEditorPage() {
     status: 'draft' as ArticleStatus,
     publishedAt: ''
   });
-  
+
   const [loading, setLoading] = useState(!isNew);
   const [preview, setPreview] = useState(false);
   const [zenMode, setZenMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
-  
+
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
-  
+
   const articleRef = useRef<Article | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitRequestedRef = useRef(false);
@@ -105,7 +105,7 @@ export function ArticleEditorPage() {
       if (isNew && !articleRef.current?.id) {
         const created = await createArticle(data);
         articleRef.current = created;
-        
+
         navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } else {
         const articleId = articleRef.current?.id ?? id;
@@ -233,7 +233,7 @@ export function ArticleEditorPage() {
       }
 
       const result = await upload(articleId, file, 'cover');
-      
+
       handleChange('coverImage', result.publicUrl);
     } catch (error) {
       console.error('Failed to upload cover image:', error);
@@ -242,7 +242,7 @@ export function ArticleEditorPage() {
       setSaveState('idle');
     }
   };
-  
+
   const uploadContentImage = async (file: File): Promise<string> => {
     const articleId = articleRef.current?.id ?? id;
 
@@ -266,34 +266,35 @@ export function ArticleEditorPage() {
     <div className={zenMode ? 'fixed inset-0 z-50 bg-bg overflow-y-auto' : ''}>
       {/* Top Bar */}
       <header className={`sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle relative overflow-hidden ${zenMode ? 'px-6' : ''}`}>
-        
-        {/* Render Strands dynamically when saving */}
-        {saveState === 'saving' && (
-          <div className="absolute inset-0 z-0 pointer-events-none opacity-40 flex items-center">
-            <div style={{ width: '100%', height: '600px', position: 'relative' }}>
-              <Strands
-                colors={["#ff0000","#000000","#4500ff"]}
-                count={4}
-                speed={0.4}
-                amplitude={1.6}
-                waviness={1.3}
-                thickness={3}
-                glow={0.8}
-                taper={3.4}
-                spread={1}
-                intensity={0.1}
-                saturation={1.75}
-                opacity={1}
-                scale={0.7}
-                glass={false}
-                refraction={1}
-                dispersion={1}
-                glassSize={1}
-                hueShift={0}
-              />
-            </div>
+
+        <div
+          className={`absolute inset-0 z-0 pointer-events-none flex items-center transition-opacity duration-300 ${saveState === 'saving' ? 'opacity-40' : 'opacity-0'
+            }`}
+          aria-hidden="true"
+        >
+          <div className="relative w-full h-[600px]">
+            <Strands
+              colors={["#ff0000", "#000000", "#4500ff"]}
+              count={4}
+              speed={0.4}
+              amplitude={1.6}
+              waviness={1.3}
+              thickness={3}
+              glow={0.8}
+              taper={3.4}
+              spread={1}
+              intensity={0.1}
+              saturation={1.75}
+              opacity={1}
+              scale={0.7}
+              glass={false}
+              refraction={1}
+              dispersion={1}
+              glassSize={1}
+              hueShift={0}
+            />
           </div>
-        )}
+        </div>
 
         <div className="relative z-10 flex items-center justify-between h-14 px-4 sm:px-6">
           <div className="flex items-center gap-4">

@@ -78,20 +78,18 @@ export function HomePage() {
   return (
     <PageContainer className="py-8 md:py-12">
 
-      <div style={{ width: '100%', height: 360, background: '#090909' }}>
+      <div className="w-full h-[360px] bg-bg">
         <ParticleText
-          text="Lallu syndrome"
+          text="Lallu Syndrome"
           particleSize={2.3}
           density={4}
-          color="#f8fafc"
-          highlightColor="#ffffff"
           scatter={190}
           gatherDuration={2000}
           stagger={420}
           pointerRepel={38}
           repelRadius={100}
           idleDrift={0}
-          trigger="mount"
+          trigger="click"
           fontSize="clamp(3.5rem, 13vw, 9rem)"
           fontWeight={800}
           fontFamily="inherit"
