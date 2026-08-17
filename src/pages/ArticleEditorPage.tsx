@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import type { Article, ArticleStatus, Category } from '@/types';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { ArticleContent } from '@/components/articles/ArticleContent';
-import { upload, deleteRemovedContentImages, deleteCoverImage } from '@/services/storageService'
+import { upload, deleteRemovedContentImages, deleteCoverImage } from '@/services/storageService';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   Maximize2, Minimize2, X, Check, ImagePlus,
@@ -24,24 +24,33 @@ export function ArticleEditorPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
-
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState('development');
-  const [tags, setTags] = useState('');
-  const [slug, setSlug] = useState('');
-  const [coverImage, setCoverImage] = useState('');
-  const [status, setStatus] = useState<ArticleStatus>('draft');
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: 'development',
+    tags: '',
+    slug: '',
+    coverImage: '',
+    status: 'draft' as ArticleStatus,
+    publishedAt: ''
+  });
+  
   const [loading, setLoading] = useState(!isNew);
   const [preview, setPreview] = useState(false);
   const [zenMode, setZenMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
-  const [publishedAt, setPublishedAt] = useState('');
-
+  
+  const handleChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+  
   const articleRef = useRef<Article | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitRequestedRef = useRef(false); // FIXED: Added missing ref
+
   useEffect(() => {
     getCategories()
       .then(setCategories)
@@ -53,95 +62,117 @@ export function ArticleEditorPage() {
       getArticleById(id).then((a) => {
         if (a) {
           articleRef.current = a;
-          setTitle(a.title);
-          setContent(a.content);
-          setCategory(a.category);
-          setTags(a.tags.join(', '));
-          setSlug(a.slug);
-          setCoverImage(a.coverImage);
-          setStatus(a.status);
-          setPublishedAt(
-            a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 16) : ''
-          );
+          setFormData({
+            title: a.title,
+            content: a.content,
+            category: a.category,
+            tags: a.tags.join(', '),
+            slug: a.slug,
+            coverImage: a.coverImage,
+            status: a.status,
+            publishedAt: a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 16) : ''
+          });
         }
         setLoading(false);
       });
     }
   }, [id, isNew]);
 
-  const readingTime = calculateReadingTime(content);
+  const readingTime = useMemo(() => calculateReadingTime(formData.content), [formData.content]);
 
-  const buildArticleData = useCallback((): Partial<Article> => {
-    return {
-      title: title || 'Untitled',
-      content,
-      category,
-      tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-      slug: slug || generateSlug(title || 'untitled'),
-      coverImage,
-      status,
-      author: AUTHOR,
-      readingTime,
-      publishedAt: publishedAt? new Date(publishedAt).toISOString(): undefined,
-    };
-  }, [title, content, category, tags, slug, coverImage, status, readingTime]);
+  const buildArticleData = useCallback((): Partial<Article> => ({
+    ...formData,
+    tags: formData.tags.split(',').map((t) => t.trim()).filter(Boolean),
+    slug: formData.slug || generateSlug(formData.title || 'untitled'),
+    author: AUTHOR,
+    readingTime,
+    publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
+  }), [formData, readingTime]);
 
-  const triggerAutosave = useCallback(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+  const saveArticle = useCallback(async () => {
+    const data = buildArticleData();
+    const isEmpty = !data.title?.trim() && !data.content?.trim();
+
+    if (isNew && isEmpty) {
+      setSaveState('idle');
+      return;
+    }
+
     setSaveState('saving');
-    saveTimer.current = setTimeout(async () => {
-      if (isNew) {
-        const created = await createArticle(buildArticleData());
-        articleRef.current = created;
-        if (created.id !== id) {
-          navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
-        }
-      } else if (id) {
-        const updated = await updateArticle(id, buildArticleData());
 
-        if (updated) {
-          articleRef.current = updated;
+    try {
+      if (isNew && !articleRef.current?.id) {
+        const created = await createArticle(data);
+        articleRef.current = created;
+        
+        // Use replace router method to prevent stale "isNew" issues without unmounting
+        navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
+      } else {
+        const articleId = articleRef.current?.id ?? id;
+        if (articleId) {
+          const updated = await updateArticle(articleId, data);
+          if (updated) articleRef.current = updated;
         }
       }
+
+      setSavedTime(
+        new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+      );
       setSaveState('saved');
-      setSavedTime(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
-    }, 1000);
-  }, [buildArticleData, id, isNew, navigate]);
+    } catch (error) {
+      console.error('Failed to save article:', error);
+      setSaveState('idle');
+    }
+  }, [buildArticleData, isNew, id, navigate]);
 
   useEffect(() => {
-    if (loading) return;
-    triggerAutosave();
-  }, [title, content, category, tags, slug, coverImage, status, triggerAutosave, loading]);
+    if (loading || exitRequestedRef.current) return;
+
+    // FIXED: Properly attach the timeout to the ref so it can be cleared on exit
+    saveTimer.current = setTimeout(() => {
+      saveArticle();
+    }, 2000);
+
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+      }
+    };
+  }, [formData, saveArticle, loading]);
+
+  // FIXED: Removed duplicate triggerAutosave useEffect that referenced undefined variables
 
   const handlePublish = async () => {
-    if (!coverImage) {
+    // FIXED: Prefixed properties with formData
+    if (!formData.coverImage) {
       alert('Cover image is required for published articles.');
       return;
     }
 
-    if (publishedAt && new Date(publishedAt) > new Date()) {
+    if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
       alert('Publication date cannot be in the future.');
       return;
     }
 
     const previousContent = articleRef.current?.content ?? '';
-    const nextContent = content;
+    const nextContent = formData.content;
 
     const data = {
       ...buildArticleData(),
       status: 'published' as ArticleStatus,
-      publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
+      publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
     };
 
-    if (isNew) {
+    if (isNew && !articleRef.current?.id) {
       const created = await createArticle(data);
       articleRef.current = created;
       navigate('/dashboard');
       return;
     }
 
-    if (id) {
-      const updated = await updateArticle(id, data);
+    const articleId = articleRef.current?.id ?? id;
+    if (articleId) {
+      const updated = await updateArticle(articleId, data);
 
       if (updated) {
         articleRef.current = updated;
@@ -158,56 +189,40 @@ export function ArticleEditorPage() {
   };
 
   const handleSaveAndExit = async () => {
-    const previousContent = articleRef.current?.content ?? '';
-    const nextContent = content;
-    const data = buildArticleData();
+    // FIXED: Prefixed variables with formData
+    const isEmpty =
+      !formData.title.trim() &&
+      !formData.content.trim() &&
+      !formData.coverImage.trim() &&
+      !formData.tags.trim();
+
+    if (isNew && isEmpty && !articleRef.current?.id) {
+      navigate('/dashboard');
+      return;
+    }
+
+    exitRequestedRef.current = true;
+
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
 
     try {
-      setSaveState('saving');
-
-      if (isNew) {
-        const created = await createArticle(data);
-        articleRef.current = created;
-
-        navigate('/dashboard');
-        return;
-      }
-
-      if (id) {
-        const updated = await updateArticle(id, data);
-
-        if (updated) {
-          articleRef.current = updated;
-
-          try {
-            await deleteRemovedContentImages(
-              previousContent,
-              nextContent
-            );
-          } catch (error) {
-            console.error(
-              'Failed to delete removed images:',
-              error
-            );
-          }
-        }
-
-        navigate('/dashboard');
-      }
+      await saveArticle();
+      navigate('/dashboard');
     } catch (error) {
       console.error('Failed to save article:', error);
-      setSaveState('idle');
+      exitRequestedRef.current = false;
       alert('Failed to save the article. Please try again.');
     }
   };
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
 
     e.target.value = '';
-
     const articleId = articleRef.current?.id ?? id;
 
     if (!articleId || articleId === 'new') {
@@ -218,13 +233,14 @@ export function ArticleEditorPage() {
     try {
       setSaveState('saving');
 
-      if (coverImage) {
-        await deleteCoverImage(coverImage);
+      if (formData.coverImage) {
+        await deleteCoverImage(formData.coverImage);
       }
 
       const result = await upload(articleId, file, 'cover');
-
-      setCoverImage(result.publicUrl);
+      
+      // FIXED: Used handleChange instead of non-existent setCoverImage
+      handleChange('coverImage', result.publicUrl);
     } catch (error) {
       console.error('Failed to upload cover image:', error);
       alert('Failed to upload cover image. Please try again.');
@@ -232,6 +248,7 @@ export function ArticleEditorPage() {
       setSaveState('idle');
     }
   };
+  
   const uploadContentImage = async (file: File): Promise<string> => {
     const articleId = articleRef.current?.id ?? id;
 
@@ -240,7 +257,6 @@ export function ArticleEditorPage() {
     }
 
     const result = await upload(articleId, file, 'content');
-
     return result.publicUrl;
   };
 
@@ -350,16 +366,16 @@ export function ArticleEditorPage() {
                   label="Cover image URL"
                   name="coverImage"
                   placeholder="https://..."
-                  value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
+                  value={formData.coverImage}
+                  onChange={(e) => handleChange('coverImage', e.target.value)}
                 />
               </div>
               <div>
                 <label htmlFor="category" className="block text-sm font-medium text-text-secondary mb-1.5">Category</label>
                 <select
                   id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  value={formData.category}
+                  onChange={(e) => handleChange('category', e.target.value)}
                   className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
                 >
                   {categories.map((c) => (
@@ -372,8 +388,8 @@ export function ArticleEditorPage() {
                   label="Slug"
                   name="slug"
                   placeholder="auto-generated"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
+                  value={formData.slug}
+                  onChange={(e) => handleChange('slug', e.target.value)}
                 />
               </div>
               <div className="sm:col-span-2">
@@ -381,8 +397,8 @@ export function ArticleEditorPage() {
                   label="Tags (comma-separated)"
                   name="tags"
                   placeholder="TypeScript, React, API"
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
+                  value={formData.tags}
+                  onChange={(e) => handleChange('tags', e.target.value)}
                 />
               </div>
 
@@ -390,8 +406,8 @@ export function ArticleEditorPage() {
                 <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
                 <select
                   id="status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as ArticleStatus)}
+                  value={formData.status}
+                  onChange={(e) => handleChange('status', e.target.value as ArticleStatus)}
                   className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
                 >
                   <option value="draft">Draft</option>
@@ -409,9 +425,9 @@ export function ArticleEditorPage() {
                 <input
                   id="published-at"
                   type="datetime-local"
-                  value={publishedAt}
+                  value={formData.publishedAt}
                   max={getLocalDateTime()}
-                  onChange={(e) => setPublishedAt(e.target.value)}
+                  onChange={(e) => handleChange("publishedAt", e.target.value)}
                   className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
                 />
               </div>
@@ -425,27 +441,26 @@ export function ArticleEditorPage() {
       {preview ? (
         <div className="max-w-article mx-auto px-4 sm:px-6 py-12">
           <div className="flex items-center gap-3 mb-4">
-            <Badge variant="accent">{category}</Badge>
+            <Badge variant="accent">{formData.category}</Badge>
             <span className="font-mono text-xs text-text-muted">{readingTime} min read</span>
           </div>
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
-            {title || 'Untitled'}
+            {formData.title || 'Untitled'}
           </h1>
 
           <div className="flex items-center gap-3 mb-8">
             <img src={AUTHOR.avatar} alt={AUTHOR.name} className="w-9 h-9 rounded-full" />
             <span className="text-sm font-medium text-text-primary">{AUTHOR.name}</span>
           </div>
-          {coverImage && (
+          {formData.coverImage && (
             <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
-              <img src={coverImage} alt={title} className="w-full" />
+              <img src={formData.coverImage} alt={formData.title} className="w-full" />
             </div>
           )}
-          <ArticleContent content={content || 'Nothing written yet.'} />
+          <ArticleContent content={formData.content || 'Nothing written yet.'} />
         </div>
       ) : (
         <div className={`relative mx-auto ${zenMode ? 'max-w-3xl px-6' : 'max-w-3xl px-4 sm:px-6'} py-8`}>
-
 
           <div className="flex items-center gap-4 mb-5">
             <label className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
@@ -455,20 +470,20 @@ export function ArticleEditorPage() {
             </label>
           </div>
 
-          {coverImage && (
+          {formData.coverImage && (
             <div className="relative group mb-6">
               <div className="overflow-hidden rounded-card border border-border-subtle">
-                <img src={coverImage} alt="Cover" className="w-full h-48 object-cover" />
+                <img src={formData.coverImage} alt="Cover" className="w-full h-48 object-cover" />
               </div>
               <button
                 type="button"
                 onClick={async () => {
                   try {
-                    if (coverImage) {
-                      await deleteCoverImage(coverImage);
+                    if (formData.coverImage) {
+                      await deleteCoverImage(formData.coverImage);
                     }
-
-                    setCoverImage('');
+                    // FIXED: Used handleChange instead of non-existent setCoverImage
+                    handleChange('coverImage', '');
                   } catch (error) {
                     console.error('Failed to remove cover image:', error);
                     alert('Failed to remove cover image. Please try again.');
@@ -485,8 +500,8 @@ export function ArticleEditorPage() {
           {/* Title */}
           <input
             type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={formData.title}
+            onChange={(e) => handleChange('title', e.target.value)}
             placeholder="Article title"
             className="w-full bg-transparent font-serif text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3" aria-label="Article title"
           />
@@ -494,8 +509,8 @@ export function ArticleEditorPage() {
           {/* Category + Reading Time */}
           <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border-subtle">
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={formData.category}
+              onChange={(e) => handleChange('category', e.target.value)}
               className="rounded border border-border bg-surface px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-text-secondary focus:border-accent focus:outline-none"
             >
               {categories.map((c) => (
@@ -506,7 +521,7 @@ export function ArticleEditorPage() {
           </div>
 
           {/* Editor */}
-          <TiptapEditor value={content} onChange={setContent} onImageUpload={uploadContentImage} />
+          <TiptapEditor value={formData.content} onChange={(val) => handleChange('content', val)} onImageUpload={uploadContentImage} />
         </div>
       )}
     </div>

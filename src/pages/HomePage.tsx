@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { getCategories } from '@/services/categoryService';
 import { CategoryButton } from '@/components/ui/CategoryButton';
+import ParticleText from '@/components/ui/ParticleText';
 
 export function HomePage() {
   const [featured, setFeatured] = useState<Article | null>(null);
@@ -19,26 +20,26 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  async function loadHome() {
-    try {
-      const [allArts, categoryResults] = await Promise.all([
-        getArticles(),
-        getCategories(),
-      ]);
+    async function loadHome() {
+      try {
+        const [allArts, categoryResults] = await Promise.all([
+          getArticles(),
+          getCategories(),
+        ]);
 
-      setFeatured(allArts[0] ?? null);
-      setLatest(allArts.slice(1, 4));
-      setAll(allArts);
-      setCategories(categoryResults);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+        setFeatured(allArts[0] ?? null);
+        setLatest(allArts.slice(1, 4));
+        setAll(allArts);
+        setCategories(categoryResults);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
 
-  loadHome();
-}, []);
+    loadHome();
+  }, []);
 
   const filtered = activeCategory === 'all'
     ? all
@@ -76,14 +77,26 @@ export function HomePage() {
 
   return (
     <PageContainer className="py-8 md:py-12">
-      {/* Intro */}
-      <div className="mb-12 md:mb-16 max-w-2xl">
-        <h1 className="font-serif text-2xl md:text-3xl font-semibold text-text-primary tracking-tight">
-          Lallu Syndrome
-        </h1>
-        <p className="mt-2 text-text-secondary text-lg leading-relaxed">
-          Notes, experiments, and deep dives into technology.
-        </p>
+
+      <div style={{ width: '100%', height: 360, background: '#09090f' }}>
+        <ParticleText
+          text="Lallu syndrome"
+          particleSize={2.3}
+          density={4}
+          color="#f8fafc"
+          highlightColor="#ffffff"
+          scatter={190}
+          gatherDuration={2000}
+          stagger={420}
+          pointerRepel={38}
+          repelRadius={100}
+          idleDrift={0}
+          trigger="mount"
+          fontSize="clamp(3.5rem, 13vw, 9rem)"
+          fontWeight={800}
+          fontFamily="inherit"
+          glow={false}
+        />
       </div>
 
       {/* Featured Article */}
