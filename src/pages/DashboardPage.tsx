@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Link} from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getAllArticles, deleteArticle } from '@/services/articleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer } from '@/components/layout/Navbar';
 import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
-import { Plus, Pencil, Trash2, FileText} from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'published' | 'drafts'>('published');
+
+  // Modal State
+  const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     getAllArticles().then((a) => {
@@ -25,9 +30,19 @@ export function DashboardPage() {
   const drafts = articles.filter((a) => a.status === 'draft');
   const displayed = tab === 'published' ? published : drafts;
 
-  const handleDelete = async (id: string) => {
-    await deleteArticle(id);
-    setArticles((prev) => prev.filter((a) => a.id !== id));
+  const handleConfirmDelete = async () => {
+    if (!articleToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteArticle(articleToDelete.id);
+      setArticles((prev) => prev.filter((a) => a.id !== articleToDelete.id));
+      setArticleToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete article:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const articleListContent = (() => {
@@ -87,7 +102,7 @@ export function DashboardPage() {
               </Link>
               <button
                 type="button"
-                onClick={() => handleDelete(article.id)}
+                onClick={() => setArticleToDelete(article)}
                 className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
                 aria-label="Delete article"
               >
@@ -138,6 +153,16 @@ export function DashboardPage() {
 
       {/* Article List */}
       {articleListContent}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(articleToDelete)}
+        isLoading={isDeleting}
+        onClose={() => setArticleToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Article"
+        message={`Are you sure you want to delete "${articleToDelete?.title}"? This action cannot be undone.`}
+      />
     </PageContainer>
   );
 }
@@ -145,7 +170,7 @@ export function DashboardPage() {
 function TabButton({ label, count, active, onClick }: Readonly<{ label: string; count: number; active: boolean; onClick: () => void }>) {
   return (
     <button
-      type='button'
+      type="button"
       onClick={onClick}
       className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${
         active

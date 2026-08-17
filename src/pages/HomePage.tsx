@@ -78,7 +78,7 @@ export function HomePage() {
   return (
     <PageContainer className="py-8 md:py-12">
 
-      <div style={{ width: '100%', height: 360, background: '#09090f' }}>
+      <div style={{ width: '100%', height: 360, background: '#090909' }}>
         <ParticleText
           text="Lallu syndrome"
           particleSize={2.3}

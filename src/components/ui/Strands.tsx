@@ -197,7 +197,7 @@ const buildPalette = (colors: string[]): number[][] => {
   const filled = colors?.length ? colors : ['#ffffff'];
   const padded: number[][] = [];
   for (let i = 0; i < MAX_COLORS; i++) {
-    const hex = filled[i] ?? filled[filled.length - 1];
+    const hex = filled[i] ?? filled.at(-1);
     const c = new Color(hex);
     padded.push([c.r, c.g, c.b]);
   }
