@@ -27,7 +27,15 @@ type TiptapEditorProps = {
   onChange: (markdown: string) => void;
   onImageUpload: (file: File) => Promise<string>;
 };
+function isDirectImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
 
+    return /\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(url.pathname + url.search);
+  } catch {
+    return false;
+  }
+}
 export function TiptapEditor({
   value,
   onChange,
@@ -120,6 +128,19 @@ export function TiptapEditor({
       },
 
       handlePaste: (_view, event) => {
+        const pastedText = event.clipboardData?.getData('text/plain').trim();
+
+        if (pastedText && isDirectImageUrl(pastedText)) {
+          editor?.chain()
+            .focus()
+            .setImage({
+              src: pastedText,
+              alt: '',
+            })
+            .run();
+
+          return true;
+        }
         const items = Array.from(event.clipboardData?.items ?? []);
 
         const imageItem = items.find((item) =>

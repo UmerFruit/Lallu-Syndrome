@@ -13,6 +13,7 @@ import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   Maximize2, Minimize2, X, Check, ImagePlus,
 } from 'lucide-react';
+import { getLocalDateTime } from '@/utils/date';
 
 const AUTHOR = { name: 'Umer Farooq', avatar: 'https://images.unsplash.com/photo-1500648767731-5ca545ace573?w=200&h=200&fit=crop&crop=faces&q=80' };
 
@@ -37,6 +38,7 @@ export function ArticleEditorPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
+  const [publishedAt, setPublishedAt] = useState('');
 
   const articleRef = useRef<Article | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +60,9 @@ export function ArticleEditorPage() {
           setSlug(a.slug);
           setCoverImage(a.coverImage);
           setStatus(a.status);
+          setPublishedAt(
+            a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 16) : ''
+          );
         }
         setLoading(false);
       });
@@ -77,6 +82,7 @@ export function ArticleEditorPage() {
       status,
       author: AUTHOR,
       readingTime,
+      publishedAt: publishedAt? new Date(publishedAt).toISOString(): undefined,
     };
   }, [title, content, category, tags, slug, coverImage, status, readingTime]);
 
@@ -108,10 +114,15 @@ export function ArticleEditorPage() {
   }, [title, content, category, tags, slug, coverImage, status, triggerAutosave, loading]);
 
   const handlePublish = async () => {
-    // if (!coverImage) {
-    //   alert('Cover image is required for published articles.');
-    //   return;
-    // }
+    if (!coverImage) {
+      alert('Cover image is required for published articles.');
+      return;
+    }
+
+    if (publishedAt && new Date(publishedAt) > new Date()) {
+      alert('Publication date cannot be in the future.');
+      return;
+    }
 
     const previousContent = articleRef.current?.content ?? '';
     const nextContent = content;
@@ -119,6 +130,7 @@ export function ArticleEditorPage() {
     const data = {
       ...buildArticleData(),
       status: 'published' as ArticleStatus,
+      publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
     };
 
     if (isNew) {
@@ -387,11 +399,23 @@ export function ArticleEditorPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor='reading-time' className="block text-sm font-medium text-text-secondary mb-1.5">Reading time (auto)</label>
-                <div id='reading-time' className="px-3.5 py-2.5 rounded bg-elevated border border-border-subtle text-sm text-text-muted font-mono">
-                  {readingTime} min
-                </div>
+                <label
+                  htmlFor="published-at"
+                  className="block text-sm font-medium text-text-secondary mb-1.5"
+                >
+                  Publication date
+                </label>
+
+                <input
+                  id="published-at"
+                  type="datetime-local"
+                  value={publishedAt}
+                  max={getLocalDateTime()}
+                  onChange={(e) => setPublishedAt(e.target.value)}
+                  className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
+                />
               </div>
+
             </div>
           </div>
         </div>

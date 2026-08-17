@@ -251,9 +251,7 @@ export async function getRelatedArticles(article: Article, count: number = 3): P
   return [...related, ...others];
 }
 
-export async function createArticle(
-  data: Partial<ArticleInput>
-): Promise<Article> {
+export async function createArticle(data: Partial<ArticleInput>): Promise<Article> {
   const {
     data: { user },
     error: authError,
@@ -285,6 +283,7 @@ export async function createArticle(
       content,
       cover_image: data.coverImage || null,
       status: data.status ?? 'draft',
+      published_at: data.publishedAt ?? null,
       reading_time: calculateReadingTime(content),
     })
     .select(ARTICLE_SELECT)
@@ -295,10 +294,7 @@ export async function createArticle(
   return mapSupabaseArticle(article);
 }
 
-export async function updateArticle(
-  id: string,
-  data: Partial<ArticleInput>
-): Promise<Article | null> {
+export async function updateArticle(id: string, data: Partial<ArticleInput>): Promise<Article | null> {
   const {
     data: { user },
     error: authError,
@@ -331,6 +327,10 @@ export async function updateArticle(
 
   if (data.status !== undefined) {
     updateData.status = data.status;
+  }
+  
+  if (data.publishedAt !== undefined) {
+    updateData.published_at = data.publishedAt;
   }
 
   if (data.category !== undefined) {

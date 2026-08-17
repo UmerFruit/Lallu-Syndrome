@@ -10,7 +10,7 @@ export type Author = {
 
 export type ArticleInput = Pick<
   Article,
-  'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status'
+  'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
 >;
 
 export type CreateArticleInput = {

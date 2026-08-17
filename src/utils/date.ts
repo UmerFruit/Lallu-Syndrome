@@ -16,13 +16,11 @@ export function formatDateLong(date: string): string {
   });
 }
 
-export function formatTime(date: string): string {
-  const d = new Date(date);
-  return d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+export function getLocalDateTime(): string {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+
+  return now.toISOString().slice(0, 16);
 }
 
 export function relativeTime(date: string): string {
