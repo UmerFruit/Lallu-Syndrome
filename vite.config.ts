@@ -11,6 +11,12 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    host: true,
+    allowedHosts: [
+      'quakier-ascensive-melodie.ngrok-free.dev',
+    ],
+  },
   optimizeDeps: {
     include: ['lucide-react','highlight.js/lib/common'],
   },
