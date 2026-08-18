@@ -5,7 +5,6 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { Markdown } from 'tiptap-markdown';
 import { CodeBlock } from './CodeBlock';
 import { AlignedImage } from './AlignedImage';
 import { SlashCommand } from './SlashCommand';
@@ -33,7 +32,7 @@ import {
 
 type TiptapEditorProps = {
   value: string;
-  onChange: (markdown: string) => void;
+  onChange: (html: string) => void;
   onImageUpload: (file: File) => Promise<string>;
 };
 function isDirectImageUrl(value: string): boolean {
@@ -110,12 +109,6 @@ export function TiptapEditor({
         types: ['paragraph', 'heading'],
         defaultAlignment: 'justify',
       }),
-      Markdown.configure({
-        html: false,
-        transformCopiedText: false,
-        transformPastedText: false,
-
-      }),
       SlashCommand.configure({
         onImageUpload: openImagePicker,
       }),
@@ -127,15 +120,8 @@ export function TiptapEditor({
     content: value,
 
     onUpdate: ({ editor }) => {
-      const markdownStorage = editor.storage as unknown as {
-        markdown: {
-          getMarkdown: () => string;
-        };
-      };
-
-      onChange(markdownStorage.markdown.getMarkdown());
+      onChange(editor.getHTML());
     },
-
     editorProps: {
       attributes: {
         class: 'article-prose focus:outline-none min-h-[300px]',

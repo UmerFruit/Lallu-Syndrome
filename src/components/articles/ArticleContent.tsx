@@ -1,49 +1,65 @@
-import { useMemo } from 'react';
-import MarkdownIt from 'markdown-it';
-import hljs from 'highlight.js/lib/common';
+import DOMPurify from 'dompurify';
 
 type ArticleContentProps = {
   content: string;
 };
 
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: true,
-  highlight(str: string, lang: string): string {
-    const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext';
-
-    try {
-      const highlighted = hljs.highlight(str, { language }).value;
-      return `<pre class="hljs"><code class="language-${language}">${highlighted}</code></pre>`;
-    } catch {
-      return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`;
-    }
-  },
-});
-
-md.renderer.rules.heading_open = (tokens, idx) => {
-  const token = tokens[idx];
-  const level = token.tag;
-  const text = tokens[idx + 1].content;
-
-  const id = text
+function slugify(text: string): string {
+  return text
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
-    .trim();
+    .replace(/^-|-$/g, '');
+}
 
-  return `<${level} id="${id}">`;
-};
+export function ArticleContent({
+  content,
+}: Readonly<ArticleContentProps>) {
+  const sanitized = DOMPurify.sanitize(content, {
+    USE_PROFILES: {
+      html: true,
+    },
+    ADD_ATTR: [
+      'target',
+      'rel',
+      'class',
+      'style',
+      'data-width',
+      'data-alignment',
+    ],
+  });
 
-export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
-  const html = useMemo(() => md.render(content), [content]);
+  const document = new DOMParser().parseFromString(
+    sanitized,
+    'text/html'
+  );
+
+  const usedIds = new Set<string>();
+
+  document.querySelectorAll('h1, h2, h3').forEach((heading) => {
+    const text = heading.textContent?.trim() ?? '';
+
+    if (!text) return;
+
+    const baseId = slugify(text);
+    let id = baseId;
+    let counter = 2;
+
+    while (usedIds.has(id)) {
+      id = `${baseId}-${counter++}`;
+    }
+
+    usedIds.add(id);
+    heading.id = id;
+  });
 
   return (
     <div
       className="article-prose"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{
+        __html: document.body.innerHTML,
+      }}
     />
   );
 }

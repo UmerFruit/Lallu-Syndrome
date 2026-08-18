@@ -12,6 +12,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['lucide-react', 'markdown-it', 'highlight.js/lib/common'],
+    include: ['lucide-react','highlight.js/lib/common'],
   },
 });

@@ -15,18 +15,22 @@ function slugify(text: string): string {
     .trim();
 }
 
-export function extractHeadings(markdown: string): Heading[] {
-  const lines = markdown.split('\n');
-  const headings: Heading[] = [];
-  for (const line of lines) {
-    const match = /^(#{1,3})\s+(.+)/.exec(line);
-    if (match) {
-      const level = match[1].length;
-      const text = match[2].replace(/[*_`~]/g, '').trim();
-      headings.push({ id: slugify(text), text, level });
-    }
-  }
-  return headings;
+export function extractHeadings(html: string): Heading[] {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+
+  const headings = Array.from(
+    document.querySelectorAll('h1, h2, h3')
+  );
+
+  return headings.map((heading) => {
+    const text = heading.textContent?.trim() ?? '';
+
+    return {
+      id: slugify(text),
+      text,
+      level: Number(heading.tagName.substring(1)),
+    };
+  });
 }
 
 type TableOfContentsProps = {
