@@ -15,7 +15,9 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { SignupPage } from '@/pages/auth/SignupPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
-
+import { SettingsLayout } from '@/components/layout/SettingsLayout';
+import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
+import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
 
 
 function ScrollToTop() {
@@ -86,7 +88,15 @@ function AppRoutes() {
         <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
         <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
         <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
+        >
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="password" element={<PasswordSettingsPage />} />
 
+        </Route>
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

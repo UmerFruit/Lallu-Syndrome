@@ -1,9 +1,9 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sun, Moon} from 'lucide-react';
-import { useState } from 'react';
+import { Menu, X, Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { UserMenu } from '@/components/layout/UserMenu';
 
 const navLinks = [
   { label: 'Articles', to: '/articles' },
@@ -12,7 +12,7 @@ const navLinks = [
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
@@ -33,36 +33,24 @@ export function Navbar() {
           Lallu Syndrome
         </Link>
 
+        {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${isActive(link.to)
-                ? 'text-text-primary'
-                : 'text-text-secondary hover:text-text-primary'
-                }`}
+              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${
+                isActive(link.to)
+                  ? 'text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
             >
               {link.label}
             </Link>
           ))}
-         
+
           {user ? (
-            <>
-              <Link
-                to="/dashboard"
-                className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors duration-200"
-              >
-                Dashboard
-              </Link>
-              <button
-                type="button"
-                onClick={logout}
-                className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors duration-200"
-              >
-                Logout
-              </button>
-            </>
+            <UserMenu onNavigate={() => setMobileOpen(false)} />
           ) : (
             <Link
               to="/login"
@@ -82,7 +70,10 @@ export function Navbar() {
           </button>
         </div>
 
+        {/* Mobile controls */}
         <div className="flex md:hidden items-center gap-2">
+          {user && <UserMenu onNavigate={() => setMobileOpen(false)} />}
+
           <button
             type="button"
             onClick={toggleTheme}
@@ -91,6 +82,7 @@ export function Navbar() {
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
@@ -103,6 +95,7 @@ export function Navbar() {
         </div>
       </nav>
 
+      {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-border-subtle bg-bg animate-fade-in">
           <div className="px-4 py-4 space-y-1">
@@ -116,28 +109,8 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {user ? (
-              <>
-                <Link
-                  to="/dashboard"
-                  className="block px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Dashboard
-                </Link>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    logout();
-                    setMobileOpen(false);
-                  }}
-                  className="block w-full text-left px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
+            {!user && (
               <Link
                 to="/login"
                 className="block px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
@@ -153,7 +126,10 @@ export function Navbar() {
   );
 }
 
-export function PageContainer({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
+export function PageContainer({
+  children,
+  className,
+}: Readonly<{ children: ReactNode; className?: string }>) {
   return (
     <div className={`max-w-content mx-auto px-4 sm:px-6 ${className ?? ''}`}>
       {children}

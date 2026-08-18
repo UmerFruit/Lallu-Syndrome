@@ -89,7 +89,7 @@ export function HomePage() {
           pointerRepel={38}
           repelRadius={100}
           idleDrift={0}
-          trigger="click"
+          trigger="mount"
           fontSize="clamp(3.5rem, 13vw, 9rem)"
           fontWeight={800}
           fontFamily="inherit"
