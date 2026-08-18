@@ -10,6 +10,9 @@ import { CodeBlock } from './CodeBlock';
 import { AlignedImage } from './AlignedImage';
 import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
+import { processPastedHtml } from './processPastedHtml';
+import { DOMParser as TiptapDOMParser } from '@tiptap/pm/model';
+
 import {
   Bold,
   Italic,
@@ -205,80 +208,43 @@ export function TiptapEditor({
           return true;
         }
 
-        // 3. Image copied from a browser page
+        // 3. Pasted HTML content
         const pastedHtml = clipboardData.getData('text/html');
 
         if (pastedHtml) {
-          const document = new DOMParser().parseFromString(
-            pastedHtml,
-            'text/html'
-          );
+          const position = editor?.state.selection.from;
 
-          const image = document.querySelector('img');
-
-          const src = image?.getAttribute('src');
-
-          if (src) {
-            const position = editor?.state.selection.from;
-
-            void (async () => {
-              try {
-                // Download the browser image
-                const response = await fetch(src);
-
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch image: ${response.status}`);
-                }
-
-                const blob = await response.blob();
-
-                if (!blob.type.startsWith('image/')) {
-                  throw new Error('Clipboard image is not a valid image.');
-                }
-
-                const extension =
-                  blob.type.split('/')[1]?.split('+')[0] || 'png';
-
-                const file = new File(
-                  [blob],
-                  `pasted-image.${extension}`,
-                  { type: blob.type }
-                );
-
-                const url = await onImageUpload(file);
-
-                if (!editor || position === undefined) {
-                  return;
-                }
-
-                editor
-                  .chain()
-                  .focus()
-                  .insertContentAt(position, {
-                    type: 'image',
-                    attrs: {
-                      src: url,
-                      alt: image?.getAttribute('alt') || '',
-                    },
-                  })
-                  .run();
-              } catch (error) {
-                console.error(
-                  'Failed to download and upload pasted browser image:',
-                  error
-                );
-                alert(
-                  'Could not copy this image. The source website may block image downloads.'
-                );
+          void (async () => {
+            try {
+              if (!editor || position === undefined) {
+                return;
               }
-            })();
 
-            return true;
-          }
+              const processedHtml = await processPastedHtml(
+                pastedHtml,
+                onImageUpload
+              );
+
+              const parsed = TiptapDOMParser.fromSchema(editor.schema).parse(
+                new window.DOMParser()
+                  .parseFromString(processedHtml, 'text/html')
+                  .body
+              );
+
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(position, parsed.toJSON())
+                .run();
+
+
+            } catch (error) {
+              console.error('Paste processing failed:', error);
+            }
+          })();
+
+          return true;
         }
-
-        // Let Tiptap handle normal text/HTML pasting
-        return false;
       },
 
       handleDrop: (_view, event, _slice, moved) => {
