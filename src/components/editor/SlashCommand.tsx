@@ -48,19 +48,6 @@ const getItems = ({
 }): SlashCommandItem[] => {
     const items: SlashCommandItem[] = [
         {
-            title: 'Text',
-            description: 'Start writing with plain text',
-            keywords: ['paragraph', 'text', 'plain'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setParagraph()
-                    .run();
-            },
-        },
-        {
             title: 'Heading 1',
             description: 'Large section heading',
             keywords: ['h1', 'heading', 'title'],

@@ -31,31 +31,31 @@ export function ArticlePage() {
         setArticle(null);
         setRelated([]);
         setLiked(false);
-        
+
         const articleData = await getArticleBySlug(slug);
-        
+
         if (!articleData) {
           setError(true);
           return;
         }
-        
+
         setArticle(articleData);
-        
+
         const [relatedData, likedData] = await Promise.all([
           getRelatedArticles(articleData, 3),
           isLiked(articleData.id),
         ]);
-        
+
         setRelated(relatedData);
         setLiked(likedData);
-        window.scrollTo(0, 0);
+        window.scrollTo(0, 30);
       } catch {
         setError(true);
       } finally {
         setLoading(false);
       }
     }
-    
+
     loadArticle();
   }, [slug]);
 
@@ -94,37 +94,23 @@ export function ArticlePage() {
     <>
       <ArticleProgress />
 
-      <article id="article-content" className="max-w-article mx-auto px-4 sm:px-6 pt-8 md:pt-12">
+      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-8 md:pt-12">
         {/* Header */}
-        <header className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <Badge variant="accent">{article.category}</Badge>
-            <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
-          </div>
 
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
+
+        <header className="mb-8">
+          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>
 
-          <div className="flex items-center gap-3">
-            {article.author.avatar ? (
-              <img
-                src={article.author.avatar}
-                alt={article.author.name}
-                className="w-9 h-9 rounded-full"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary">
-                {article.author.name.charAt(0)}
-              </div>
-            )}
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-medium text-text-primary">{article.author.name}</span>
-              <span className="font-mono text-xs text-text-muted">
-                {formatDateLong(article.publishedAt ?? article.createdAt)}
-
-              </span>
-            </div>
+          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
+            <span>
+              <Badge variant="accent">{article.category}</Badge>
+            </span>
+            <span>•</span>
+            {formatDateLong(article.publishedAt ?? article.createdAt)}
+            <span>•</span>
+            <span>{article.readingTime} min read</span>
           </div>
         </header>
 
@@ -139,7 +125,7 @@ export function ArticlePage() {
       </article>
 
       {/* Content + TOC */}
-      <div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12">
+      < div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12" >
         <div className="max-w-article lg:max-w-none lg:col-start-1 lg:row-start-1">
           <ArticleContent content={article.content} />
 
@@ -160,11 +146,34 @@ export function ArticlePage() {
           <RelatedArticles articles={related} />
         </div>
 
-        {/* TOC */}
+        {/* TOC Sidebar */}
         <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-          <TableOfContents headings={headings} />
+          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            {/* Author Info */}
+            <div className="text-center mb-6 pb-6 border-b border-border-subtle">
+              {article.author.avatar && (
+                <img
+                  src={article.author.avatar}
+                  alt={article.author.name}
+                  className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
+                />
+              )}
+
+              <h3 className="text-sm font-semibold text-text-primary mb-1">
+                {article.author.name}
+              </h3>
+
+              <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span>{article.author.bio ?? "Writing about Linux & open source"}</span>
+              </div>
+            </div>
+
+            {/* Table of Contents */}
+            <TableOfContents headings={headings} />
+          </div>
         </div>
-      </div>
+      </div >
 
       <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
         <Link

@@ -52,6 +52,7 @@ export function ArticleContent({
 
     usedIds.add(id);
     heading.id = id;
+    heading.classList.add('scroll-mt-20');
   });
 
   return (

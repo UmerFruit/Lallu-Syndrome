@@ -11,8 +11,9 @@ import { ArticleContent } from '@/components/articles/ArticleContent';
 import { upload, cleanupArticleContentMedia, deleteCoverImage } from '@/services/storageService';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
-  Maximize2, Minimize2, X, Check, ImagePlus,
+  X, Check, ImagePlus,
 } from 'lucide-react';
+import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { getLocalDateTime } from '@/utils/date';
 import Strands from '@/components/ui/Strands';
 
@@ -39,7 +40,6 @@ export function ArticleEditorPage() {
 
   const [loading, setLoading] = useState(!isNew);
   const [preview, setPreview] = useState(false);
-  const [zenMode, setZenMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
@@ -80,7 +80,9 @@ export function ArticleEditorPage() {
   }, [id, isNew]);
 
   const readingTime = useMemo(() => calculateReadingTime(formData.content), [formData.content]);
-
+  const headings = useMemo(
+    () => extractHeadings(formData.content), [formData.content]
+  );
   const buildArticleData = useCallback((): Partial<Article> => ({
     ...formData,
     tags: formData.tags.split(',').map((t) => t.trim()).filter(Boolean),
@@ -171,7 +173,7 @@ export function ArticleEditorPage() {
         articleRef.current = updated;
 
         try {
-          await cleanupArticleContentMedia(articleId,data.content ?? '');
+          await cleanupArticleContentMedia(articleId, data.content ?? '');
         } catch (error) {
           console.error('Failed to clean up article media:', error);
         }
@@ -260,30 +262,31 @@ export function ArticleEditorPage() {
   }
 
   return (
-    <div className={zenMode ? 'fixed inset-0 z-50 bg-bg overflow-y-auto' : ''}>
+    <div>
       {/* Top Bar */}
-      <header className={`sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle relative overflow-hidden ${zenMode ? 'px-6' : ''}`}>
+      <header className={`sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle relative overflow-hidden`}>
 
         <div
-          className={`absolute inset-0 z-0 pointer-events-none flex items-center transition-opacity duration-300 ${saveState === 'saving' ? 'opacity-40' : 'opacity-0'
-            }`}
+          className={
+            `absolute inset-0 z-0 pointer-events-none flex items-center transition-opacity duration-300 ${saveState === 'saving' ? 'opacity-100' : 'opacity-20'}
+            `}
           aria-hidden="true"
         >
           <div className="relative w-full h-[600px]">
             <Strands
               colors={["#ff0000", "#000000", "#4500ff"]}
-              count={4}
-              speed={0.4}
-              amplitude={1.6}
-              waviness={1.3}
+              count={3}
+              speed={0.7}
+              amplitude={0.5}
+              waviness={1.6}
               thickness={3}
               glow={0.8}
-              taper={3.4}
+              taper={4.4}
               spread={1}
               intensity={0.1}
               saturation={1.75}
               opacity={1}
-              scale={0.7}
+              scale={0.6}
               glass={false}
               refraction={1}
               dispersion={1}
@@ -293,28 +296,19 @@ export function ArticleEditorPage() {
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center justify-between h-14 px-4 sm:px-6">
+        <div className=" relative max-w-content w-full mx-auto z-10 flex items-center justify-between h-14 px-4 sm:px-6">
           <div className="flex items-center gap-4">
-            {!zenMode ? (
-              <button
-                type="button"
-                onClick={handleSaveAndExit}
-                disabled={saveState === 'saving'}
-                className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
-              >
-                <ArrowLeft size={16} />
-                Save & Exit
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setZenMode(false)}
-                className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
-              >
-                <Minimize2 size={16} />
-                Exit focus
-              </button>
-            )}
+
+            <button
+              type="button"
+              onClick={handleSaveAndExit}
+              disabled={saveState === 'saving'}
+              className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+            >
+              <ArrowLeft size={16} />
+              Save & Exit
+            </button>
+
             <div className="flex items-center gap-1.5 text-xs font-mono text-text-muted">
               {saveState === 'saving' && (
                 <span className="flex items-center gap-1">
@@ -342,27 +336,17 @@ export function ArticleEditorPage() {
               <Eye size={15} />
               Preview
             </button>
-            {!zenMode && (
-              <button
-                type="button"
-                onClick={() => setZenMode(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors"
-              >
-                <Maximize2 size={15} />
-                Focus
-              </button>
-            )}
-            {!zenMode && (
-              <button
-                type="button"
-                onClick={() => setShowSettings((s) => !s)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
-                  }`}
-              >
-                <SettingsIcon size={15} />
-                Settings
-              </button>
-            )}
+
+            <button
+              type="button"
+              onClick={() => setShowSettings((s) => !s)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
+                }`}
+            >
+              <SettingsIcon size={15} />
+              Settings
+            </button>
+
             <Button type="button" size="sm" onClick={handlePublish}>
               Publish
             </Button>
@@ -371,7 +355,7 @@ export function ArticleEditorPage() {
       </header>
 
       {/* Settings Panel */}
-      {showSettings && !zenMode && (
+      {showSettings && (
         <div className="border-b border-border-subtle bg-surface animate-fade-in">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
             <div className="flex items-center justify-between">
@@ -460,28 +444,59 @@ export function ArticleEditorPage() {
 
       {/* Main Content */}
       {preview ? (
-        <div className="max-w-article mx-auto px-4 sm:px-6 py-12">
+        <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
+
+          {/* Article header */}
           <div className="flex items-center gap-3 mb-4">
             <Badge variant="accent">{formData.category}</Badge>
-            <span className="font-mono text-xs text-text-muted">{readingTime} min read</span>
+            <span className="font-mono text-xs text-text-muted">
+              {readingTime} min read
+            </span>
           </div>
+
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
             {formData.title || 'Untitled'}
           </h1>
 
           <div className="flex items-center gap-3 mb-8">
-            <img src={AUTHOR.avatar} alt={AUTHOR.name} className="w-9 h-9 rounded-full" />
-            <span className="text-sm font-medium text-text-primary">{AUTHOR.name}</span>
+            <img
+              src={AUTHOR.avatar}
+              alt={AUTHOR.name}
+              className="w-9 h-9 rounded-full"
+            />
+            <span className="text-sm font-medium text-text-primary">
+              {AUTHOR.name}
+            </span>
           </div>
+
+          {/* Cover */}
           {formData.coverImage && (
             <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
-              <img src={formData.coverImage} alt={formData.title} className="w-full" />
+              <img
+                src={formData.coverImage}
+                alt={formData.title}
+                className="w-full"
+              />
             </div>
           )}
-          <ArticleContent content={formData.content || 'Nothing written yet.'} />
+
+          {/* Article + TOC */}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px] gap-12">
+
+            <article className="min-w-0">
+              <ArticleContent
+                content={formData.content || 'Nothing written yet.'}
+              />
+            </article>
+
+            <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
+              <TableOfContents headings={headings} />
+            </div>
+
+          </div>
         </div>
       ) : (
-        <div className={`relative mx-auto ${zenMode ? 'max-w-3xl px-6' : 'max-w-3xl px-4 sm:px-6'} py-8`}>
+        <div className={`relative mx-auto max-w-3xl px-4 sm:px-6 py-8`}>
 
           <div className="flex items-center gap-4 mb-5">
             <label className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
