@@ -5,10 +5,11 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
 import { CodeBlock } from './CodeBlock';
+import { AlignedImage } from './AlignedImage';
 import { SlashCommand } from './SlashCommand';
+import TextAlign from '@tiptap/extension-text-align';
 import {
   Bold,
   Italic,
@@ -20,7 +21,12 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  AlignJustify,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from 'lucide-react';
+
 
 type TiptapEditorProps = {
   value: string;
@@ -84,6 +90,7 @@ export function TiptapEditor({
       { once: true }
     );
   };
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -96,16 +103,20 @@ export function TiptapEditor({
       Link.configure({
         openOnClick: false,
       }),
-      Image,
+      TextAlign.configure({
+        types: ['paragraph', 'heading'],
+        defaultAlignment: 'justify',
+      }),
       Markdown.configure({
         html: false,
-        transformCopiedText: true,
-        transformPastedText: true,
+        transformCopiedText: false,
+        transformPastedText: false,
 
       }),
       SlashCommand.configure({
         onImageUpload: openImagePicker,
       }),
+      AlignedImage,
       CodeBlock,
     ],
 
@@ -128,10 +139,62 @@ export function TiptapEditor({
       },
 
       handlePaste: (_view, event) => {
-        const pastedText = event.clipboardData?.getData('text/plain').trim();
+        const clipboardData = event.clipboardData;
+
+        if (!clipboardData) {
+          return false;
+        }
+
+        // 1. Pasted image file from clipboard
+        const items = Array.from(clipboardData.items);
+
+        const imageItem = items.find((item) =>
+          item.type.startsWith('image/')
+        );
+
+        if (imageItem) {
+          const file = imageItem.getAsFile();
+
+          if (!file) {
+            return false;
+          }
+
+          const position = editor?.state.selection.from;
+
+          void (async () => {
+            try {
+              const url = await onImageUpload(file);
+
+              if (!editor || position === undefined) {
+                return;
+              }
+
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(position, {
+                  type: 'image',
+                  attrs: {
+                    src: url,
+                    alt: file.name,
+                  },
+                })
+                .run();
+            } catch (error) {
+              console.error('Failed to upload pasted image:', error);
+              alert('Failed to upload image. Please try again.');
+            }
+          })();
+
+          return true;
+        }
+
+        // 2. Direct image URL pasted as text
+        const pastedText = clipboardData.getData('text/plain').trim();
 
         if (pastedText && isDirectImageUrl(pastedText)) {
-          editor?.chain()
+          editor
+            ?.chain()
             .focus()
             .setImage({
               src: pastedText,
@@ -141,50 +204,81 @@ export function TiptapEditor({
 
           return true;
         }
-        const items = Array.from(event.clipboardData?.items ?? []);
 
-        const imageItem = items.find((item) =>
-          item.type.startsWith('image/')
-        );
+        // 3. Image copied from a browser page
+        const pastedHtml = clipboardData.getData('text/html');
 
-        if (!imageItem) {
-          return false;
-        }
+        if (pastedHtml) {
+          const document = new DOMParser().parseFromString(
+            pastedHtml,
+            'text/html'
+          );
 
-        const file = imageItem.getAsFile();
+          const image = document.querySelector('img');
 
-        if (!file) {
-          return false;
-        }
+          const src = image?.getAttribute('src');
 
-        const position = editor?.state.selection.from;
+          if (src) {
+            const position = editor?.state.selection.from;
 
-        void (async () => {
-          try {
-            const url = await onImageUpload(file);
+            void (async () => {
+              try {
+                // Download the browser image
+                const response = await fetch(src);
 
-            if (!editor || position === undefined) {
-              return;
-            }
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch image: ${response.status}`);
+                }
 
-            editor
-              .chain()
-              .focus()
-              .insertContentAt(position, {
-                type: 'image',
-                attrs: {
-                  src: url,
-                  alt: file.name,
-                },
-              })
-              .run();
-          } catch (error) {
-            console.error('Failed to upload pasted image:', error);
-            alert('Failed to upload image. Please try again.');
+                const blob = await response.blob();
+
+                if (!blob.type.startsWith('image/')) {
+                  throw new Error('Clipboard image is not a valid image.');
+                }
+
+                const extension =
+                  blob.type.split('/')[1]?.split('+')[0] || 'png';
+
+                const file = new File(
+                  [blob],
+                  `pasted-image.${extension}`,
+                  { type: blob.type }
+                );
+
+                const url = await onImageUpload(file);
+
+                if (!editor || position === undefined) {
+                  return;
+                }
+
+                editor
+                  .chain()
+                  .focus()
+                  .insertContentAt(position, {
+                    type: 'image',
+                    attrs: {
+                      src: url,
+                      alt: image?.getAttribute('alt') || '',
+                    },
+                  })
+                  .run();
+              } catch (error) {
+                console.error(
+                  'Failed to download and upload pasted browser image:',
+                  error
+                );
+                alert(
+                  'Could not copy this image. The source website may block image downloads.'
+                );
+              }
+            })();
+
+            return true;
           }
-        })();
+        }
 
-        return true;
+        // Let Tiptap handle normal text/HTML pasting
+        return false;
       },
 
       handleDrop: (_view, event, _slice, moved) => {
@@ -250,7 +344,15 @@ export function TiptapEditor({
   if (!editor) {
     return null;
   }
+  // Predicates for bubble menus
+  const textMenuShouldShow = ({ editor }: { editor: Editor }) => {
+    // Show only when there is a selection and the active node is NOT an image
+    return !editor.isActive('image') && !editor.state.selection.empty;
+  };
 
+  const imageMenuShouldShow = ({ editor }: { editor: Editor }) => {
+    return editor.isActive('image');
+  };
   return (
     <>
       <input
@@ -259,8 +361,10 @@ export function TiptapEditor({
         accept="image/*"
         className="hidden"
       />
+      {/* ====== TEXT BUBBLE MENU ====== */}
       <BubbleMenu
         editor={editor}
+        shouldShow={textMenuShouldShow}
         className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
       >
         {/* Bold */}
@@ -307,9 +411,7 @@ export function TiptapEditor({
         {/* Heading 1 */}
         <button
           type="button"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
@@ -322,9 +424,7 @@ export function TiptapEditor({
         {/* Heading 2 */}
         <button
           type="button"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
@@ -337,9 +437,7 @@ export function TiptapEditor({
         {/* Heading 3 */}
         <button
           type="button"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
@@ -347,6 +445,27 @@ export function TiptapEditor({
           title="Heading 3"
         >
           <Heading3 size={15} />
+        </button>
+
+        <div className="w-px h-5 bg-border" />
+
+        {/* Justify text */}
+        <button
+          type="button"
+          onClick={() => {
+            if (editor.isActive({ textAlign: 'justify' })) {
+              editor.chain().focus().setTextAlign('left').run();
+            } else {
+              editor.chain().focus().setTextAlign('justify').run();
+            }
+          }}
+          className={`p-1.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
+            ? 'text-accent bg-surface'
+            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+            }`}
+          title="Justify text"
+        >
+          <AlignJustify size={15} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -380,9 +499,7 @@ export function TiptapEditor({
         {/* Clear formatting */}
         <button
           type="button"
-          onClick={() =>
-            editor.chain().focus().unsetAllMarks().clearNodes().run()
-          }
+          onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
           className="p-1.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
           title="Clear formatting"
         >
@@ -401,6 +518,80 @@ export function TiptapEditor({
         >
           <LinkIcon size={15} />
         </button>
+      </BubbleMenu>
+      {/* ====== IMAGE BUBBLE MENU ====== */}
+      <BubbleMenu
+        editor={editor}
+        shouldShow={imageMenuShouldShow}
+        className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+      >
+        {/* Alignment */}
+        <button
+          type="button"
+          onClick={() =>
+            editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
+          }
+          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
+            ? 'text-accent bg-surface'
+            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+            }`}
+          title="Align image left"
+        >
+          <AlignLeft size={15} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
+          }
+          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
+            ? 'text-accent bg-surface'
+            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+            }`}
+          title="Center image"
+        >
+          <AlignCenter size={15} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
+          }
+          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
+            ? 'text-accent bg-surface'
+            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+            }`}
+          title="Align image right"
+        >
+          <AlignRight size={15} />
+        </button>
+
+        <div className="w-px h-5 bg-border" />
+
+        {/* Width presets */}
+        {[
+          { label: 'S', width: '25%', title: 'Small image' },
+          { label: 'M', width: '50%', title: 'Medium image' },
+          { label: 'L', width: '75%', title: 'Large image' },
+          { label: 'F', width: '100%', title: 'Full width image' },
+        ].map(({ label, width, title }) => (
+          <button
+            key={width}
+            type="button"
+            onClick={() =>
+              editor.chain().focus().updateAttributes('image', { width }).run()
+            }
+            className={`p-1.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title={title}
+          >
+            {label}
+          </button>
+        ))}
       </BubbleMenu>
 
       <EditorContent editor={editor} />

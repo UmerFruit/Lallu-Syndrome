@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { ArticleContent } from '@/components/articles/ArticleContent';
-import { upload, deleteRemovedContentImages, deleteCoverImage } from '@/services/storageService';
+import { upload, cleanupArticleContentMedia, deleteCoverImage } from '@/services/storageService';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   Maximize2, Minimize2, X, Check, ImagePlus,
@@ -150,9 +150,6 @@ export function ArticleEditorPage() {
       return;
     }
 
-    const previousContent = articleRef.current?.content ?? '';
-    const nextContent = formData.content;
-
     const data = {
       ...buildArticleData(),
       status: 'published' as ArticleStatus,
@@ -174,9 +171,9 @@ export function ArticleEditorPage() {
         articleRef.current = updated;
 
         try {
-          await deleteRemovedContentImages(previousContent, nextContent);
+          await cleanupArticleContentMedia(articleId,data.content ?? '');
         } catch (error) {
-          console.error('Failed to delete removed images:', error);
+          console.error('Failed to clean up article media:', error);
         }
       }
 
@@ -544,7 +541,13 @@ export function ArticleEditorPage() {
           </div>
 
           {/* Editor */}
-          <TiptapEditor value={formData.content} onChange={(val) => handleChange('content', val)} onImageUpload={uploadContentImage} />
+          <TiptapEditor
+            value={formData.content}
+            onChange={(val) => {
+              handleChange('content', val);
+            }}
+            onImageUpload={uploadContentImage}
+          />
         </div>
       )}
     </div>

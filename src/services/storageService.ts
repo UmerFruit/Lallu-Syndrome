@@ -6,7 +6,51 @@ export interface StorageUploadResult {
     path: string;
     publicUrl: string;
 }
+export async function cleanupArticleContentMedia(
+  articleId: string,
+  content: string
+): Promise<void> {
+  const folder = `articles/${articleId}/content`;
 
+  const referencedPaths = new Set(
+    extractStorageImagePaths(content)
+  );
+
+  const { data: files, error: listError } = await supabase.storage
+    .from(BUCKET)
+    .list(folder, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+
+  if (listError) {
+    throw listError;
+  }
+
+  const storedPaths = (files ?? [])
+    .filter(
+      (file) =>
+        file.name &&
+        file.name !== '.emptyFolderPlaceholder'
+    )
+    .map((file) => `${folder}/${file.name}`);
+
+  const orphanedPaths = storedPaths.filter(
+    (path) => !referencedPaths.has(path)
+  );
+
+  if (orphanedPaths.length === 0) {
+    return;
+  }
+
+  const { error: deleteError } = await supabase.storage
+    .from(BUCKET)
+    .remove(orphanedPaths);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+}
 export async function upload(articleId: string, file: File, type: 'cover' | 'content'): Promise<StorageUploadResult> {
 
     let filePath = `articles/${articleId}/`;
@@ -102,31 +146,10 @@ export function extractStorageImagePaths(content: string): string[] {
         const url = match[1];
 
         if (url.startsWith(publicUrlPrefix)) {
-            paths.push(url.slice(publicUrlPrefix.length));
+            const path = url.slice(publicUrlPrefix.length);
+            paths.push(path);
         }
     }
-
-    return [...new Set(paths)];
-}
-
-export async function deleteRemovedContentImages(
-    previousContent: string,
-    nextContent: string
-): Promise<void> {
-    const previousPaths = extractStorageImagePaths(previousContent);
-    const nextPaths = new Set(extractStorageImagePaths(nextContent));
-
-    const removedPaths = previousPaths.filter(
-        (path) => !nextPaths.has(path)
-    );
-
-    if (removedPaths.length === 0) return;
-
-    const { error } = await supabase.storage
-        .from(BUCKET)
-        .remove(removedPaths);
-
-    if (error) {
-        throw error;
-    }
+    const uniquePaths = [...new Set(paths)];
+    return uniquePaths;
 }
