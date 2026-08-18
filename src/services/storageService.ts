@@ -134,22 +134,27 @@ export function getPublicUrl(path: string): string {
     return data["publicUrl"]
 }
 export function extractStorageImagePaths(content: string): string[] {
-    const publicUrlPrefix =
-        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+  const publicUrlPrefix =
+    `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
 
-    const imageUrlRegex = /!\[[^\]]*]\(([^)]+)\)/g;
+  const document = new DOMParser().parseFromString(
+    content,
+    'text/html'
+  );
 
-    const paths: string[] = [];
-    let match: RegExpExecArray | null;
+  const paths: string[] = [];
 
-    while ((match = imageUrlRegex.exec(content)) !== null) {
-        const url = match[1];
+  document.querySelectorAll('img[src]').forEach((image) => {
+    const src = image.getAttribute('src');
 
-        if (url.startsWith(publicUrlPrefix)) {
-            const path = url.slice(publicUrlPrefix.length);
-            paths.push(path);
-        }
+    if (!src) {
+      return;
     }
-    const uniquePaths = [...new Set(paths)];
-    return uniquePaths;
+
+    if (src.startsWith(publicUrlPrefix)) {
+      paths.push(src.slice(publicUrlPrefix.length));
+    }
+  });
+
+  return [...new Set(paths)];
 }
