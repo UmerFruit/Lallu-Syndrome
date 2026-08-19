@@ -84,6 +84,7 @@ src/
   contexts/
     AuthContext.tsx
     ThemeContext.tsx
+    ToastContext.tsx
   lib/
     supabase.ts
   pages/
@@ -119,6 +120,7 @@ src/
   vite-env.d.ts
 supabase/
   .temp/
+    cli-latest
     gotrue-version
     linked-project.json
     pooler-url
@@ -157,6 +159,7 @@ supabase/
     20260818093232_profiles_permission2.sql
     20260818093622_profiles_permission3.sql
     20260818094053_avatars_storage.sql
+    20260819074048_remove_tags.sql
 .gitignore
 eslint.config.js
 index.html
@@ -272,110 +275,44 @@ export const CodeBlock = TiptapCodeBlock.extend({
 <file path="src/components/editor/processPastedHtml.ts">
 function decodeHtmlEntities(value: string): string {
   const textarea = document.createElement('textarea');
-
   textarea.innerHTML = value;
-
   return textarea.value;
 }
 
 function normalizeHtml(html: string): string {
   let result = html;
-
-  // Decode clipboard HTML if it has been entity-encoded.
   for (let i = 0; i < 3; i++) {
-    if (!result.includes('&lt;')) {
-      break;
-    }
-
+    if (!result.includes('&lt;')) break;
     const decoded = decodeHtmlEntities(result);
-
-    if (decoded === result) {
-      break;
-    }
-
+    if (decoded === result) break;
     result = decoded;
   }
-
   return result;
 }
 
-export async function processPastedHtml(
-  html: string,
-  onImageUpload: (file: File) => Promise<string>
-): Promise<string> {
+export type PastedImage = {
+  originalSrc: string;
+};
+
+export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
   const normalizedHtml = normalizeHtml(html);
-
-  const document = new DOMParser().parseFromString(
-    normalizedHtml,
-    'text/html'
-  );
-
+  const document = new DOMParser().parseFromString(normalizedHtml, 'text/html');
   const images = Array.from(document.querySelectorAll('img'));
+  const imagesToUpload: PastedImage[] = [];
 
-  await Promise.all(
-    images.map(async (image, index) => {
-      const src = image.getAttribute('src');
+  images.forEach((image) => {
+    const src = image.getAttribute('src');
+    if (!src) { return; }
 
-      if (!src) {
-        return;
-      }
+    // if already stored in our Supabase bucket. Don't re-upload.
+    if (src.includes('/storage/v1/object/public/media/')) { return; }
 
-      try {
-        // Already stored in our Supabase bucket.
-        // Don't download and upload it again.
-        if (
-          src.includes(
-            '/storage/v1/object/public/media/'
-          )
-        ) {
-          return;
-        }
+    imagesToUpload.push({ originalSrc: src });
+    image.removeAttribute('srcset');
+    image.removeAttribute('sizes');
 
-        const response = await fetch(src);
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch image: ${response.status}`
-          );
-        }
-
-        const blob = await response.blob();
-
-        if (!blob.type.startsWith('image/')) {
-          throw new Error('Source is not an image.');
-        }
-
-        const extension =
-          blob.type.split('/')[1]?.split('+')[0] || 'png';
-
-        const file = new File(
-          [blob],
-          `pasted-image-${index + 1}.${extension}`,
-          {
-            type: blob.type,
-          }
-        );
-
-        const url = await onImageUpload(file);
-
-        image.setAttribute('src', url);
-
-        // Don't carry responsive-image information
-        // from the source website into our editor.
-        image.removeAttribute('srcset');
-        image.removeAttribute('sizes');
-
-      } catch (error) {
-        console.error(
-          `Failed to process pasted image ${index + 1}:`,
-          error
-        );
-        throw error;
-      }
-    })
-  );
-
-  return document.body.innerHTML;
+  })
+  return { html: document.body.innerHTML, images: imagesToUpload };
 }
 </file>
 
@@ -923,6 +860,106 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 );
 
 Input.displayName = 'Input';
+</file>
+
+<file path="src/contexts/ToastContext.tsx">
+import { createContext, useContext, useState, useCallback, type ReactNode, useMemo } from 'react';
+import { CheckCircle, AlertCircle, X } from 'lucide-react'
+
+type ToastType = 'success' | 'error' | 'info';
+type Toast = {
+    id: string;
+    message: string;
+    type: ToastType;
+};
+
+type ToastContextValue = {
+    toast: {
+        success: (message: string) => void;
+        error: (message: string) => void;
+        info: (message: string) => void;
+    };
+};
+
+const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+
+export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    const showToast = useCallback(
+    (message: string, type: ToastType = 'info') => {
+        const id = crypto.randomUUID();
+
+        setToasts((prev) => [...prev, { id, message, type }]);
+
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 4000);
+    },
+    []
+);
+
+    const removeToast = (id: string) => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+    };
+
+    const toastValue = useMemo(
+        () => ({
+            toast: {
+                success: (message: string) => showToast(message, 'success'),
+                error: (message: string) => showToast(message, 'error'),
+                info: (message: string) => showToast(message, 'info'),
+            },
+        }),
+        [showToast]
+    );
+    return (
+        <ToastContext.Provider value={toastValue}>
+            {children}
+
+            {/* Toast Container */}
+            <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+                {toasts.map((t) => {
+                    const toastClassNames: Record<ToastType, string> = {
+                        error: 'bg-red-950/90 border-red-800 text-red-100',
+                        success: 'bg-emerald-950/90 border-emerald-800 text-emerald-100',
+                        info: 'bg-surface/90 border-border text-text-primary',
+                    };
+
+                    let toastIcon: ReactNode = null;
+                    if (t.type === 'error') {
+                        toastIcon = <AlertCircle size={18} className="text-red-400 shrink-0" />;
+                    } else if (t.type === 'success') {
+                        toastIcon = <CheckCircle size={18} className="text-emerald-400 shrink-0" />;
+                    }
+
+                    return <div
+                        key={t.id}
+                        className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-up min-w-[280px] max-w-sm backdrop-blur-sm ${toastClassNames[t.type]}`}
+                    >
+                        {toastIcon}
+                        <p className="text-sm flex-1">{t.message}</p>
+                        <button
+                            type="button"
+                            onClick={() => removeToast(t.id)}
+                            className="text-text-muted hover:text-text-primary transition-colors shrink-0"
+                            aria-label="Dismiss"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>;
+                })
+                }
+            </div >
+        </ToastContext.Provider >
+    );
+}
+
+export function useToast() {
+    const ctx = useContext(ToastContext);
+    if (!ctx) throw new Error('useToast must be used within ToastProvider');
+    return ctx;
+}
 </file>
 
 <file path="src/pages/auth/LoginPage.tsx">
@@ -2140,6 +2177,10 @@ createRoot(document.getElementById('root')!).render(
 /// <reference types="vite/client" />
 </file>
 
+<file path="supabase/.temp/cli-latest">
+v2.115.0
+</file>
+
 <file path="supabase/.temp/gotrue-version">
 v2.195.0
 </file>
@@ -3045,6 +3086,11 @@ using (
 );
 </file>
 
+<file path="supabase/migrations/20260819074048_remove_tags.sql">
+drop table if exists public.article_tags;
+drop table if exists public.tags;
+</file>
+
 <file path=".gitignore">
 logs
 *.log
@@ -3523,79 +3569,6 @@ export default function CodeBlockComponent({ node, updateAttributes, deleteNode 
         <NodeViewContent spellCheck={false} />
       </div>
     </NodeViewWrapper>
-  );
-}
-</file>
-
-<file path="src/components/interactions/LikeButton.tsx">
-import { useState } from 'react';
-import { Heart } from 'lucide-react';
-import { toggleLike } from '@/services/articleService';
-import { useAuth } from '@/contexts/AuthContext';
-
-type LikeButtonProps = {
-  articleId: string;
-  initialLikes: number;
-  initiallyLiked?: boolean;
-};
-
-export function LikeButton({ articleId, initialLikes, initiallyLiked = false }: Readonly<LikeButtonProps>) {
-  const [liked, setLiked] = useState(initiallyLiked);
-  const [likes, setLikes] = useState(initialLikes);
-  const [animating, setAnimating] = useState(false);
-  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
-  const { user } = useAuth();
-
-  const handleToggle = async () => {
-    // Intercept click if not logged in
-    if (!user) {
-      setShowAuthPrompt(true);
-      setTimeout(() => setShowAuthPrompt(false), 3000);
-      return;
-    }
-
-    const result = await toggleLike(articleId);
-    setLiked(result.liked);
-    setLikes(result.likes);
-    if (result.liked) {
-      setAnimating(true);
-      setTimeout(() => setAnimating(false), 300);
-    }
-  };
-
-  return (
-    <div className="relative inline-flex items-center">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="group inline-flex items-center gap-2.5 px-4 py-2.5 rounded border border-border bg-surface hover:border-text-muted transition-colors duration-200"
-        aria-pressed={liked}
-        aria-label={liked ? 'Unlike article' : 'Like article'}
-      >
-        <Heart
-          size={20}
-          className={`transition-all duration-200 ${
-            liked
-              ? 'fill-accent text-accent'
-              : 'text-text-muted group-hover:text-text-secondary'
-          } ${animating ? 'animate-pulse-once' : ''}`}
-        />
-        <span className={`text-sm font-medium ${liked ? 'text-accent' : 'text-text-secondary'}`}>
-          {likes}
-        </span>
-      </button>
-
-      {/* Tooltip message when unauthenticated */}
-      {showAuthPrompt && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="absolute bottom-full mb-2 left-0 whitespace-nowrap rounded bg-elevated border border-border px-2.5 py-1 text-xs text-text-primary shadow-md"
-        >
-          Sign in to like articles
-        </div>
-      )}
-    </div>
   );
 }
 </file>
@@ -5739,6 +5712,89 @@ function CommentItem({
 }
 </file>
 
+<file path="src/components/interactions/LikeButton.tsx">
+import { useState } from 'react';
+import { Heart } from 'lucide-react';
+import { toggleLike } from '@/services/articleService';
+import { useAuth } from '@/contexts/AuthContext';
+
+type LikeButtonProps = {
+  articleId: string;
+  initialLikes: number;
+  initiallyLiked?: boolean;
+};
+
+export function LikeButton({ articleId, initialLikes, initiallyLiked = false }: Readonly<LikeButtonProps>) {
+  const [liked, setLiked] = useState(initiallyLiked);
+  const [likes, setLikes] = useState(initialLikes);
+  const [animating, setAnimating] = useState(false);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  const handleToggle = async () => {
+    if (loading) return;
+
+    // Intercept click if not logged in
+    if (!user) {
+      setShowAuthPrompt(true);
+      setTimeout(() => setShowAuthPrompt(false), 3000);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await toggleLike(articleId);
+      setLiked(result.liked);
+      setLikes(result.likes);
+      if (result.liked) {
+        setAnimating(true);
+        setTimeout(() => setAnimating(false), 300);
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        type="button"
+        disabled={loading}
+        onClick={handleToggle}
+        className="group inline-flex items-center gap-2.5 px-4 py-2.5 rounded border border-border bg-surface hover:border-text-muted transition-colors duration-200"
+        aria-pressed={liked}
+        aria-label={liked ? 'Unlike article' : 'Like article'}
+      >
+        <Heart
+          size={20}
+          className={`transition-all duration-200 ${liked
+            ? 'fill-accent text-accent'
+            : 'text-text-muted group-hover:text-text-secondary'
+            } ${animating ? 'animate-pulse-once' : ''}`}
+        />
+        <span className={`text-sm font-medium ${liked ? 'text-accent' : 'text-text-secondary'}`}>
+          {likes}
+        </span>
+      </button>
+
+      {/* Tooltip message when unauthenticated */}
+      {showAuthPrompt && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute bottom-full mb-2 left-0 whitespace-nowrap rounded bg-elevated border border-border px-2.5 py-1 text-xs text-text-primary shadow-md"
+        >
+          Sign in to like articles
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
 <file path="src/services/categoryService.ts">
 import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types";
@@ -5928,128 +5984,6 @@ export async function logout(): Promise<void> {
 
   if (error) { throw new Error(error.message);}
 }
-</file>
-
-<file path="src/App.tsx">
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { type ReactNode, useEffect } from 'react';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { HomePage } from '@/pages/HomePage';
-import { ArticlesPage } from '@/pages/ArticlesPage';
-import { ArticlePage } from '@/pages/ArticlePage';
-import { CategoryPage } from '@/pages/CategoryPage';
-import { AboutPage } from '@/pages/AboutPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { SignupPage } from '@/pages/auth/SignupPage';
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
-import { SettingsLayout } from '@/components/layout/SettingsLayout';
-import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
-import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
-
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  return null;
-}
-
-function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
-  );
-}
-
-function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen bg-bg">{children}</div>
-  );
-}
-
-function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-    </div>
-  );
-}
-
-function AppRoutes() {
-  return (
-    <>
-      <ScrollToTop />
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
-        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
-        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
-        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
-        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
-
-        {/* Auth routes */}
-        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
-        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
-        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
-        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
-
-        {/* Dashboard routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route
-          path="/settings"
-          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
-        >
-          <Route index element={<Navigate to="profile" replace />} />
-          <Route path="profile" element={<ProfileSettingsPage />} />
-          <Route path="password" element={<PasswordSettingsPage />} />
-
-        </Route>
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </ThemeProvider>
-  );
-}
-
-export default App;
 </file>
 
 <file path="src/index.css">
@@ -6994,6 +6928,131 @@ export function ArticlesPage() {
 }
 </file>
 
+<file path="src/App.tsx">
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { type ReactNode, useEffect } from 'react';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { HomePage } from '@/pages/HomePage';
+import { ArticlesPage } from '@/pages/ArticlesPage';
+import { ArticlePage } from '@/pages/ArticlePage';
+import { CategoryPage } from '@/pages/CategoryPage';
+import { AboutPage } from '@/pages/AboutPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
+import { LoginPage } from '@/pages/auth/LoginPage';
+import { SignupPage } from '@/pages/auth/SignupPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { SettingsLayout } from '@/components/layout/SettingsLayout';
+import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
+import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
+import { ToastProvider } from '@/contexts/ToastContext';
+
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
+function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
+function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen bg-bg">{children}</div>
+  );
+}
+
+function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <>
+      <ScrollToTop />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
+        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
+        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
+        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
+        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
+
+        {/* Auth routes */}
+        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
+        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
+        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
+        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
+
+        {/* Dashboard routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
+        >
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="password" element={<PasswordSettingsPage />} />
+
+        </Route>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
+</file>
+
 <file path="src/contexts/AuthContext.tsx">
 import {
   createContext,
@@ -7280,11 +7339,72 @@ export function extractStorageImagePaths(content: string): string[] {
 }
 </file>
 
+<file path="package.json">
+{
+  "name": "vite-react-typescript-starter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@supabase/supabase-js": "^2.112.2",
+    "@tiptap/extension-image": "^3.30.1",
+    "@tiptap/extension-link": "^3.30.1",
+    "@tiptap/extension-placeholder": "^3.30.1",
+    "@tiptap/extension-text-align": "^3.30.1",
+    "@tiptap/extension-underline": "^3.30.1",
+    "@tiptap/pm": "^3.30.1",
+    "@tiptap/react": "^3.30.1",
+    "@tiptap/starter-kit": "^3.30.1",
+    "@tiptap/suggestion": "^3.30.1",
+    "@uiw/react-markdown-preview": "^5.2.1",
+    "@uiw/react-md-editor": "^4.1.1",
+    "dompurify": "^3.4.13",
+    "highlight.js": "^11.11.1",
+    "lucide-react": "^0.446.0",
+    "markdown-it-highlightjs": "^4.3.0",
+    "ogl": "^1.0.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.2",
+    "tippy.js": "^6.3.7",
+    "tiptap-markdown": "^0.9.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@types/node": "^26.2.0",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "eslint": "^9.9.1",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "globals": "^15.9.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.3.0",
+    "vite": "^5.4.2"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
+</file>
+
 <file path="src/pages/DashboardPage.tsx">
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Article } from '@/types';
-import { getAllArticles, deleteArticle } from '@/services/articleService';
+import { getMyArticles, deleteArticle } from '@/services/articleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer } from '@/components/layout/Navbar';
 import { formatDate } from '@/utils/date';
@@ -7303,11 +7423,13 @@ export function DashboardPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    getAllArticles().then((a) => {
+    if (!user) return;
+
+    getMyArticles(user.id).then((a) => {
       setArticles(a);
       setLoading(false);
     });
-  }, []);
+  }, [user]);
 
   const published = articles.filter((a) => a.status === 'published');
   const drafts = articles.filter((a) => a.status === 'draft');
@@ -7455,77 +7577,15 @@ function TabButton({ label, count, active, onClick }: Readonly<{ label: string; 
     <button
       type="button"
       onClick={onClick}
-      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${
-        active
+      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
           ? 'border-accent text-text-primary'
           : 'border-transparent text-text-muted hover:text-text-secondary'
-      }`}
+        }`}
     >
       {label}
       <span className="ml-1.5 font-mono text-xs text-text-muted">{count}</span>
     </button>
   );
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "vite-react-typescript-starter",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
-  },
-  "dependencies": {
-    "@floating-ui/dom": "^1.8.0",
-    "@supabase/supabase-js": "^2.112.2",
-    "@tiptap/extension-image": "^3.30.1",
-    "@tiptap/extension-link": "^3.30.1",
-    "@tiptap/extension-placeholder": "^3.30.1",
-    "@tiptap/extension-text-align": "^3.30.1",
-    "@tiptap/extension-underline": "^3.30.1",
-    "@tiptap/pm": "^3.30.1",
-    "@tiptap/react": "^3.30.1",
-    "@tiptap/starter-kit": "^3.30.1",
-    "@tiptap/suggestion": "^3.30.1",
-    "@uiw/react-markdown-preview": "^5.2.1",
-    "@uiw/react-md-editor": "^4.1.1",
-    "dompurify": "^3.4.13",
-    "highlight.js": "^11.11.1",
-    "lucide-react": "^0.446.0",
-    "markdown-it-highlightjs": "^4.3.0",
-    "ogl": "^1.0.11",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2",
-    "tippy.js": "^6.3.7",
-    "tiptap-markdown": "^0.9.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.9.1",
-    "@types/node": "^26.2.0",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.18",
-    "eslint": "^9.9.1",
-    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
-    "eslint-plugin-react-refresh": "^0.4.11",
-    "globals": "^15.9.0",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^8.3.0",
-    "vite": "^5.4.2"
-  },
-  "allowScripts": {
-    "esbuild@0.21.5": true
-  }
 }
 </file>
 
@@ -7543,6 +7603,7 @@ import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
 import { DOMParser as TiptapDOMParser } from '@tiptap/pm/model';
+import { useToast } from '@/contexts/ToastContext';
 
 import {
   Bold,
@@ -7582,6 +7643,7 @@ export function TiptapEditor({
   onImageUpload
 }: Readonly<TiptapEditorProps>) {
 
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openImagePicker = (targetEditor: Editor) => {
@@ -7605,7 +7667,7 @@ export function TiptapEditor({
           .run();
       } catch (error) {
         console.error('Failed to upload image:', error);
-        alert('Failed to upload image. Please try again.');
+        toast.error('Failed to upload image. Please try again.');
       } finally {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -7703,7 +7765,7 @@ export function TiptapEditor({
                 .run();
             } catch (error) {
               console.error('Failed to upload pasted image:', error);
-              alert('Failed to upload image. Please try again.');
+              toast.error('Failed to upload image. Please try again.');
             }
           })();
 
@@ -7714,14 +7776,38 @@ export function TiptapEditor({
         const pastedText = clipboardData.getData('text/plain').trim();
 
         if (pastedText && isDirectImageUrl(pastedText)) {
-          editor
-            ?.chain()
-            .focus()
-            .setImage({
-              src: pastedText,
-              alt: '',
-            })
-            .run();
+          if (!editor) return true;
+          editor.chain().focus().setImage({ src: pastedText, alt: '' }).run();
+
+          void (async () => {
+            try {
+              const response = await fetch(pastedText);
+              if (!response.ok) return;
+              const blob = await response.blob();
+              if (!blob.type.startsWith('image/')) return;
+
+              const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
+              const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+              const url = await onImageUpload(file);
+
+              // Find the image node by its original src and update it
+              editor.chain().command(({ tr }) => {
+                let updated = false;
+                tr.doc.descendants((node, pos) => {
+                  if (node.type.name === 'image' && node.attrs.src === pastedText) {
+                    tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
+                    updated = true;
+                    return false;
+                  }
+                });
+                return updated;
+              }).run();
+            }
+            catch (error) {
+              console.error('Failed to upload image from URL:', error);
+              toast.error('Failed to upload image from URL. Please try again.');
+            }
+          })();
 
           return true;
         }
@@ -7730,34 +7816,43 @@ export function TiptapEditor({
         const pastedHtml = clipboardData.getData('text/html');
 
         if (pastedHtml) {
-          const position = editor?.state.selection.from;
+          if (!editor) return true;
+
+          // Process HTML synchronously to get the content and the list of images
+          const { html: processedHtml, images } = processPastedHtml(pastedHtml);
+
+          // FIX: Let Tiptap parse the HTML string directly. 
+          // This safely handles the schema and replaces active text selections.
+          editor.chain().focus().insertContent(processedHtml).run();
 
           void (async () => {
-            try {
-              if (!editor || position === undefined) {
-                return;
+            for (const img of images) {
+              try {
+                const response = await fetch(img.originalSrc);
+                if (!response.ok) continue;
+                const blob = await response.blob();
+                if (!blob.type.startsWith('image/')) continue;
+
+                const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
+                const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+                const url = await onImageUpload(file);
+
+                // Find the image node by its original src and update it
+                editor.chain().command(({ tr }) => {
+                  let updated = false;
+                  tr.doc.descendants((node, pos) => {
+                    if (node.type.name === 'image' && node.attrs.src === img.originalSrc) {
+                      tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
+                      updated = true;
+                      return false;
+                    }
+                  });
+                  return updated;
+                }).run();
+              } catch (error) {
+                console.error(`Failed to process pasted image:`, error);
+                toast.error('Failed to process pasted image. Please try again.');
               }
-
-              const processedHtml = await processPastedHtml(
-                pastedHtml,
-                onImageUpload
-              );
-
-              const parsed = TiptapDOMParser.fromSchema(editor.schema).parse(
-                new window.DOMParser()
-                  .parseFromString(processedHtml, 'text/html')
-                  .body
-              );
-
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(position, parsed.toJSON())
-                .run();
-
-
-            } catch (error) {
-              console.error('Paste processing failed:', error);
             }
           })();
 
@@ -7793,7 +7888,7 @@ export function TiptapEditor({
               .run();
           } catch (error) {
             console.error('Failed to upload dropped image:', error);
-            alert('Failed to upload image. Please try again.');
+            toast.error('Failed to upload image. Please try again.');
           }
         })();
 
@@ -7817,12 +7912,7 @@ export function TiptapEditor({
       return;
     }
 
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange('link')
-      .setLink({ href: url })
-      .run();
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   };
 
   if (!editor) {
@@ -8082,78 +8172,6 @@ export function TiptapEditor({
     </>
   );
 }
-</file>
-
-<file path="src/types/index.ts">
-import type { User } from '@supabase/supabase-js';
-
-export type ArticleStatus = 'draft' | 'published';
-
-export type Author = {
-  name: string;
-  avatar?: string;
-  bio?: string;
-};
-
-export type ArticleInput = Pick<
-  Article,
-  'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
->;
-
-export type CreateArticleInput = {
-  title?: string;
-  slug?: string;
-  content?: string;
-  category?: string;
-  coverImage?: string;
-  status?: Article['status'];
-};
-export type ArticleUpdateData = {
-  title?: string;
-  slug?: string;
-  content?: string;
-  cover_image?: string | null;
-  status?: Article['status'];
-  category_id?: number;
-  reading_time?: number;
-};
-export type Comment = {
-  id: string;
-  articleId: string;
-  author: string;
-  avatar?: string;
-  content: string;
-  createdAt: string;
-  parentId: string | null;
-};
-
-export type Category = {
-  id: number;
-  slug: string;
-  name: string;
-};
-
-export type Article = {
-  id: string;
-  slug: string;
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  coverImage: string;
-  author: Author;
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt?: string;
-  readingTime: number;
-  likes: number;
-  status: ArticleStatus;
-};
-
-export type AuthState = {
-  user: User | null;
-  isLoading: boolean;
-};
 </file>
 
 <file path="src/pages/ArticlePage.tsx">
@@ -8504,6 +8522,77 @@ export function HomePage() {
 }
 </file>
 
+<file path="src/types/index.ts">
+import type { User } from '@supabase/supabase-js';
+
+export type ArticleStatus = 'draft' | 'published';
+
+export type Author = {
+  name: string;
+  avatar?: string;
+  bio?: string;
+};
+
+export type ArticleInput = Pick<
+  Article,
+  'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
+>;
+
+export type CreateArticleInput = {
+  title?: string;
+  slug?: string;
+  content?: string;
+  category?: string;
+  coverImage?: string;
+  status?: Article['status'];
+};
+export type ArticleUpdateData = {
+  title?: string;
+  slug?: string;
+  content?: string;
+  cover_image?: string | null;
+  status?: Article['status'];
+  category_id?: number;
+  reading_time?: number;
+};
+export type Comment = {
+  id: string;
+  articleId: string;
+  author: string;
+  avatar?: string;
+  content: string;
+  createdAt: string;
+  parentId: string | null;
+};
+
+export type Category = {
+  id: number;
+  slug: string;
+  name: string;
+};
+
+export type Article = {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  category: string;
+  coverImage: string;
+  author: Author;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+  readingTime: number;
+  likes: number;
+  status: ArticleStatus;
+};
+
+export type AuthState = {
+  user: User | null;
+  isLoading: boolean;
+};
+</file>
+
 <file path="src/services/articleService.ts">
 import type { Article, Comment, ArticleInput } from '@/types';
 import type { Database } from '@/types/database';
@@ -8522,11 +8611,6 @@ const ARTICLE_SELECT = `
     display_name,
     avatar_url,
     bio
-  ),
-  article_tags (
-    tags (
-      name
-    )
   ),
   article_likes (
     count
@@ -8548,10 +8632,7 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     throw new Error(`Profile not found for article ${article.id}`);
   }
 
-  const tags = article.article_tags
-    .map((articleTag) => articleTag.tags?.name)
-    .filter((name): name is string => Boolean(name));
-
+  
   const likes = article.article_likes?.[0]?.count ?? 0;
 
   return {
@@ -8560,7 +8641,6 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     title: article.title,
     content: article.content,
     category: article.categories.slug,
-    tags,
     coverImage: article.cover_image ?? '',
     author: {
       name: article.profiles.display_name,
@@ -8604,11 +8684,13 @@ function mapSupabaseComment(
 
 export function calculateReadingTime(content: string): number {
   const wordsPerMinute = 220;
-  const trimmedContent = content.trim();
 
-  if (!trimmedContent) return 1;
+  const doc = new DOMParser().parseFromString(content,"text/html");
+  const plaintext = (doc.body.textContent || '').trim();
+  
+  if (!plaintext) return 1;
 
-  const words = trimmedContent.split(/\s+/).length;
+  const words = plaintext.split(/\s+/).length;
 
   return Math.max(1, Math.ceil(words / wordsPerMinute));
 }
@@ -9080,6 +9162,16 @@ export async function isLiked(articleId: string): Promise<boolean> {
 
   return data !== null;
 }
+export async function getMyArticles(userId: string): Promise<Article[]> {
+  const {data, error} = await supabase
+  .from("articles")
+  .select(ARTICLE_SELECT)
+  .eq("author_id", userId)
+  .order("created_at",{ascending: false});
+  
+  if (error) throw error;
+  return data.map(mapSupabaseArticle);
+}
 </file>
 
 <file path="src/pages/ArticleEditorPage.tsx">
@@ -9101,6 +9193,7 @@ import {
 import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { getLocalDateTime } from '@/utils/date';
 import Strands from '@/components/ui/Strands';
+import { useToast } from '@/contexts/ToastContext';
 
 const AUTHOR = { name: 'Umer Farooq', avatar: 'https://images.unsplash.com/photo-1500648767731-5ca545ace573?w=200&h=200&fit=crop&crop=faces&q=80' };
 
@@ -9111,12 +9204,11 @@ export function ArticleEditorPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
-
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     category: 'development',
-    tags: '',
     slug: '',
     coverImage: '',
     status: 'draft' as ArticleStatus,
@@ -9152,7 +9244,6 @@ export function ArticleEditorPage() {
             title: a.title,
             content: a.content,
             category: a.category,
-            tags: a.tags.join(', '),
             slug: a.slug,
             coverImage: a.coverImage,
             status: a.status,
@@ -9170,7 +9261,6 @@ export function ArticleEditorPage() {
   );
   const buildArticleData = useCallback((): Partial<Article> => ({
     ...formData,
-    tags: formData.tags.split(',').map((t) => t.trim()).filter(Boolean),
     slug: formData.slug || generateSlug(formData.title || 'untitled'),
     author: AUTHOR,
     readingTime,
@@ -9228,12 +9318,12 @@ export function ArticleEditorPage() {
 
   const handlePublish = async () => {
     if (!formData.coverImage) {
-      alert('Cover image is required for published articles.');
+      toast.error('Cover image is required for published articles.');
       return;
     }
 
     if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
-      alert('Publication date cannot be in the future.');
+      toast.error('Publication date cannot be in the future.');
       return;
     }
 
@@ -9272,8 +9362,7 @@ export function ArticleEditorPage() {
     const isEmpty =
       !formData.title.trim() &&
       !formData.content.trim() &&
-      !formData.coverImage.trim() &&
-      !formData.tags.trim();
+      !formData.coverImage.trim();
 
     if (isNew && isEmpty && !articleRef.current?.id) {
       navigate('/dashboard');
@@ -9293,7 +9382,7 @@ export function ArticleEditorPage() {
     } catch (error) {
       console.error('Failed to save article:', error);
       exitRequestedRef.current = false;
-      alert('Failed to save the article. Please try again.');
+      toast.error('Failed to save the article. Please try again.');
     }
   };
 
@@ -9305,7 +9394,7 @@ export function ArticleEditorPage() {
     const articleId = articleRef.current?.id ?? id;
 
     if (!articleId || articleId === 'new') {
-      alert('Save the article before uploading a cover image.');
+      toast.error('Save the article before uploading a cover image.');
       return;
     }
 
@@ -9321,7 +9410,7 @@ export function ArticleEditorPage() {
       handleChange('coverImage', result.publicUrl);
     } catch (error) {
       console.error('Failed to upload cover image:', error);
-      alert('Failed to upload cover image. Please try again.');
+      toast.error('Failed to upload cover image. Please try again.');
     } finally {
       setSaveState('idle');
     }
@@ -9482,15 +9571,6 @@ export function ArticleEditorPage() {
                   onChange={(e) => handleChange('slug', e.target.value)}
                 />
               </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Tags (comma-separated)"
-                  name="tags"
-                  placeholder="TypeScript, React, API"
-                  value={formData.tags}
-                  onChange={(e) => handleChange('tags', e.target.value)}
-                />
-              </div>
 
               <div>
                 <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
@@ -9606,7 +9686,7 @@ export function ArticleEditorPage() {
                     handleChange('coverImage', '');
                   } catch (error) {
                     console.error('Failed to remove cover image:', error);
-                    alert('Failed to remove cover image. Please try again.');
+                    toast.error('Failed to remove cover image. Please try again.');
                   }
                 }}
                 className="absolute top-2 right-2 p-1.5 rounded bg-bg/80 text-text-secondary hover:text-accent transition-colors"

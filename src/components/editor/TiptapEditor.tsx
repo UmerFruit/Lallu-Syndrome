@@ -184,14 +184,38 @@ export function TiptapEditor({
         const pastedText = clipboardData.getData('text/plain').trim();
 
         if (pastedText && isDirectImageUrl(pastedText)) {
-          editor
-            ?.chain()
-            .focus()
-            .setImage({
-              src: pastedText,
-              alt: '',
-            })
-            .run();
+          if (!editor) return true;
+          editor.chain().focus().setImage({ src: pastedText, alt: '' }).run();
+
+          void (async () => {
+            try {
+              const response = await fetch(pastedText);
+              if (!response.ok) return;
+              const blob = await response.blob();
+              if (!blob.type.startsWith('image/')) return;
+
+              const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
+              const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+              const url = await onImageUpload(file);
+
+              // Find the image node by its original src and update it
+              editor.chain().command(({ tr }) => {
+                let updated = false;
+                tr.doc.descendants((node, pos) => {
+                  if (node.type.name === 'image' && node.attrs.src === pastedText) {
+                    tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
+                    updated = true;
+                    return false;
+                  }
+                });
+                return updated;
+              }).run();
+            }
+            catch (error) {
+              console.error('Failed to upload image from URL:', error);
+              toast.error('Failed to upload image from URL. Please try again.');
+            }
+          })();
 
           return true;
         }
@@ -200,34 +224,43 @@ export function TiptapEditor({
         const pastedHtml = clipboardData.getData('text/html');
 
         if (pastedHtml) {
-          const position = editor?.state.selection.from;
+          if (!editor) return true;
+
+          // Process HTML synchronously to get the content and the list of images
+          const { html: processedHtml, images } = processPastedHtml(pastedHtml);
+
+          // FIX: Let Tiptap parse the HTML string directly. 
+          // This safely handles the schema and replaces active text selections.
+          editor.chain().focus().insertContent(processedHtml).run();
 
           void (async () => {
-            try {
-              if (!editor || position === undefined) {
-                return;
+            for (const img of images) {
+              try {
+                const response = await fetch(img.originalSrc);
+                if (!response.ok) continue;
+                const blob = await response.blob();
+                if (!blob.type.startsWith('image/')) continue;
+
+                const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
+                const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+                const url = await onImageUpload(file);
+
+                // Find the image node by its original src and update it
+                editor.chain().command(({ tr }) => {
+                  let updated = false;
+                  tr.doc.descendants((node, pos) => {
+                    if (node.type.name === 'image' && node.attrs.src === img.originalSrc) {
+                      tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
+                      updated = true;
+                      return false;
+                    }
+                  });
+                  return updated;
+                }).run();
+              } catch (error) {
+                console.error(`Failed to process pasted image:`, error);
+                toast.error('Failed to process pasted image. Please try again.');
               }
-
-              const processedHtml = await processPastedHtml(
-                pastedHtml,
-                onImageUpload
-              );
-
-              const parsed = TiptapDOMParser.fromSchema(editor.schema).parse(
-                new window.DOMParser()
-                  .parseFromString(processedHtml, 'text/html')
-                  .body
-              );
-
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(position, parsed.toJSON())
-                .run();
-
-
-            } catch (error) {
-              console.error('Paste processing failed:', error);
             }
           })();
 
@@ -287,12 +320,7 @@ export function TiptapEditor({
       return;
     }
 
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange('link')
-      .setLink({ href: url })
-      .run();
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   };
 
   if (!editor) {
