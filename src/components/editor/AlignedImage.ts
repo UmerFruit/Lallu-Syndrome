@@ -6,7 +6,7 @@ export const AlignedImage = Image.extend({
       ...this.parent?.(),
 
       width: {
-        default: '100%',
+        default: '75%',
 
         parseHTML: (element) => {
           const dataWidth = element.dataset.width;

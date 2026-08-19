@@ -106,7 +106,11 @@ export function TiptapEditor({
       Link.configure({
         openOnClick: false,
       }),
-      TextAlign.configure({
+      TextAlign.extend({
+        addKeyboardShortcuts() {
+          return {}; // disable all TextAlign shortcuts
+        },
+      }).configure({
         types: ['paragraph', 'heading'],
         defaultAlignment: 'justify',
       }),
