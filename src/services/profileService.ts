@@ -79,3 +79,13 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
   // Append timestamp to bypass browser cache when the image updates
   return `${data.publicUrl}?t=${Date.now()}`;
 }
+
+export async function getProfileByUsername(username: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Profile | null;
+}

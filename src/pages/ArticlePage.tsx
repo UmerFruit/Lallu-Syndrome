@@ -150,18 +150,33 @@ export function ArticlePage() {
           <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
             {/* Author Info */}
             <div className="text-center mb-6 pb-6 border-b border-border-subtle">
-              {article.author.avatar && (
-                <img
-                  src={article.author.avatar}
-                  alt={article.author.name}
-                  className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
-                />
+              {article.author.username ? (
+                <Link to={`/writers/${article.author.username}`} className="group block">
+                  {article.author.avatar && (
+                    <img
+                      src={article.author.avatar}
+                      alt={article.author.name}
+                      className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5 transition-colors duration-200 group-hover:border-accent/40"
+                    />
+                  )}
+                  <h3 className="text-sm font-semibold text-text-primary mb-1 transition-colors duration-200 group-hover:text-accent">
+                    {article.author.name}
+                  </h3>
+                </Link>
+              ) : (
+                <>
+                  {article.author.avatar && (
+                    <img
+                      src={article.author.avatar}
+                      alt={article.author.name}
+                      className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
+                    />
+                  )}
+                  <h3 className="text-sm font-semibold text-text-primary mb-1">
+                    {article.author.name}
+                  </h3>
+                </>
               )}
-
-              <h3 className="text-sm font-semibold text-text-primary mb-1">
-                {article.author.name}
-              </h3>
-
               <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                 <span>{article.author.bio ?? "Writing about Linux & open source"}</span>

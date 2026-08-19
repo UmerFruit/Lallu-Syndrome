@@ -8,6 +8,7 @@ import { UserMenu } from '@/components/layout/UserMenu';
 const navLinks = [
   { label: 'Articles', to: '/articles' },
   { label: 'About', to: '/about' },
+  { label: 'Creator', to: '/creator' },
 ];
 
 export function Navbar() {
@@ -19,6 +20,7 @@ export function Navbar() {
   const isActive = (path: string) => {
     if (path === '/articles') return location.pathname.startsWith('/articles');
     if (path === '/about') return location.pathname === '/about';
+    if (path === '/creator') return location.pathname === '/creator';
     return false;
   };
 
@@ -39,11 +41,10 @@ export function Navbar() {
             <Link
               key={link.to}
               to={link.to}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${
-                isActive(link.to)
+              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${isActive(link.to)
                   ? 'text-text-primary'
                   : 'text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               {link.label}
             </Link>

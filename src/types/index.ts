@@ -4,6 +4,7 @@ export type ArticleStatus = 'draft' | 'published';
 
 export type Author = {
   name: string;
+  username?: string;
   avatar?: string;
   bio?: string;
 };

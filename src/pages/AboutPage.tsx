@@ -1,19 +1,26 @@
-import { PageContainer } from '@/components/layout/Navbar';
-import { ArrowUpRight } from 'lucide-react';
-import { getCategories } from '@/services/categoryService';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
+import { getCategories } from '@/services/categoryService';
 import type { Category } from '@/types';
 
-const PORTFOLIO_URL = 'https://umerfruit.dev';
-const GITHUB_URL = 'https://github.com/UmerFruit';
-const LINKEDIN_URL = 'https://www.linkedin.com/in/umer-farooq-242130277/';
-const Avatar_Photo =
-  'https://pvbcyuflhlucnmcnlgfh.supabase.co/storage/v1/object/public/avatars/d30e44ea-4558-40d6-a3ef-b05ead808f06/avatar.png';
-
-const externalLinks = [
-  { label: 'Portfolio', href: PORTFOLIO_URL },
-  { label: 'GitHub', href: GITHUB_URL },
-  { label: 'LinkedIn', href: LINKEDIN_URL },
+const principles = [
+  {
+    id: '01',
+    title: 'Depth over noise',
+    body: 'Articles are written to be useful in six months, not six hours. Nothing padded, nothing rushed.',
+  },
+  {
+    id: '02',
+    title: 'Show the work',
+    body: 'Code, configs, and failure notes included. Reproduce it, improve it, or disagree with it.',
+  },
+  {
+    id: '03',
+    title: 'Stay independent',
+    body: 'No sponsors, no affiliates, no engagement bait. The opinions here belong to the authors alone.',
+  },
 ];
 
 export function AboutPage() {
@@ -31,69 +38,81 @@ export function AboutPage() {
     <div className="grain">
       <PageContainer className="py-16 md:py-24">
         <div className="relative mx-auto max-w-2xl">
-          {/* Top label */}
+          {/* Eyebrow */}
           <p
             className="anim-fade-up text-center font-mono text-xl uppercase tracking-[0.25em] text-text-muted"
             style={{ animationDelay: '0.05s' }}
           >
-            About me
+            The publication
           </p>
-
-          {/* Avatar */}
-          <div
-            className="anim-fade-up mt-10 flex justify-center"
-            style={{ animationDelay: '0.25s' }}
-          >
-            <div className="avatar-ring relative inline-block rounded-full anim-breathe">
-              <img
-                src={Avatar_Photo}
-                alt="Umer Farooq"
-                className="avatar-hover h-44 w-44 rounded-full border-4 border-bg object-cover md:h-52 md:w-52"
-              />
-            </div>
-          </div>
 
           {/* Title */}
           <h1
             className="anim-wipe mt-10 text-center font-serif text-4xl leading-tight text-text-primary md:text-6xl"
-            style={{ animationDelay: '0.5s' }}
+            style={{ animationDelay: '0.3s' }}
           >
-            Umer Farooq
+            Lallu Syndrome<span className="text-accent">.</span>
           </h1>
 
-          {/* Bio */}
+          {/* Lead */}
           <p
             className="anim-fade-up mx-auto mt-8 max-w-md text-center text-base leading-relaxed text-text-secondary md:text-lg"
-            style={{ animationDelay: '0.85s' }}
+            style={{ animationDelay: '0.65s' }}
           >
-            A generalist and a computer enthusiast. Writing here to think out loud,
-            document what I learn. A quiet corner of the internet for technical
-            writing and long-running experiments.
+            An independent technology publication. Notes, experiments, and
+            deep dives into the systems we use every day written slowly,
+            published carefully.
           </p>
 
-          {/* Links */}
+          {/* Quick links */}
           <div
             className="anim-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
-            style={{ animationDelay: '1.05s' }}
+            style={{ animationDelay: '0.85s' }}
           >
-            {externalLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
-              >
-                {link.label}
-                <ArrowUpRight size={13} className="anim-arrow" />
-              </a>
-            ))}
+            <Link
+              to="/articles"
+              className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+            >
+              Browse the writing
+              <ArrowRight size={13} className="anim-arrow" />
+            </Link>
+            <Link
+              to="/creator"
+              className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+            >
+              Meet the creator
+              <ArrowRight size={13} className="anim-arrow" />
+            </Link>
           </div>
 
-          {/* Divider */}
+          {/* Mission */}
           <div
             className="anim-fade-up my-20 flex items-center gap-4"
-            style={{ animationDelay: '1.25s' }}
+            style={{ animationDelay: '1.05s' }}
+          >
+            <span className="h-px flex-1 bg-border-subtle" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+              Mission
+            </span>
+            <span className="h-px flex-1 bg-border-subtle" />
+          </div>
+
+          <div className="anim-fade-up space-y-5" style={{ animationDelay: '1.2s' }}>
+            <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
+              Write to understand. Publish to remember<span className="text-accent">.</span>
+            </p>
+            <p className="text-sm leading-relaxed text-text-secondary">
+              Most of the web is marketing. This is the opposite. Slow, careful
+              writing about how things actually work. Operating systems, compilers,
+              networks, security, and the occasional piece of hardware: taken
+              apart, explained, and put back together.
+            </p>
+          </div>
+
+          {/* Topics */}
+          <div
+            className="anim-fade-up my-20 flex items-center gap-4"
+            style={{ animationDelay: '1.35s' }}
           >
             <span className="h-px flex-1 bg-border-subtle" />
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
@@ -102,11 +121,10 @@ export function AboutPage() {
             <span className="h-px flex-1 bg-border-subtle" />
           </div>
 
-          {/* Infinite marquee */}
           {categories.length > 0 && (
             <div
               className="anim-fade-up marquee-mask overflow-hidden"
-              style={{ animationDelay: '1.4s' }}
+              style={{ animationDelay: '1.5s' }}
             >
               <div className="anim-marquee flex w-max gap-12 whitespace-nowrap py-2">
                 {marqueeItems.map((cat, i) => (
@@ -122,31 +140,45 @@ export function AboutPage() {
             </div>
           )}
 
-          {/* Publication statement */}
+          {/* Principles */}
           <div
-            className="anim-fade-up mt-20"
-            style={{ animationDelay: '1.55s' }}
+            className="anim-fade-up my-20 flex items-center gap-4"
+            style={{ animationDelay: '1.65s' }}
           >
-            <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
-              Lallu Syndrome is a technology publication{' '}
-              <span className="text-accent">.</span>
-            </p>
-            <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-              A place to share Lallu and fangirl about how amazing the things we
-              use daily really are under the hood. This is a personal project and
-              not affiliated with any company or organization.
-            </p>
+            <span className="h-px flex-1 bg-border-subtle" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+              Principles
+            </span>
+            <span className="h-px flex-1 bg-border-subtle" />
           </div>
 
-          {/* Colophon */}
-          <footer
-            className="anim-fade-up mt-24 border-t border-border-subtle pt-6"
-            style={{ animationDelay: '1.7s' }}
+          <div className="space-y-10">
+            {principles.map((principle, index) => (
+              <div
+                key={principle.id}
+                className="anim-fade-up flex gap-6"
+                style={{ animationDelay: `${1.8 + index * 0.15}s` }}
+              >
+                <span className="font-mono text-sm text-accent">{principle.id}</span>
+                <div>
+                  <h2 className="font-serif text-lg font-medium text-text-primary">
+                    {principle.title}
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                    {principle.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Independence note */}
+          <p
+            className="anim-fade-up mt-16 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted"
+            style={{ animationDelay: '2.3s' }}
           >
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
-              React · TypeScript · Tailwind · Supabase
-            </p>
-          </footer>
+            A personal project · Not affiliated with any company or organization
+          </p>
         </div>
       </PageContainer>
     </div>

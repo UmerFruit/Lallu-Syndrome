@@ -19,7 +19,8 @@ import { SettingsLayout } from '@/components/layout/SettingsLayout';
 import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
 import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
 import { ToastProvider } from '@/contexts/ToastContext';
-
+import { CreatorPage } from '@/pages/CreatorPage';
+import { WriterProfilePage } from '@/pages/WriterProfilePage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -78,6 +79,8 @@ function AppRoutes() {
         <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
         <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
         <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
+        <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
+        <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
 
         {/* Auth routes */}
         <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />

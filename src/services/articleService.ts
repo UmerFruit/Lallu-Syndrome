@@ -10,16 +10,17 @@ type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
 const ARTICLE_SELECT = `
-  *,
-  categories (slug),
-  profiles!articles_author_id_fkey (
-    display_name,
-    avatar_url,
-    bio
-  ),
-  article_likes (
-    count
-  )
+*,
+categories (slug),
+profiles!articles_author_id_fkey (
+display_name,
+username,
+avatar_url,
+bio
+),
+article_likes (
+count
+)
 `;
 
 const articleQuery = supabase
@@ -37,7 +38,7 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     throw new Error(`Profile not found for article ${article.id}`);
   }
 
-  
+
   const likes = article.article_likes?.[0]?.count ?? 0;
 
   return {
@@ -49,6 +50,7 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     coverImage: article.cover_image ?? '',
     author: {
       name: article.profiles.display_name,
+      username: article.profiles.username ?? undefined,
       avatar: article.profiles.avatar_url ?? undefined,
       bio: article.profiles.bio ?? undefined,
     },
@@ -90,9 +92,9 @@ function mapSupabaseComment(
 export function calculateReadingTime(content: string): number {
   const wordsPerMinute = 220;
 
-  const doc = new DOMParser().parseFromString(content,"text/html");
+  const doc = new DOMParser().parseFromString(content, "text/html");
   const plaintext = (doc.body.textContent || '').trim();
-  
+
   if (!plaintext) return 1;
 
   const words = plaintext.split(/\s+/).length;
@@ -171,6 +173,17 @@ export async function getArticlesByCategory(categorySlug: string): Promise<Artic
     .eq('category_id', category.id)
     .order('published_at', { ascending: false });
 
+  if (error) throw error;
+  return data.map(mapSupabaseArticle);
+}
+
+export async function getPublishedArticlesByAuthor(authorId: string): Promise<Article[]> {
+  const { data, error } = await supabase
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .eq('author_id', authorId)
+    .eq('status', 'published')
+    .order('published_at', { ascending: false });
   if (error) throw error;
   return data.map(mapSupabaseArticle);
 }
@@ -317,7 +330,7 @@ export async function updateArticle(id: string, data: Partial<ArticleInput>): Pr
   if (data.status !== undefined) {
     updateData.status = data.status;
   }
-  
+
   if (data.publishedAt !== undefined) {
     updateData.published_at = data.publishedAt;
   }
@@ -563,12 +576,12 @@ export async function isLiked(articleId: string): Promise<boolean> {
   return data !== null;
 }
 export async function getMyArticles(userId: string): Promise<Article[]> {
-  const {data, error} = await supabase
-  .from("articles")
-  .select(ARTICLE_SELECT)
-  .eq("author_id", userId)
-  .order("created_at",{ascending: false});
-  
+  const { data, error } = await supabase
+    .from("articles")
+    .select(ARTICLE_SELECT)
+    .eq("author_id", userId)
+    .order("created_at", { ascending: false });
+
   if (error) throw error;
   return data.map(mapSupabaseArticle);
 }

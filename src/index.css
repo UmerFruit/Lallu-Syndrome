@@ -324,7 +324,7 @@
 }
 
 .anim-wipe {
-  animation: wipe 1.2s cubic-bezier(0.7, 0, 0.2, 1) forwards;
+  animation: wipe 1.2s cubic-bezier(0.7, 0, 0.2, 1) both;
 }
 
 .grain::after {
@@ -364,7 +364,7 @@
   }
 }
 
-/* Tiptap — borderless, page-flush */
+/* Tiptap borderless, page-flush */
 .ProseMirror {
   outline: none;
 }
