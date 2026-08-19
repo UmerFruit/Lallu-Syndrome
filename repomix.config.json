@@ -1,0 +1,15 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "customPatterns": [
+      "supabase/.temp/**",
+      "src/components/ui/Strands.tsx",
+      "src/components/ui/ParticleText.tsx",
+      ".bolt/**",
+      ".env"
+    ]
+  }
+}

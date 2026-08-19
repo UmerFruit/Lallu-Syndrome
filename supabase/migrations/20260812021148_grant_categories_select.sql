@@ -1,1 +1,0 @@
-grant select on public.categories to anon, authenticated;

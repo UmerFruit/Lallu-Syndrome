@@ -1,1 +1,0 @@
-grant select on public.tags to anon, authenticated;
