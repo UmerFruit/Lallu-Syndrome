@@ -88,11 +88,13 @@ function mapSupabaseComment(
 
 export function calculateReadingTime(content: string): number {
   const wordsPerMinute = 220;
-  const trimmedContent = content.trim();
 
-  if (!trimmedContent) return 1;
+  const doc = new DOMParser().parseFromString(content,"text/html");
+  const plaintext = (doc.body.textContent || '').trim();
+  
+  if (!plaintext) return 1;
 
-  const words = trimmedContent.split(/\s+/).length;
+  const words = plaintext.split(/\s+/).length;
 
   return Math.max(1, Math.ceil(words / wordsPerMinute));
 }
