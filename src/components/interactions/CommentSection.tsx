@@ -111,7 +111,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
       <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
         Comments
       </h3>
-      
+
       {/* Top-level comment form */}
       {user ? (
         <form onSubmit={handleSubmit} className="mb-8">
@@ -131,6 +131,12 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder="Write a comment..."
                 rows={3}
                 maxLength={1000}
@@ -214,7 +220,7 @@ function CommentItem({
             {comment.author.charAt(0).toUpperCase()}
           </div>
         )}
-        
+
         <div className="flex-1 min-w-0">
           {/* Header with Reply button */}
           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -234,7 +240,7 @@ function CommentItem({
               </button>
             )}
           </div>
-          
+
           {/* Comment Content */}
           <p className="text-sm text-text-secondary leading-relaxed">
             {comment.content}
@@ -246,6 +252,12 @@ function CommentItem({
               <textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder="Write a reply..."
                 rows={2}
                 maxLength={1000}
