@@ -18,6 +18,7 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { SettingsLayout } from '@/components/layout/SettingsLayout';
 import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
 import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
+import { ToastProvider } from '@/contexts/ToastContext';
 
 
 function ScrollToTop() {
@@ -107,11 +108,13 @@ function AppRoutes() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

@@ -16,6 +16,7 @@ import {
 import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { getLocalDateTime } from '@/utils/date';
 import Strands from '@/components/ui/Strands';
+import { useToast } from '@/contexts/ToastContext';
 
 const AUTHOR = { name: 'Umer Farooq', avatar: 'https://images.unsplash.com/photo-1500648767731-5ca545ace573?w=200&h=200&fit=crop&crop=faces&q=80' };
 
@@ -26,7 +27,7 @@ export function ArticleEditorPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
-
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -140,12 +141,12 @@ export function ArticleEditorPage() {
 
   const handlePublish = async () => {
     if (!formData.coverImage) {
-      alert('Cover image is required for published articles.');
+      toast.error('Cover image is required for published articles.');
       return;
     }
 
     if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
-      alert('Publication date cannot be in the future.');
+      toast.error('Publication date cannot be in the future.');
       return;
     }
 
@@ -204,7 +205,7 @@ export function ArticleEditorPage() {
     } catch (error) {
       console.error('Failed to save article:', error);
       exitRequestedRef.current = false;
-      alert('Failed to save the article. Please try again.');
+      toast.error('Failed to save the article. Please try again.');
     }
   };
 
@@ -216,7 +217,7 @@ export function ArticleEditorPage() {
     const articleId = articleRef.current?.id ?? id;
 
     if (!articleId || articleId === 'new') {
-      alert('Save the article before uploading a cover image.');
+      toast.error('Save the article before uploading a cover image.');
       return;
     }
 
@@ -232,7 +233,7 @@ export function ArticleEditorPage() {
       handleChange('coverImage', result.publicUrl);
     } catch (error) {
       console.error('Failed to upload cover image:', error);
-      alert('Failed to upload cover image. Please try again.');
+      toast.error('Failed to upload cover image. Please try again.');
     } finally {
       setSaveState('idle');
     }
@@ -393,7 +394,7 @@ export function ArticleEditorPage() {
                   onChange={(e) => handleChange('slug', e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
                 <select
@@ -508,7 +509,7 @@ export function ArticleEditorPage() {
                     handleChange('coverImage', '');
                   } catch (error) {
                     console.error('Failed to remove cover image:', error);
-                    alert('Failed to remove cover image. Please try again.');
+                    toast.error('Failed to remove cover image. Please try again.');
                   }
                 }}
                 className="absolute top-2 right-2 p-1.5 rounded bg-bg/80 text-text-secondary hover:text-accent transition-colors"

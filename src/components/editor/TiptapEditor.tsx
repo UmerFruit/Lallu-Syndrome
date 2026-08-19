@@ -11,6 +11,7 @@ import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
 import { DOMParser as TiptapDOMParser } from '@tiptap/pm/model';
+import { useToast } from '@/contexts/ToastContext';
 
 import {
   Bold,
@@ -50,6 +51,7 @@ export function TiptapEditor({
   onImageUpload
 }: Readonly<TiptapEditorProps>) {
 
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openImagePicker = (targetEditor: Editor) => {
@@ -73,7 +75,7 @@ export function TiptapEditor({
           .run();
       } catch (error) {
         console.error('Failed to upload image:', error);
-        alert('Failed to upload image. Please try again.');
+        toast.error('Failed to upload image. Please try again.');
       } finally {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -171,7 +173,7 @@ export function TiptapEditor({
                 .run();
             } catch (error) {
               console.error('Failed to upload pasted image:', error);
-              alert('Failed to upload image. Please try again.');
+              toast.error('Failed to upload image. Please try again.');
             }
           })();
 
@@ -261,7 +263,7 @@ export function TiptapEditor({
               .run();
           } catch (error) {
             console.error('Failed to upload dropped image:', error);
-            alert('Failed to upload image. Please try again.');
+            toast.error('Failed to upload image. Please try again.');
           }
         })();
 
