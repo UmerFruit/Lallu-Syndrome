@@ -10,7 +10,6 @@ import { AlignedImage } from './AlignedImage';
 import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
-import { DOMParser as TiptapDOMParser } from '@tiptap/pm/model';
 import { useToast } from '@/contexts/ToastContext';
 
 import {

@@ -212,22 +212,32 @@ export function ArticleEditorPage() {
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     e.target.value = '';
-    const articleId = articleRef.current?.id ?? id;
-
-    if (!articleId || articleId === 'new') {
-      toast.error('Save the article before uploading a cover image.');
-      return;
+    let articleId = articleRef.current?.id ?? id;
+    if (isNew && !articleRef.current?.id) {
+      try {
+        const data = buildArticleData();
+        const created = await createArticle(data);
+        articleRef.current = created;
+        articleId = created.id;
+        navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
+      } catch (error) {
+        console.error('Failed to auto-save article:', error);
+        toast.error('Failed to save article. Please try again.');
+        return;
+      }
     }
+    if (!articleId) return;
 
     try {
       setSaveState('saving');
 
+      // delete old cover image if it exists
       if (formData.coverImage) {
         await deleteCoverImage(formData.coverImage);
       }
 
+      // upload new cover image
       const result = await upload(articleId, file, 'cover');
 
       handleChange('coverImage', result.publicUrl);
