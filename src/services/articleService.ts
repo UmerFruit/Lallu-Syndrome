@@ -564,3 +564,13 @@ export async function isLiked(articleId: string): Promise<boolean> {
 
   return data !== null;
 }
+export async function getMyArticles(userId: string): Promise<Article[]> {
+  const {data, error} = await supabase
+  .from("articles")
+  .select(ARTICLE_SELECT)
+  .eq("author_id", userId)
+  .order("created_at",{ascending: false});
+  
+  if (error) throw error;
+  return data.map(mapSupabaseArticle);
+}

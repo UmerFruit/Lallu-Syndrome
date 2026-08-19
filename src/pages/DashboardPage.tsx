@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Article } from '@/types';
-import { getAllArticles, deleteArticle } from '@/services/articleService';
+import { getMyArticles, deleteArticle } from '@/services/articleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer } from '@/components/layout/Navbar';
 import { formatDate } from '@/utils/date';
@@ -20,11 +20,13 @@ export function DashboardPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    getAllArticles().then((a) => {
+    if (!user) return;
+
+    getMyArticles(user.id).then((a) => {
       setArticles(a);
       setLoading(false);
     });
-  }, []);
+  }, [user]);
 
   const published = articles.filter((a) => a.status === 'published');
   const drafts = articles.filter((a) => a.status === 'draft');
@@ -172,11 +174,10 @@ function TabButton({ label, count, active, onClick }: Readonly<{ label: string; 
     <button
       type="button"
       onClick={onClick}
-      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${
-        active
+      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
           ? 'border-accent text-text-primary'
           : 'border-transparent text-text-muted hover:text-text-secondary'
-      }`}
+        }`}
     >
       {label}
       <span className="ml-1.5 font-mono text-xs text-text-muted">{count}</span>
