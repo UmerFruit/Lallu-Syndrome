@@ -48,7 +48,6 @@ export function ArticlePage() {
 
         setRelated(relatedData);
         setLiked(likedData);
-        window.scrollTo(0, 30);
       } catch {
         setError(true);
       } finally {
@@ -94,7 +93,7 @@ export function ArticlePage() {
     <>
       <ArticleProgress />
 
-      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-8 md:pt-12">
+      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-6">
         {/* Header */}
 
 
@@ -115,11 +114,11 @@ export function ArticlePage() {
         </header>
 
         {/* Cover Image */}
-        <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
+        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
           <img
             src={article.coverImage}
             alt=""
-            className="w-full h-auto"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         </div>
       </article>

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getCategoryBySlug } from '@/services/categoryService';
 import { deleteArticleMedia } from './storageService';
 import type { QueryData } from '@supabase/supabase-js';
+import { slugify } from '@/utils/slugify';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
@@ -100,12 +101,7 @@ export function calculateReadingTime(content: string): number {
 }
 
 export function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return slugify(title);
 }
 
 export async function getArticles(): Promise<Article[]> {

@@ -114,6 +114,7 @@ src/
     index.ts
   utils/
     date.ts
+    slugify.ts
   App.tsx
   index.css
   main.tsx
@@ -174,6 +175,21 @@ vite.config.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/utils/slugify.ts">
+export function slugify(text: string): string {
+return text
+.toString()
+.normalize('NFD') // Split accented characters into base character + diacritic
+.replace(/[\u0300-\u036f]/g, '') // Remove the diacritics
+.toLowerCase()
+.trim()
+.replace(/\s+/g, '-') // Replace spaces with hyphens
+.replace(/[^a-z0-9\s-]/g, '') // Remove remaining non-ASCII characters
+.replace(/-+/g, '-') // Replace multiple hyphens with a single hyphen
+.replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+}
+</file>
 
 <file path=".bolt/config.json">
 {
@@ -270,50 +286,6 @@ export const CodeBlock = TiptapCodeBlock.extend({
     return ReactNodeViewRenderer(CodeBlockComponent);
   },
 });
-</file>
-
-<file path="src/components/editor/processPastedHtml.ts">
-function decodeHtmlEntities(value: string): string {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = value;
-  return textarea.value;
-}
-
-function normalizeHtml(html: string): string {
-  let result = html;
-  for (let i = 0; i < 3; i++) {
-    if (!result.includes('&lt;')) break;
-    const decoded = decodeHtmlEntities(result);
-    if (decoded === result) break;
-    result = decoded;
-  }
-  return result;
-}
-
-export type PastedImage = {
-  originalSrc: string;
-};
-
-export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
-  const normalizedHtml = normalizeHtml(html);
-  const document = new DOMParser().parseFromString(normalizedHtml, 'text/html');
-  const images = Array.from(document.querySelectorAll('img'));
-  const imagesToUpload: PastedImage[] = [];
-
-  images.forEach((image) => {
-    const src = image.getAttribute('src');
-    if (!src) { return; }
-
-    // if already stored in our Supabase bucket. Don't re-upload.
-    if (src.includes('/storage/v1/object/public/media/')) { return; }
-
-    imagesToUpload.push({ originalSrc: src });
-    image.removeAttribute('srcset');
-    image.removeAttribute('sizes');
-
-  })
-  return { html: document.body.innerHTML, images: imagesToUpload };
-}
 </file>
 
 <file path="src/components/editor/SlashCommandMenu.tsx">
@@ -3288,21 +3260,13 @@ export default {
 
 <file path="src/components/articles/TableOfContents.tsx">
 import { useEffect, useState } from 'react';
+import { slugify } from '@/utils/slugify';
 
 type Heading = {
   id: string;
   text: string;
   level: number;
 };
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim();
-}
 
 export function extractHeadings(html: string): Heading[] {
   const document = new DOMParser().parseFromString(html, 'text/html');
@@ -3570,6 +3534,50 @@ export default function CodeBlockComponent({ node, updateAttributes, deleteNode 
       </div>
     </NodeViewWrapper>
   );
+}
+</file>
+
+<file path="src/components/editor/processPastedHtml.ts">
+function decodeHtmlEntities(value: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+}
+
+function normalizeHtml(html: string): string {
+  let result = html;
+  for (let i = 0; i < 3; i++) {
+    if (!result.includes('&lt;')) break;
+    const decoded = decodeHtmlEntities(result);
+    if (decoded === result) break;
+    result = decoded;
+  }
+  return result;
+}
+
+export type PastedImage = {
+  originalSrc: string;
+};
+
+export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
+  const normalizedHtml = normalizeHtml(html);
+  const document = new DOMParser().parseFromString(normalizedHtml, 'text/html');
+  const images = Array.from(document.querySelectorAll('img'));
+  const imagesToUpload: PastedImage[] = [];
+
+  images.forEach((image) => {
+    const src = image.getAttribute('src');
+    if (!src) { return; }
+
+    // if already stored in our Supabase bucket. Don't re-upload.
+    if (src.includes('/storage/v1/object/public/media/')) { return; }
+
+    imagesToUpload.push({ originalSrc: src });
+    image.removeAttribute('srcset');
+    image.removeAttribute('sizes');
+
+  })
+  return { html: document.body.innerHTML, images: imagesToUpload };
 }
 </file>
 
@@ -5095,11 +5103,11 @@ export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
         to={`/articles/${article.slug}`}
         className="group block overflow-hidden rounded-card border border-border-subtle"
       >
-        <div className="aspect-[16/10] overflow-hidden bg-elevated">
+        <div className="relative aspect-video overflow-hidden bg-elevated">
           <img
             src={article.coverImage}
             alt={article.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </div>
       </Link>
@@ -5429,289 +5437,6 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
 });
 </file>
 
-<file path="src/components/interactions/CommentSection.tsx">
-import { useEffect, useState, type FormEvent } from 'react';
-import { Send } from 'lucide-react';
-import type { Comment } from '@/types';
-import { getComments, addComment } from '@/services/articleService';
-import { useAuth } from '@/contexts/AuthContext';
-import { relativeTime } from '@/utils/date';
-
-type CommentSectionProps = {
-  articleId: string;
-};
-
-export function CommentSection({
-  articleId,
-}: Readonly<CommentSectionProps>) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { user } = useAuth();
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadComments = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const result = await getComments(articleId);
-
-        if (mounted) {
-          setComments(result);
-        }
-      } catch {
-        if (mounted) {
-          setError('Unable to load comments.');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadComments();
-
-    return () => {
-      mounted = false;
-    };
-  }, [articleId]);
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const trimmedContent = content.trim();
-
-    if (!trimmedContent || !user || submitting) {
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setError(null);
-
-      const newComment = await addComment(articleId, trimmedContent);
-
-      setComments((previousComments) => [
-        ...previousComments,
-        newComment,
-      ]);
-
-      setContent('');
-    } catch {
-      setError('Unable to post your comment. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const topLevel = comments.filter(
-    (comment) => comment.parentId === null
-  );
-
-  const getReplies = (parentId: string) =>
-    comments.filter((comment) => comment.parentId === parentId);
-
-  let commentsContent: JSX.Element;
-
-  if (loading) {
-    commentsContent = (
-      <div className="space-y-6">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="animate-pulse">
-            <div className="flex gap-3">
-              <div className="w-9 h-9 rounded-full bg-elevated" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-24 bg-elevated rounded" />
-                <div className="h-4 w-full bg-elevated rounded" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  } else if (error && comments.length === 0) {
-    commentsContent = (
-      <p className="text-sm text-text-muted">
-        {error}
-      </p>
-    );
-  } else if (topLevel.length === 0) {
-    commentsContent = (
-      <p className="text-sm text-text-muted">
-        No comments yet. Be the first to say something.
-      </p>
-    );
-  } else {
-    commentsContent = (
-      <div className="space-y-6">
-        {topLevel.map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            replies={getReplies(comment.id)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <section className="mt-16 pt-10 border-t border-border-subtle">
-      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
-        Comments
-      </h3>
-
-      {user ? (
-        <form onSubmit={handleSubmit} className="mb-8">
-          <div className="flex gap-3">
-            {user.user_metadata.avatar ? (
-              <img
-                src={user.user_metadata.avatar}
-                alt={user.user_metadata.name ?? 'User'}
-                className="w-9 h-9 rounded-full flex-shrink-0"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-                {(user.user_metadata.name ?? 'U')
-                  .charAt(0)
-                  .toUpperCase()}
-              </div>
-            )}
-
-            <div className="flex-1">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Write a comment..."
-                rows={3}
-                maxLength={1000}
-                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-sm resize-y transition-colors focus:border-accent focus:outline-none"
-                aria-label="Write a comment"
-                disabled={submitting}
-              />
-
-              <div className="flex justify-end mt-2">
-                <button
-                  type="submit"
-                  disabled={!content.trim() || submitting}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  <Send size={14} />
-                  {submitting ? 'Posting...' : 'Comment'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <p className="mt-3 text-sm text-accent">
-              {error}
-            </p>
-          )}
-        </form>
-      ) : (
-        <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
-          <a
-            href="/login"
-            className="text-accent hover:underline"
-          >
-            Sign in
-          </a>{' '}
-          to leave a comment.
-        </div>
-      )}
-
-      {commentsContent}
-    </section>
-  );
-}
-
-function CommentItem({
-  comment,
-  replies,
-}: Readonly<{
-  comment: Comment;
-  replies: Comment[];
-}>) {
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-3">
-        {comment.avatar ? (
-          <img
-            src={comment.avatar}
-            alt={comment.author}
-            className="w-9 h-9 rounded-full flex-shrink-0"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-            {comment.author.charAt(0).toUpperCase()}
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-text-primary">
-              {comment.author}
-            </span>
-
-            <span className="font-mono text-xs text-text-muted">
-              {relativeTime(comment.createdAt)}
-            </span>
-          </div>
-
-          <p className="text-sm text-text-secondary leading-relaxed">
-            {comment.content}
-          </p>
-
-          {replies.length > 0 && (
-            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
-              {replies.map((reply) => (
-                <div key={reply.id} className="flex gap-3">
-                  {reply.avatar ? (
-                    <img
-                      src={reply.avatar}
-                      alt={reply.author}
-                      className="w-7 h-7 rounded-full flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-elevated flex items-center justify-center text-xs font-medium text-text-secondary flex-shrink-0">
-                      {reply.author.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-text-primary">
-                        {reply.author}
-                      </span>
-
-                      <span className="font-mono text-xs text-text-muted">
-                        {relativeTime(reply.createdAt)}
-                      </span>
-                    </div>
-
-                    <p className="text-sm text-text-secondary leading-relaxed">
-                      {reply.content}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/interactions/LikeButton.tsx">
 import { useState } from 'react';
 import { Heart } from 'lucide-react';
@@ -5842,6 +5567,294 @@ export async function getCategoryBySlug(slug: string): Promise<Category> {
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
+}
+</file>
+
+<file path="src/components/interactions/CommentSection.tsx">
+// src/components/interactions/CommentSection.tsx
+import { useEffect, useState, type FormEvent } from 'react';
+import { Send } from 'lucide-react';
+import type { Comment } from '@/types';
+import { getComments, addComment } from '@/services/articleService';
+import { useAuth } from '@/contexts/AuthContext';
+import { relativeTime } from '@/utils/date';
+import type { User } from '@supabase/supabase-js';
+
+type CommentSectionProps = {
+  articleId: string;
+};
+
+export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+
+  useEffect(() => {
+    let mounted = true;
+    const loadComments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await getComments(articleId);
+        if (mounted) setComments(result);
+      } catch {
+        if (mounted) setError('Unable to load comments.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadComments();
+    return () => { mounted = false; };
+  }, [articleId]);
+
+  // Helper to add a new comment/reply to the local state
+  const handleAddComment = (newComment: Comment) => {
+    setComments((prev) => [...prev, newComment]);
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmedContent = content.trim();
+    if (!trimmedContent || !user || submitting) return;
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      const newComment = await addComment(articleId, trimmedContent);
+      handleAddComment(newComment);
+      setContent('');
+    } catch {
+      setError('Unable to post your comment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const topLevel = comments.filter((comment) => comment.parentId === null);
+  const getReplies = (parentId: string) =>
+    comments.filter((comment) => comment.parentId === parentId);
+
+  let commentsContent: JSX.Element;
+  if (loading) {
+    commentsContent = (
+      <div className="space-y-6">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="animate-pulse">
+            <div className="flex gap-3">
+              <div className="w-9 h-9 rounded-full bg-elevated" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 bg-elevated rounded" />
+                <div className="h-4 w-full bg-elevated rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else if (error && comments.length === 0) {
+    commentsContent = <p className="text-sm text-text-muted">{error}</p>;
+  } else if (topLevel.length === 0) {
+    commentsContent = (
+      <p className="text-sm text-text-muted">
+        No comments yet. Be the first to say something.
+      </p>
+    );
+  } else {
+    commentsContent = (
+      <div className="space-y-6">
+        {topLevel.map((comment) => (
+          <CommentItem
+            key={comment.id}
+            comment={comment}
+            replies={getReplies(comment.id)}
+            articleId={articleId}
+            user={user}
+            onReplyAdded={handleAddComment}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section className="mt-16 pt-10 border-t border-border-subtle">
+      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
+        Comments
+      </h3>
+      
+      {/* Top-level comment form */}
+      {user ? (
+        <form onSubmit={handleSubmit} className="mb-8">
+          <div className="flex gap-3">
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name ?? 'User'}
+                className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
+                {(profile?.display_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1">
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Write a comment..."
+                rows={3}
+                maxLength={1000}
+                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-sm resize-y transition-colors focus:border-accent focus:outline-none"
+                aria-label="Write a comment"
+                disabled={submitting}
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  type="submit"
+                  disabled={!content.trim() || submitting}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  <Send size={14} />
+                  {submitting ? 'Posting...' : 'Comment'}
+                </button>
+              </div>
+            </div>
+          </div>
+          {error && <p className="mt-3 text-sm text-accent">{error}</p>}
+        </form>
+      ) : (
+        <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
+          <a href="/login" className="text-accent hover:underline">Sign in</a> to leave a comment.
+        </div>
+      )}
+
+      {commentsContent}
+    </section>
+  );
+}
+
+// Recursive Comment Item component
+function CommentItem({
+  comment,
+  replies,
+  articleId,
+  user,
+  onReplyAdded,
+}: Readonly<{
+  comment: Comment;
+  replies: Comment[];
+  articleId: string;
+  user: User | null;
+  onReplyAdded: (newComment: Comment) => void;
+}>) {
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = replyContent.trim();
+    if (!trimmed || !user || submitting) return;
+
+    try {
+      setSubmitting(true);
+      // Pass the parent comment's ID to create a threaded reply
+      const newComment = await addComment(articleId, trimmed, comment.id);
+      onReplyAdded(newComment);
+      setReplyContent('');
+      setIsReplying(false);
+    } catch (error) {
+      console.error('Failed to post reply:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        {comment.avatar ? (
+          <img
+            src={comment.avatar}
+            alt={comment.author}
+            className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
+            {comment.author.charAt(0).toUpperCase()}
+          </div>
+        )}
+        
+        <div className="flex-1 min-w-0">
+          {/* Header with Reply button */}
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-sm font-medium text-text-primary">
+              {comment.author}
+            </span>
+            <span className="font-mono text-xs text-text-muted">
+              {relativeTime(comment.createdAt)}
+            </span>
+            {user && (
+              <button
+                type="button"
+                onClick={() => setIsReplying(!isReplying)}
+                className="text-xs font-medium text-text-muted hover:text-text-secondary transition-colors"
+              >
+                {isReplying ? 'Cancel' : 'Reply'}
+              </button>
+            )}
+          </div>
+          
+          {/* Comment Content */}
+          <p className="text-sm text-text-secondary leading-relaxed">
+            {comment.content}
+          </p>
+
+          {/* Inline Reply Form */}
+          {isReplying && (
+            <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="Write a reply..."
+                rows={2}
+                maxLength={1000}
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-sm resize-y focus:border-accent focus:outline-none"
+                disabled={submitting}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!replyContent.trim() || submitting}
+                className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={14} />
+              </button>
+            </form>
+          )}
+
+          {/* Nested Replies */}
+          {replies.length > 0 && (
+            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
+              {replies.map((reply) => (
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  replies={[]} // Keeps UI clean at 1 level of visual nesting
+                  articleId={articleId}
+                  user={user}
+                  onReplyAdded={onReplyAdded}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -6334,19 +6347,11 @@ export default defineConfig({
 
 <file path="src/components/articles/ArticleContent.tsx">
 import DOMPurify from 'dompurify';
+import { slugify } from '@/utils/slugify';
 
 type ArticleContentProps = {
   content: string;
 };
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 export function ArticleContent({
   content,
@@ -7589,6 +7594,424 @@ function TabButton({ label, count, active, onClick }: Readonly<{ label: string; 
 }
 </file>
 
+<file path="src/pages/ArticlePage.tsx">
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import type { Article } from '@/types';
+import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
+import { formatDateLong } from '@/utils/date';
+import { ArticleContent } from '@/components/articles/ArticleContent';
+import { ArticleProgress } from '@/components/articles/ArticleProgress';
+import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
+import { RelatedArticles } from '@/components/articles/RelatedArticles';
+import { LikeButton } from '@/components/interactions/LikeButton';
+import { ShareButton } from '@/components/interactions/ShareButton';
+import { CommentSection } from '@/components/interactions/CommentSection';
+import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
+import { Badge } from '@/components/ui/Badge';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
+
+export function ArticlePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const [article, setArticle] = useState<Article | null>(null);
+  const [related, setRelated] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [liked, setLiked] = useState(false);
+
+  useEffect(() => {
+    async function loadArticle() {
+      if (!slug) return;
+      try {
+        setLoading(true);
+        setError(false);
+        setArticle(null);
+        setRelated([]);
+        setLiked(false);
+
+        const articleData = await getArticleBySlug(slug);
+
+        if (!articleData) {
+          setError(true);
+          return;
+        }
+
+        setArticle(articleData);
+
+        const [relatedData, likedData] = await Promise.all([
+          getRelatedArticles(articleData, 3),
+          isLiked(articleData.id),
+        ]);
+
+        setRelated(relatedData);
+        setLiked(likedData);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadArticle();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <>
+        <ArticleProgress />
+        <ArticlePageSkeleton />
+      </>
+    );
+  }
+
+  if (error || !article) {
+    return (
+      <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
+        <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />
+        <h1 className="font-serif text-2xl text-text-primary mb-2">
+          Something went wrong while loading this article.
+        </h1>
+        <p className="text-text-muted mb-6">The article may have been moved or deleted.</p>
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to articles
+        </Link>
+      </div>
+    );
+  }
+
+  const headings = extractHeadings(article.content);
+  const articleUrl = window.location.href;
+
+  return (
+    <>
+      <ArticleProgress />
+
+      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-6">
+        {/* Header */}
+
+
+        <header className="mb-8">
+          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
+            {article.title}
+          </h1>
+
+          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
+            <span>
+              <Badge variant="accent">{article.category}</Badge>
+            </span>
+            <span>•</span>
+            {formatDateLong(article.publishedAt ?? article.createdAt)}
+            <span>•</span>
+            <span>{article.readingTime} min read</span>
+          </div>
+        </header>
+
+        {/* Cover Image */}
+        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
+          <img
+            src={article.coverImage}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </div>
+      </article>
+
+      {/* Content + TOC */}
+      < div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12" >
+        <div className="max-w-article lg:max-w-none lg:col-start-1 lg:row-start-1">
+          <ArticleContent content={article.content} />
+
+          {/* Interactions */}
+          <div className="flex items-center gap-3 mt-12 pt-8 border-t border-border-subtle">
+            <LikeButton
+              articleId={article.id}
+              initialLikes={article.likes}
+              initiallyLiked={liked}
+            />
+            <ShareButton url={articleUrl} title={article.title} />
+          </div>
+
+          {/* Comments */}
+          <CommentSection articleId={article.id} />
+
+          {/* Related */}
+          <RelatedArticles articles={related} />
+        </div>
+
+        {/* TOC Sidebar */}
+        <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
+          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            {/* Author Info */}
+            <div className="text-center mb-6 pb-6 border-b border-border-subtle">
+              {article.author.avatar && (
+                <img
+                  src={article.author.avatar}
+                  alt={article.author.name}
+                  className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
+                />
+              )}
+
+              <h3 className="text-sm font-semibold text-text-primary mb-1">
+                {article.author.name}
+              </h3>
+
+              <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span>{article.author.bio ?? "Writing about Linux & open source"}</span>
+              </div>
+            </div>
+
+            {/* Table of Contents */}
+            <TableOfContents headings={headings} />
+          </div>
+        </div>
+      </div >
+
+      <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} />
+          All articles
+        </Link>
+      </div>
+    </>
+  );
+}
+</file>
+
+<file path="src/pages/HomePage.tsx">
+import { useEffect, useState } from 'react';
+import type { Article, Category } from '@/types';
+import { getArticles } from '@/services/articleService';
+import { PageContainer } from '@/components/layout/Navbar';
+import { FeaturedArticle } from '@/components/articles/FeaturedArticle';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+import { FeaturedArticleSkeleton, ArticleCardSkeleton } from '@/components/ui/Skeleton';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { getCategories } from '@/services/categoryService';
+import { CategoryButton } from '@/components/ui/CategoryButton';
+import ParticleText from '@/components/ui/ParticleText';
+
+export function HomePage() {
+  const [featured, setFeatured] = useState<Article | null>(null);
+  const [latest, setLatest] = useState<Article[]>([]);
+  const [all, setAll] = useState<Article[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadHome() {
+      try {
+        const [allArts, categoryResults] = await Promise.all([
+          getArticles(),
+          getCategories(),
+        ]);
+
+        setFeatured(allArts[0] ?? null);
+        setLatest(allArts.slice(1, 4));
+        setAll(allArts);
+        setCategories(categoryResults);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadHome();
+  }, []);
+
+  const filtered = activeCategory === 'all'
+    ? all
+    : all.filter((a) => a.category === activeCategory);
+
+  let articleGridContent: JSX.Element;
+
+  if (loading) {
+    articleGridContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+      </div>
+    );
+  } else if (filtered.length === 0) {
+    articleGridContent = <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
+  } else {
+    articleGridContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    );
+  }
+
+  let featuredContent: JSX.Element;
+
+  if (loading) {
+    featuredContent = <FeaturedArticleSkeleton />;
+  } else if (featured) {
+    featuredContent = <FeaturedArticle article={featured} />;
+  } else {
+    featuredContent = <p className="text-text-muted">Nothing here yet.</p>;
+  }
+
+  return (
+    <PageContainer className="py-8 md:py-12">
+
+      <div className="w-full h-[360px] bg-bg">
+        <ParticleText
+          text="Lallu Syndrome"
+          particleSize={2.3}
+          density={4}
+          scatter={190}
+          gatherDuration={2000}
+          stagger={420}
+          pointerRepel={38}
+          repelRadius={100}
+          idleDrift={0}
+          trigger="mount"
+          fontSize="clamp(3.5rem, 13vw, 9rem)"
+          fontWeight={800}
+          fontFamily="inherit"
+          glow={false}
+        />
+      </div>
+
+      {/* Featured Article */}
+      <section className="mb-16 md:mb-20">
+        {featuredContent}
+      </section>
+
+      {/* Latest Posts */}
+      {latest.length > 0 && (
+        <section className="mb-16 md:mb-20">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-text-muted">
+              Latest Posts
+            </h2>
+            <Link
+              to="/articles"
+              className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary transition-colors"
+            >
+              View all
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {loading
+              ? Array.from({ length: 3 }).map((_, i) => <ArticleCardSkeleton key={i} />)
+              : latest.map((article) => <ArticleCard key={article.id} article={article} />)}
+          </div>
+        </section>
+      )}
+
+      {/* Category Filters */}
+      <section className="mb-8">
+        <div className="flex flex-wrap gap-2">
+          <CategoryButton
+            label="All"
+            active={activeCategory === 'all'}
+            onClick={() => setActiveCategory('all')}
+          />
+          {categories.map((cat) => (
+            <CategoryButton
+              key={cat.slug}
+              label={cat.name}
+              active={activeCategory === cat.slug}
+              onClick={() => setActiveCategory(cat.slug)}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Article Grid */}
+      <section className="mb-12">
+        {articleGridContent}
+      </section>
+    </PageContainer>
+  );
+}
+</file>
+
+<file path="src/types/index.ts">
+import type { User } from '@supabase/supabase-js';
+
+export type ArticleStatus = 'draft' | 'published';
+
+export type Author = {
+  name: string;
+  avatar?: string;
+  bio?: string;
+};
+
+export type ArticleInput = Pick<
+  Article,
+  'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
+>;
+
+export type CreateArticleInput = {
+  title?: string;
+  slug?: string;
+  content?: string;
+  category?: string;
+  coverImage?: string;
+  status?: Article['status'];
+};
+export type ArticleUpdateData = {
+  title?: string;
+  slug?: string;
+  content?: string;
+  cover_image?: string | null;
+  status?: Article['status'];
+  category_id?: number;
+  reading_time?: number;
+};
+export type Comment = {
+  id: string;
+  articleId: string;
+  author: string;
+  avatar?: string;
+  content: string;
+  createdAt: string;
+  parentId: string | null;
+};
+
+export type Category = {
+  id: number;
+  slug: string;
+  name: string;
+};
+
+export type Article = {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  category: string;
+  coverImage: string;
+  author: Author;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+  readingTime: number;
+  likes: number;
+  status: ArticleStatus;
+};
+
+export type AuthState = {
+  user: User | null;
+  isLoading: boolean;
+};
+</file>
+
 <file path="src/components/editor/TiptapEditor.tsx">
 import { useEditor, EditorContent } from '@tiptap/react';
 import { useRef } from 'react';
@@ -7602,7 +8025,6 @@ import { AlignedImage } from './AlignedImage';
 import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
-import { DOMParser as TiptapDOMParser } from '@tiptap/pm/model';
 import { useToast } from '@/contexts/ToastContext';
 
 import {
@@ -8174,425 +8596,6 @@ export function TiptapEditor({
 }
 </file>
 
-<file path="src/pages/ArticlePage.tsx">
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import type { Article } from '@/types';
-import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
-import { formatDateLong } from '@/utils/date';
-import { ArticleContent } from '@/components/articles/ArticleContent';
-import { ArticleProgress } from '@/components/articles/ArticleProgress';
-import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
-import { RelatedArticles } from '@/components/articles/RelatedArticles';
-import { LikeButton } from '@/components/interactions/LikeButton';
-import { ShareButton } from '@/components/interactions/ShareButton';
-import { CommentSection } from '@/components/interactions/CommentSection';
-import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
-import { Badge } from '@/components/ui/Badge';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
-
-export function ArticlePage() {
-  const { slug } = useParams<{ slug: string }>();
-  const [article, setArticle] = useState<Article | null>(null);
-  const [related, setRelated] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [liked, setLiked] = useState(false);
-
-  useEffect(() => {
-    async function loadArticle() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        setError(false);
-        setArticle(null);
-        setRelated([]);
-        setLiked(false);
-
-        const articleData = await getArticleBySlug(slug);
-
-        if (!articleData) {
-          setError(true);
-          return;
-        }
-
-        setArticle(articleData);
-
-        const [relatedData, likedData] = await Promise.all([
-          getRelatedArticles(articleData, 3),
-          isLiked(articleData.id),
-        ]);
-
-        setRelated(relatedData);
-        setLiked(likedData);
-        window.scrollTo(0, 30);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadArticle();
-  }, [slug]);
-
-  if (loading) {
-    return (
-      <>
-        <ArticleProgress />
-        <ArticlePageSkeleton />
-      </>
-    );
-  }
-
-  if (error || !article) {
-    return (
-      <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
-        <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />
-        <h1 className="font-serif text-2xl text-text-primary mb-2">
-          Something went wrong while loading this article.
-        </h1>
-        <p className="text-text-muted mb-6">The article may have been moved or deleted.</p>
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to articles
-        </Link>
-      </div>
-    );
-  }
-
-  const headings = extractHeadings(article.content);
-  const articleUrl = window.location.href;
-
-  return (
-    <>
-      <ArticleProgress />
-
-      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-8 md:pt-12">
-        {/* Header */}
-
-
-        <header className="mb-8">
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
-            {article.title}
-          </h1>
-
-          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
-            <span>
-              <Badge variant="accent">{article.category}</Badge>
-            </span>
-            <span>•</span>
-            {formatDateLong(article.publishedAt ?? article.createdAt)}
-            <span>•</span>
-            <span>{article.readingTime} min read</span>
-          </div>
-        </header>
-
-        {/* Cover Image */}
-        <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
-          <img
-            src={article.coverImage}
-            alt=""
-            className="w-full h-auto"
-          />
-        </div>
-      </article>
-
-      {/* Content + TOC */}
-      < div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12" >
-        <div className="max-w-article lg:max-w-none lg:col-start-1 lg:row-start-1">
-          <ArticleContent content={article.content} />
-
-          {/* Interactions */}
-          <div className="flex items-center gap-3 mt-12 pt-8 border-t border-border-subtle">
-            <LikeButton
-              articleId={article.id}
-              initialLikes={article.likes}
-              initiallyLiked={liked}
-            />
-            <ShareButton url={articleUrl} title={article.title} />
-          </div>
-
-          {/* Comments */}
-          <CommentSection articleId={article.id} />
-
-          {/* Related */}
-          <RelatedArticles articles={related} />
-        </div>
-
-        {/* TOC Sidebar */}
-        <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            {/* Author Info */}
-            <div className="text-center mb-6 pb-6 border-b border-border-subtle">
-              {article.author.avatar && (
-                <img
-                  src={article.author.avatar}
-                  alt={article.author.name}
-                  className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
-                />
-              )}
-
-              <h3 className="text-sm font-semibold text-text-primary mb-1">
-                {article.author.name}
-              </h3>
-
-              <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                <span>{article.author.bio ?? "Writing about Linux & open source"}</span>
-              </div>
-            </div>
-
-            {/* Table of Contents */}
-            <TableOfContents headings={headings} />
-          </div>
-        </div>
-      </div >
-
-      <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
-        >
-          <ArrowLeft size={16} />
-          All articles
-        </Link>
-      </div>
-    </>
-  );
-}
-</file>
-
-<file path="src/pages/HomePage.tsx">
-import { useEffect, useState } from 'react';
-import type { Article, Category } from '@/types';
-import { getArticles } from '@/services/articleService';
-import { PageContainer } from '@/components/layout/Navbar';
-import { FeaturedArticle } from '@/components/articles/FeaturedArticle';
-import { ArticleCard } from '@/components/articles/ArticleCard';
-import { FeaturedArticleSkeleton, ArticleCardSkeleton } from '@/components/ui/Skeleton';
-import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
-import { getCategories } from '@/services/categoryService';
-import { CategoryButton } from '@/components/ui/CategoryButton';
-import ParticleText from '@/components/ui/ParticleText';
-
-export function HomePage() {
-  const [featured, setFeatured] = useState<Article | null>(null);
-  const [latest, setLatest] = useState<Article[]>([]);
-  const [all, setAll] = useState<Article[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadHome() {
-      try {
-        const [allArts, categoryResults] = await Promise.all([
-          getArticles(),
-          getCategories(),
-        ]);
-
-        setFeatured(allArts[0] ?? null);
-        setLatest(allArts.slice(1, 4));
-        setAll(allArts);
-        setCategories(categoryResults);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadHome();
-  }, []);
-
-  const filtered = activeCategory === 'all'
-    ? all
-    : all.filter((a) => a.category === activeCategory);
-
-  let articleGridContent: JSX.Element;
-
-  if (loading) {
-    articleGridContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-      </div>
-    );
-  } else if (filtered.length === 0) {
-    articleGridContent = <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
-  } else {
-    articleGridContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-    );
-  }
-
-  let featuredContent: JSX.Element;
-
-  if (loading) {
-    featuredContent = <FeaturedArticleSkeleton />;
-  } else if (featured) {
-    featuredContent = <FeaturedArticle article={featured} />;
-  } else {
-    featuredContent = <p className="text-text-muted">Nothing here yet.</p>;
-  }
-
-  return (
-    <PageContainer className="py-8 md:py-12">
-
-      <div className="w-full h-[360px] bg-bg">
-        <ParticleText
-          text="Lallu Syndrome"
-          particleSize={2.3}
-          density={4}
-          scatter={190}
-          gatherDuration={2000}
-          stagger={420}
-          pointerRepel={38}
-          repelRadius={100}
-          idleDrift={0}
-          trigger="mount"
-          fontSize="clamp(3.5rem, 13vw, 9rem)"
-          fontWeight={800}
-          fontFamily="inherit"
-          glow={false}
-        />
-      </div>
-
-      {/* Featured Article */}
-      <section className="mb-16 md:mb-20">
-        {featuredContent}
-      </section>
-
-      {/* Latest Posts */}
-      {latest.length > 0 && (
-        <section className="mb-16 md:mb-20">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-mono text-xs uppercase tracking-wider text-text-muted">
-              Latest Posts
-            </h2>
-            <Link
-              to="/articles"
-              className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary transition-colors"
-            >
-              View all
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {loading
-              ? Array.from({ length: 3 }).map((_, i) => <ArticleCardSkeleton key={i} />)
-              : latest.map((article) => <ArticleCard key={article.id} article={article} />)}
-          </div>
-        </section>
-      )}
-
-      {/* Category Filters */}
-      <section className="mb-8">
-        <div className="flex flex-wrap gap-2">
-          <CategoryButton
-            label="All"
-            active={activeCategory === 'all'}
-            onClick={() => setActiveCategory('all')}
-          />
-          {categories.map((cat) => (
-            <CategoryButton
-              key={cat.slug}
-              label={cat.name}
-              active={activeCategory === cat.slug}
-              onClick={() => setActiveCategory(cat.slug)}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* Article Grid */}
-      <section className="mb-12">
-        {articleGridContent}
-      </section>
-    </PageContainer>
-  );
-}
-</file>
-
-<file path="src/types/index.ts">
-import type { User } from '@supabase/supabase-js';
-
-export type ArticleStatus = 'draft' | 'published';
-
-export type Author = {
-  name: string;
-  avatar?: string;
-  bio?: string;
-};
-
-export type ArticleInput = Pick<
-  Article,
-  'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
->;
-
-export type CreateArticleInput = {
-  title?: string;
-  slug?: string;
-  content?: string;
-  category?: string;
-  coverImage?: string;
-  status?: Article['status'];
-};
-export type ArticleUpdateData = {
-  title?: string;
-  slug?: string;
-  content?: string;
-  cover_image?: string | null;
-  status?: Article['status'];
-  category_id?: number;
-  reading_time?: number;
-};
-export type Comment = {
-  id: string;
-  articleId: string;
-  author: string;
-  avatar?: string;
-  content: string;
-  createdAt: string;
-  parentId: string | null;
-};
-
-export type Category = {
-  id: number;
-  slug: string;
-  name: string;
-};
-
-export type Article = {
-  id: string;
-  slug: string;
-  title: string;
-  content: string;
-  category: string;
-  coverImage: string;
-  author: Author;
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt?: string;
-  readingTime: number;
-  likes: number;
-  status: ArticleStatus;
-};
-
-export type AuthState = {
-  user: User | null;
-  isLoading: boolean;
-};
-</file>
-
 <file path="src/services/articleService.ts">
 import type { Article, Comment, ArticleInput } from '@/types';
 import type { Database } from '@/types/database';
@@ -8600,6 +8603,7 @@ import { supabase } from '@/lib/supabase';
 import { getCategoryBySlug } from '@/services/categoryService';
 import { deleteArticleMedia } from './storageService';
 import type { QueryData } from '@supabase/supabase-js';
+import { slugify } from '@/utils/slugify';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
@@ -8696,12 +8700,7 @@ export function calculateReadingTime(content: string): number {
 }
 
 export function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return slugify(title);
 }
 
 export async function getArticles(): Promise<Article[]> {
@@ -9389,22 +9388,32 @@ export function ArticleEditorPage() {
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     e.target.value = '';
-    const articleId = articleRef.current?.id ?? id;
-
-    if (!articleId || articleId === 'new') {
-      toast.error('Save the article before uploading a cover image.');
-      return;
+    let articleId = articleRef.current?.id ?? id;
+    if (isNew && !articleRef.current?.id) {
+      try {
+        const data = buildArticleData();
+        const created = await createArticle(data);
+        articleRef.current = created;
+        articleId = created.id;
+        navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
+      } catch (error) {
+        console.error('Failed to auto-save article:', error);
+        toast.error('Failed to save article. Please try again.');
+        return;
+      }
     }
+    if (!articleId) return;
 
     try {
       setSaveState('saving');
 
+      // delete old cover image if it exists
       if (formData.coverImage) {
         await deleteCoverImage(formData.coverImage);
       }
 
+      // upload new cover image
       const result = await upload(articleId, file, 'cover');
 
       handleChange('coverImage', result.publicUrl);
@@ -9636,11 +9645,11 @@ export function ArticleEditorPage() {
 
           {/* Cover */}
           {formData.coverImage && (
-            <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
+            <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
               <img
                 src={formData.coverImage}
                 alt={formData.title}
-                className="w-full"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             </div>
           )}
@@ -9673,8 +9682,8 @@ export function ArticleEditorPage() {
 
           {formData.coverImage && (
             <div className="relative group mb-6">
-              <div className="overflow-hidden rounded-card border border-border-subtle">
-                <img src={formData.coverImage} alt="Cover" className="w-full h-48 object-cover" />
+              <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle bg-elevated">
+                <img src={formData.coverImage} alt="Cover" className="absolute inset-0 h-full w-full object-cover" />
               </div>
               <button
                 type="button"

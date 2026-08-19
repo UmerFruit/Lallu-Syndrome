@@ -469,11 +469,11 @@ export function ArticleEditorPage() {
 
           {/* Cover */}
           {formData.coverImage && (
-            <div className="overflow-hidden rounded-card border border-border-subtle mb-10">
+            <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
               <img
                 src={formData.coverImage}
                 alt={formData.title}
-                className="w-full"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             </div>
           )}
@@ -506,8 +506,8 @@ export function ArticleEditorPage() {
 
           {formData.coverImage && (
             <div className="relative group mb-6">
-              <div className="overflow-hidden rounded-card border border-border-subtle">
-                <img src={formData.coverImage} alt="Cover" className="w-full h-48 object-cover" />
+              <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle bg-elevated">
+                <img src={formData.coverImage} alt="Cover" className="absolute inset-0 h-full w-full object-cover" />
               </div>
               <button
                 type="button"

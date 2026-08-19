@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react';
+import { slugify } from '@/utils/slugify';
 
 type Heading = {
   id: string;
   text: string;
   level: number;
 };
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim();
-}
 
 export function extractHeadings(html: string): Heading[] {
   const document = new DOMParser().parseFromString(html, 'text/html');

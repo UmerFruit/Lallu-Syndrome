@@ -15,11 +15,11 @@ export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
         to={`/articles/${article.slug}`}
         className="group block overflow-hidden rounded-card border border-border-subtle"
       >
-        <div className="aspect-[16/10] overflow-hidden bg-elevated">
+        <div className="relative aspect-video overflow-hidden bg-elevated">
           <img
             src={article.coverImage}
             alt={article.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </div>
       </Link>
