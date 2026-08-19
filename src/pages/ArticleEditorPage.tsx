@@ -31,7 +31,6 @@ export function ArticleEditorPage() {
     title: '',
     content: '',
     category: 'development',
-    tags: '',
     slug: '',
     coverImage: '',
     status: 'draft' as ArticleStatus,
@@ -67,7 +66,6 @@ export function ArticleEditorPage() {
             title: a.title,
             content: a.content,
             category: a.category,
-            tags: a.tags.join(', '),
             slug: a.slug,
             coverImage: a.coverImage,
             status: a.status,
@@ -85,7 +83,6 @@ export function ArticleEditorPage() {
   );
   const buildArticleData = useCallback((): Partial<Article> => ({
     ...formData,
-    tags: formData.tags.split(',').map((t) => t.trim()).filter(Boolean),
     slug: formData.slug || generateSlug(formData.title || 'untitled'),
     author: AUTHOR,
     readingTime,
@@ -187,8 +184,7 @@ export function ArticleEditorPage() {
     const isEmpty =
       !formData.title.trim() &&
       !formData.content.trim() &&
-      !formData.coverImage.trim() &&
-      !formData.tags.trim();
+      !formData.coverImage.trim();
 
     if (isNew && isEmpty && !articleRef.current?.id) {
       navigate('/dashboard');
@@ -397,16 +393,7 @@ export function ArticleEditorPage() {
                   onChange={(e) => handleChange('slug', e.target.value)}
                 />
               </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Tags (comma-separated)"
-                  name="tags"
-                  placeholder="TypeScript, React, API"
-                  value={formData.tags}
-                  onChange={(e) => handleChange('tags', e.target.value)}
-                />
-              </div>
-
+              
               <div>
                 <label htmlFor='status' className="block text-sm font-medium text-text-secondary mb-1.5">Status</label>
                 <select

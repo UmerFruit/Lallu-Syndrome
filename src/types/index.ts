@@ -52,7 +52,6 @@ export type Article = {
   title: string;
   content: string;
   category: string;
-  tags: string[];
   coverImage: string;
   author: Author;
   publishedAt?: string;

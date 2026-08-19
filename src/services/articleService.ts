@@ -16,11 +16,6 @@ const ARTICLE_SELECT = `
     avatar_url,
     bio
   ),
-  article_tags (
-    tags (
-      name
-    )
-  ),
   article_likes (
     count
   )
@@ -41,10 +36,7 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     throw new Error(`Profile not found for article ${article.id}`);
   }
 
-  const tags = article.article_tags
-    .map((articleTag) => articleTag.tags?.name)
-    .filter((name): name is string => Boolean(name));
-
+  
   const likes = article.article_likes?.[0]?.count ?? 0;
 
   return {
@@ -53,7 +45,6 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     title: article.title,
     content: article.content,
     category: article.categories.slug,
-    tags,
     coverImage: article.cover_image ?? '',
     author: {
       name: article.profiles.display_name,
