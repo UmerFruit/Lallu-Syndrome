@@ -18,6 +18,6 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
-    include: ['lucide-react','highlight.js/lib/common'],
+    include: ['lucide-react'],
   },
 });

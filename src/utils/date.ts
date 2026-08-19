@@ -16,13 +16,6 @@ export function formatDateLong(date: string): string {
   });
 }
 
-export function getLocalDateTime(): string {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-
-  return now.toISOString().slice(0, 16);
-}
-
 export function relativeTime(date: string): string {
   const now = new Date();
   const then = new Date(date);

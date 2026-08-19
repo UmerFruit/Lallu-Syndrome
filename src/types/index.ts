@@ -13,23 +13,6 @@ export type ArticleInput = Pick<
   'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
 >;
 
-export type CreateArticleInput = {
-  title?: string;
-  slug?: string;
-  content?: string;
-  category?: string;
-  coverImage?: string;
-  status?: Article['status'];
-};
-export type ArticleUpdateData = {
-  title?: string;
-  slug?: string;
-  content?: string;
-  cover_image?: string | null;
-  status?: Article['status'];
-  category_id?: number;
-  reading_time?: number;
-};
 export type Comment = {
   id: string;
   articleId: string;

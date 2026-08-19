@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense, lazy } from 'react';
 import type { Article, Category } from '@/types';
 import { getArticles } from '@/services/articleService';
 import { PageContainer } from '@/components/layout/Navbar';
@@ -9,7 +9,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { getCategories } from '@/services/categoryService';
 import { CategoryButton } from '@/components/ui/CategoryButton';
-import ParticleText from '@/components/ui/ParticleText';
+
+const ParticleText = lazy(() => import('@/components/ui/ParticleText'));
 
 export function HomePage() {
   const [featured, setFeatured] = useState<Article | null>(null);
@@ -79,22 +80,24 @@ export function HomePage() {
     <PageContainer className="py-8 md:py-12">
 
       <div className="w-full h-[360px] bg-bg">
-        <ParticleText
-          text="Lallu Syndrome"
-          particleSize={2.3}
-          density={4}
-          scatter={190}
-          gatherDuration={2000}
-          stagger={420}
-          pointerRepel={38}
-          repelRadius={100}
-          idleDrift={0}
-          trigger="mount"
-          fontSize="clamp(3.5rem, 13vw, 9rem)"
-          fontWeight={800}
-          fontFamily="inherit"
-          glow={false}
-        />
+        <Suspense fallback={null}>
+          <ParticleText
+            text="Lallu Syndrome"
+            particleSize={2.3}
+            density={4}
+            scatter={190}
+            gatherDuration={2000}
+            stagger={420}
+            pointerRepel={38}
+            repelRadius={100}
+            idleDrift={0}
+            trigger="mount"
+            fontSize="clamp(3.5rem, 13vw, 9rem)"
+            fontWeight={800}
+            fontFamily="inherit"
+            glow={false}
+          />
+        </Suspense>
       </div>
 
       {/* Featured Article */}
