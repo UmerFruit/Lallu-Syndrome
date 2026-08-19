@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
@@ -21,6 +21,10 @@ export function ArticlePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [liked, setLiked] = useState(false);
+
+  // Scroll-triggered animation state for the author card
+  const authorCardRef = useRef<HTMLDivElement>(null);
+  const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
 
   useEffect(() => {
     async function loadArticle() {
@@ -58,6 +62,25 @@ export function ArticlePage() {
     loadArticle();
   }, [slug]);
 
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const card = authorCardRef.current;
+      if (!card) return;
+
+      const rect = card.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight * 0.9;
+
+      if (isVisible && !isAuthorCardVisible) {
+        setIsAuthorCardVisible(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Check on mount
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isAuthorCardVisible]);
   if (loading) {
     return (
       <>
@@ -95,9 +118,7 @@ export function ArticlePage() {
 
       <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-6">
         {/* Header */}
-
-
-        <header className="mb-8">
+        <header className="mb-6">
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>
@@ -114,7 +135,7 @@ export function ArticlePage() {
         </header>
 
         {/* Cover Image */}
-        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
+        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
           <img
             src={article.coverImage}
             alt=""
@@ -124,7 +145,7 @@ export function ArticlePage() {
       </article>
 
       {/* Content + TOC */}
-      < div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12" >
+      <div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12 mt-12">
         <div className="max-w-article lg:max-w-none lg:col-start-1 lg:row-start-1">
           <ArticleContent content={article.content} />
 
@@ -147,47 +168,42 @@ export function ArticlePage() {
 
         {/* TOC Sidebar */}
         <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            {/* Author Info */}
-            <div className="text-center mb-6 pb-6 border-b border-border-subtle">
-              {article.author.username ? (
-                <Link to={`/writers/${article.author.username}`} className="group block">
-                  {article.author.avatar && (
-                    <img
-                      src={article.author.avatar}
-                      alt={article.author.name}
-                      className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5 transition-colors duration-200 group-hover:border-accent/40"
-                    />
-                  )}
-                  <h3 className="text-sm font-semibold text-text-primary mb-1 transition-colors duration-200 group-hover:text-accent">
-                    {article.author.name}
-                  </h3>
+          <div className="mb-8 rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5">
+            <div className="flex flex-col items-center gap-3">
+              {article.author.avatar && (
+                <img
+                  src={article.author.avatar}
+                  alt={article.author.name}
+                  className="h-30 w-30 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
+                />
+              )}
+              {'username' in article.author && article.author.username ? (
+                <Link
+                  to={`/writers/${article.author.username}`}
+                  className="link-underline text-center text-sm font-medium text-text-primary transition-colors hover:text-accent"
+                >
+                  {article.author.name}
                 </Link>
               ) : (
-                <>
-                  {article.author.avatar && (
-                    <img
-                      src={article.author.avatar}
-                      alt={article.author.name}
-                      className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
-                    />
-                  )}
-                  <h3 className="text-sm font-semibold text-text-primary mb-1">
-                    {article.author.name}
-                  </h3>
-                </>
+                <span className="text-center text-sm font-medium text-text-primary">
+                  {article.author.name}
+                </span>
               )}
-              <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                <span>{article.author.bio ?? "Writing about Linux & open source"}</span>
-              </div>
             </div>
 
-            {/* Table of Contents */}
+            {article.author.bio && (
+              <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">
+                {article.author.bio}
+              </p>
+            )}
+          </div>
+
+          {/* Table of Contents — stays sticky */}
+          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
             <TableOfContents headings={headings} />
           </div>
         </div>
-      </div >
+      </div>
 
       <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
         <Link
