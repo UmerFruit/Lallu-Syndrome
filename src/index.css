@@ -364,6 +364,14 @@
   }
 }
 
+/* Oval portrait — the house avatar shape (4:5, egg-framed) */
+.avatar {
+  aspect-ratio: 4 / 5;
+  border-radius: 9999px;
+  object-fit: cover;
+  object-position: center;
+}
+
 /* Tiptap borderless, page-flush */
 .ProseMirror {
   outline: none;

@@ -174,8 +174,7 @@ export function ArticlePage() {
                 <img
                   src={article.author.avatar}
                   alt={article.author.name}
-                  className="h-30 w-30 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
-                />
+                  className="avatar  shrink-0 border border-border-subtle bg-elevated" />
               )}
               {'username' in article.author && article.author.username ? (
                 <Link
