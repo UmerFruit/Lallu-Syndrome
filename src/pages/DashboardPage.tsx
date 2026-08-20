@@ -83,7 +83,7 @@ export function DashboardPage() {
               >
                 {article.title}
               </Link>
-              <div className="flex items-center gap-3 mt-1">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Badge variant="muted">{article.category}</Badge>
                 <span className="font-mono text-xs text-text-muted">
                   {article.publishedAt && formatDate(article.publishedAt)}
@@ -175,8 +175,8 @@ function TabButton({ label, count, active, onClick }: Readonly<{ label: string; 
       type="button"
       onClick={onClick}
       className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
-          ? 'border-accent text-text-primary'
-          : 'border-transparent text-text-muted hover:text-text-secondary'
+        ? 'border-accent text-text-primary'
+        : 'border-transparent text-text-muted hover:text-text-secondary'
         }`}
     >
       {label}

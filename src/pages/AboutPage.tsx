@@ -36,7 +36,7 @@ export function AboutPage() {
 
   return (
     <div className="grain">
-      <PageContainer className="py-16 md:py-24">
+      <PageContainer className="py-12 md:py-24">
         <div className="relative mx-auto max-w-2xl">
           {/* Eyebrow */}
           <p
@@ -87,7 +87,7 @@ export function AboutPage() {
 
           {/* Mission */}
           <div
-            className="anim-fade-up my-20 flex items-center gap-4"
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
             style={{ animationDelay: '1.05s' }}
           >
             <span className="h-px flex-1 bg-border-subtle" />
@@ -111,7 +111,7 @@ export function AboutPage() {
 
           {/* Topics */}
           <div
-            className="anim-fade-up my-20 flex items-center gap-4"
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
             style={{ animationDelay: '1.35s' }}
           >
             <span className="h-px flex-1 bg-border-subtle" />
@@ -142,7 +142,7 @@ export function AboutPage() {
 
           {/* Principles */}
           <div
-            className="anim-fade-up my-20 flex items-center gap-4"
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
             style={{ animationDelay: '1.65s' }}
           >
             <span className="h-px flex-1 bg-border-subtle" />

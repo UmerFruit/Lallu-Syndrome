@@ -22,17 +22,17 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const showToast = useCallback(
-    (message: string, type: ToastType = 'info') => {
-        const id = crypto.randomUUID();
+        (message: string, type: ToastType = 'info') => {
+            const id = crypto.randomUUID();
 
-        setToasts((prev) => [...prev, { id, message, type }]);
+            setToasts((prev) => [...prev, { id, message, type }]);
 
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 4000);
-    },
-    []
-);
+            setTimeout(() => {
+                setToasts((prev) => prev.filter((t) => t.id !== id));
+            }, 4000);
+        },
+        []
+    );
 
     const removeToast = (id: string) => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -53,7 +53,7 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
             {children}
 
             {/* Toast Container */}
-            <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+            <div className="pointer-events-none fixed bottom-4 left-4 right-4 z-[100] flex flex-col gap-3 sm:left-auto sm:bottom-6 sm:right-6">
                 {toasts.map((t) => {
                     const toastClassNames: Record<ToastType, string> = {
                         error: 'bg-red-950/90 border-red-800 text-red-100',
@@ -70,8 +70,7 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
 
                     return <div
                         key={t.id}
-                        className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-up min-w-[280px] max-w-sm backdrop-blur-sm ${toastClassNames[t.type]}`}
-                    >
+                        className={`pointer-events-auto flex w-full items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-up backdrop-blur-sm sm:w-auto sm:min-w-[280px] sm:max-w-sm ${toastClassNames[t.type]}`}                    >
                         {toastIcon}
                         <p className="text-sm flex-1">{t.message}</p>
                         <button

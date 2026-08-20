@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Article,Category } from '@/types';
+import type { Article, Category } from '@/types';
 import { getArticles } from '@/services/articleService';
 import { getCategories } from '@/services/categoryService';
 import { CategoryButton } from '@/components/ui/CategoryButton';
@@ -14,7 +14,7 @@ export function ArticlesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-     Promise.all([
+    Promise.all([
       getArticles(),
       getCategories(),
     ]).then(([articlesResults, categoriesResults]) => {
@@ -61,12 +61,11 @@ export function ArticlesPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-8">
-        <CategoryButton
-          label="All"
-          active={activeCategory === 'all'}
-          onClick={() => setActiveCategory('all')}
-        />
+      <div className="-mx-4 mb-8 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">        <CategoryButton
+        label="All"
+        active={activeCategory === 'all'}
+        onClick={() => setActiveCategory('all')}
+      />
         {categories.map((cat) => (
           <CategoryButton
             key={cat.slug}

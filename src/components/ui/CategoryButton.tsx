@@ -13,11 +13,10 @@ export function CategoryButton({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${
-        active
+      className={`px-3.5 py-2 sm:py-1.5 rounded font-mono shrink-0 whitespace-nowrap text-xs uppercase tracking-wider border transition-colors duration-200 ${active
           ? 'border-accent text-accent bg-accent/5'
           : 'border-border text-text-muted hover:text-text-secondary hover:border-text-muted'
-      }`}
+        }`}
     >
       {label}
     </button>

@@ -356,39 +356,39 @@ export function TiptapEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('bold')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('bold')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Bold"
         >
-          <Bold size={15} />
+          <Bold size={16} />
         </button>
 
         {/* Italic */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('italic')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('italic')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Italic"
         >
-          <Italic size={15} />
+          <Italic size={16} />
         </button>
 
         {/* Strike */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('strike')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('strike')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Strikethrough"
         >
-          <Strikethrough size={15} />
+          <Strikethrough size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -397,39 +397,39 @@ export function TiptapEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
+          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Heading 1"
         >
-          <Heading1 size={15} />
+          <Heading1 size={16} />
         </button>
 
         {/* Heading 2 */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
+          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Heading 2"
         >
-          <Heading2 size={15} />
+          <Heading2 size={16} />
         </button>
 
         {/* Heading 3 */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
+          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Heading 3"
         >
-          <Heading3 size={15} />
+          <Heading3 size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -444,13 +444,13 @@ export function TiptapEditor({
               editor.chain().focus().setTextAlign('justify').run();
             }
           }}
-          className={`p-1.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
+          className={`p-2.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Justify text"
         >
-          <AlignJustify size={15} />
+          <AlignJustify size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -459,49 +459,49 @@ export function TiptapEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('blockquote')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('blockquote')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Quote"
         >
-          <Quote size={15} />
+          <Quote size={16} />
         </button>
 
         {/* Inline Code */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleCode().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('code')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('code')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Inline code"
         >
-          <Code size={15} />
+          <Code size={16} />
         </button>
 
         {/* Clear formatting */}
         <button
           type="button"
           onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
-          className="p-1.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+          className="p-2.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
           title="Clear formatting"
         >
-          <Eraser size={15} />
+          <Eraser size={16} />
         </button>
 
         {/* Link */}
         <button
           type="button"
           onClick={setLink}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('link')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('link')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Add link"
         >
-          <LinkIcon size={15} />
+          <LinkIcon size={16} />
         </button>
       </BubbleMenu>
       {/* ====== IMAGE BUBBLE MENU ====== */}
@@ -516,13 +516,13 @@ export function TiptapEditor({
           onClick={() =>
             editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
           }
-          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
+          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Align image left"
         >
-          <AlignLeft size={15} />
+          <AlignLeft size={16} />
         </button>
 
         <button
@@ -530,13 +530,13 @@ export function TiptapEditor({
           onClick={() =>
             editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
           }
-          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
+          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Center image"
         >
-          <AlignCenter size={15} />
+          <AlignCenter size={16} />
         </button>
 
         <button
@@ -544,13 +544,13 @@ export function TiptapEditor({
           onClick={() =>
             editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
           }
-          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
+          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Align image right"
         >
-          <AlignRight size={15} />
+          <AlignRight size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -568,7 +568,7 @@ export function TiptapEditor({
             onClick={() =>
               editor.chain().focus().updateAttributes('image', { width }).run()
             }
-            className={`p-1.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
+            className={`p-2.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
               ? 'text-accent bg-surface'
               : 'text-text-secondary hover:text-text-primary hover:bg-surface'
               }`}

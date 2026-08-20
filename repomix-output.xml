@@ -77,6 +77,8 @@ src/
       ConfirmationModal.tsx
       Input.tsx
       Skeleton.tsx
+  config/
+    site.ts
   contexts/
     AuthContext.tsx
     ThemeContext.tsx
@@ -97,8 +99,10 @@ src/
     ArticlePage.tsx
     ArticlesPage.tsx
     CategoryPage.tsx
+    CreatorPage.tsx
     DashboardPage.tsx
     HomePage.tsx
+    WriterProfilePage.tsx
   services/
     articleService.ts
     authService.ts
@@ -630,11 +634,10 @@ export function CategoryButton({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3.5 py-1.5 rounded font-mono text-xs uppercase tracking-wider border transition-colors duration-200 ${
-        active
+      className={`px-3.5 py-2 sm:py-1.5 rounded font-mono shrink-0 whitespace-nowrap text-xs uppercase tracking-wider border transition-colors duration-200 ${active
           ? 'border-accent text-accent bg-accent/5'
           : 'border-border text-text-muted hover:text-text-secondary hover:border-text-muted'
-      }`}
+        }`}
     >
       {label}
     </button>
@@ -675,8 +678,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             type={inputType}
-            className={`w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-sm transition-colors duration-200 focus:border-accent focus:outline-none ${error ? 'border-accent' : ''} ${className ?? ''}`}
-            aria-invalid={!!error}
+            className={`w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm transition-colors duration-200 focus:border-accent focus:outline-none ${error ? 'border-accent' : ''} ${className ?? ''}`} aria-invalid={!!error}
             aria-describedby={error ? `${inputId}-error` : undefined}
             {...props}
           />
@@ -705,6 +707,25 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 Input.displayName = 'Input';
 </file>
 
+<file path="src/config/site.ts">
+export const siteConfig = {
+  name: 'Lallu Syndrome',
+  description: 'Notes, experiments, and deep dives into technology.',
+  creator: {
+    name: 'Umer Farooq',
+    avatarUrl:
+      'https://sakhudjwzeyhtixjqrsn.supabase.co/storage/v1/object/public/avatars/mine.png',
+    links: [
+      { label: 'Portfolio', href: 'https://umerfruit.dev' },
+      { label: 'GitHub', href: 'https://github.com/UmerFruit' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/in/umer-farooq-242130277/' },
+    ],
+  },
+} as const;
+
+export type SiteConfig = typeof siteConfig;
+</file>
+
 <file path="src/contexts/ToastContext.tsx">
 import { createContext, useContext, useState, useCallback, type ReactNode, useMemo } from 'react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react'
@@ -730,17 +751,17 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const showToast = useCallback(
-    (message: string, type: ToastType = 'info') => {
-        const id = crypto.randomUUID();
+        (message: string, type: ToastType = 'info') => {
+            const id = crypto.randomUUID();
 
-        setToasts((prev) => [...prev, { id, message, type }]);
+            setToasts((prev) => [...prev, { id, message, type }]);
 
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 4000);
-    },
-    []
-);
+            setTimeout(() => {
+                setToasts((prev) => prev.filter((t) => t.id !== id));
+            }, 4000);
+        },
+        []
+    );
 
     const removeToast = (id: string) => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -761,7 +782,7 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
             {children}
 
             {/* Toast Container */}
-            <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+            <div className="pointer-events-none fixed bottom-4 left-4 right-4 z-[100] flex flex-col gap-3 sm:left-auto sm:bottom-6 sm:right-6">
                 {toasts.map((t) => {
                     const toastClassNames: Record<ToastType, string> = {
                         error: 'bg-red-950/90 border-red-800 text-red-100',
@@ -778,8 +799,7 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
 
                     return <div
                         key={t.id}
-                        className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-up min-w-[280px] max-w-sm backdrop-blur-sm ${toastClassNames[t.type]}`}
-                    >
+                        className={`pointer-events-auto flex w-full items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-up backdrop-blur-sm sm:w-auto sm:min-w-[280px] sm:max-w-sm ${toastClassNames[t.type]}`}                    >
                         {toastIcon}
                         <p className="text-sm flex-1">{t.message}</p>
                         <button
@@ -901,7 +921,7 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const inputClass =
-  'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
+  'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
 const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
 
 export function PasswordSettingsPage() {
@@ -1033,7 +1053,7 @@ const initialForm: FormState = {
 };
 
 const inputClass =
-    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
+    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
 
 const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
 
@@ -1304,16 +1324,16 @@ export function ProfileSettingsPage() {
                         Avatar
                     </label>
 
-                    <div className="mt-3 flex items-start gap-6">
+                    <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
                         {/* Avatar preview */}
                         {form.avatar_url.trim() ? (
                             <img
                                 src={normalizeUrl(form.avatar_url)}
                                 alt="Avatar preview"
-                                className="h-36 w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
+                                className="h-28 w-28 sm:h-36 sm:w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
                             />
                         ) : (
-                            <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
+                            <div className="flex h-28 w-28 sm:h-36 sm:w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
                                 No image
                             </div>
                         )}
@@ -1354,7 +1374,7 @@ export function ProfileSettingsPage() {
 
                                     <label
                                         htmlFor="avatar-upload"
-                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
+                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
                                                 ? 'pointer-events-none opacity-50'
                                                 : ''
                                             }`}
@@ -1507,87 +1527,351 @@ export function ProfileSettingsPage() {
 }
 </file>
 
-<file path="src/services/profileService.ts">
-import { supabase } from '@/lib/supabase';
+<file path="src/pages/CreatorPage.tsx">
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
+import { getCategories } from '@/services/categoryService';
+import type { Category } from '@/types';
+import { siteConfig } from '@/config/site';
 
-export type Profile = {
-  id: string;
-  display_name: string;
-  username: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  website_url: string | null;
-  github_url: string | null;
-  linkedin_url: string | null;
-  created_at: string;
-  updated_at: string;
-};
+export function CreatorPage() {
+  const [categories, setCategories] = useState<Category[]>([]);
 
-export type ProfileSaveValues = {
-  display_name: string;
-  username?: string | null;
-  avatar_url?: string | null;
-  bio?: string | null;
-  website_url?: string | null;
-  github_url?: string | null;
-  linkedin_url?: string | null;
-};
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
 
-export async function getProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  const { creator } = siteConfig;
+  const marqueeItems = [...categories, ...categories];
 
-  if (error) throw error;
+  return (
+    <div className="grain">
+      <PageContainer className="py-12 md:py-24">
+        <div className="relative mx-auto max-w-2xl">
+          {/* Top label */}
+          <p
+            className="anim-fade-up text-center font-mono text-xl uppercase tracking-[0.25em] text-text-muted"
+            style={{ animationDelay: '0.05s' }}
+          >
+            The creator
+          </p>
 
-  return data as Profile | null;
+          {/* Avatar */}
+          <div
+            className="anim-fade-up mt-10 flex justify-center"
+            style={{ animationDelay: '0.25s' }}
+          >
+            <div className="avatar-ring relative inline-block rounded-full">
+              <img
+                src={creator.avatarUrl}
+                alt={creator.name}
+                className="avatar-hover h-44 w-44 rounded-full border-4 border-bg object-cover md:h-52 md:w-52"
+              />
+            </div>
+          </div>
+
+          {/* Name */}
+          <h1
+            className="anim-wipe mt-10 text-center font-serif text-4xl leading-tight text-text-primary md:text-6xl"
+            style={{ animationDelay: '0.5s' }}
+          >
+            {creator.name}
+           
+          </h1>
+
+          {/* Bio */}
+          <p
+            className="anim-fade-up mx-auto mt-8 max-w-md text-center text-base leading-relaxed text-text-secondary md:text-lg"
+          >
+            A generalist and a computer enthusiast. A quiet corner of the internet
+            for technical writing and long-running experiments. Hopefully, this will be a place to share ideas and learn from others.
+          </p>
+
+          {/* Links */}
+          <div
+            className="anim-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+            style={{ animationDelay: '1.05s' }}
+          >
+            {creator.links.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+              >
+                {link.label}
+                <ArrowUpRight size={13} className="anim-arrow" />
+              </a>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
+            style={{ animationDelay: '1.25s' }}
+          >
+            <span className="h-px flex-1 bg-border-subtle" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+              Topics
+            </span>
+            <span className="h-px flex-1 bg-border-subtle" />
+          </div>
+
+          {/* Statement */}
+          <div className="anim-fade-up mt-14 md:mt-20" style={{ animationDelay: '1.55s' }}>
+            <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
+              I build in public<span className="text-accent">.</span>
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-text-secondary">
+              Lallu Syndrome is my personal diary as much as it is a publication.
+              The database schema, the editor, and the animations on this page
+              are all handcrafted. It is a personal project, not affiliated
+              with any company or organization.
+            </p>
+            <Link
+              to="/about"
+              className="link-underline mt-6 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+            >
+              About the publication
+              <ArrowRight size={13} className="anim-arrow" />
+            </Link>
+          </div>
+
+          {/* Colophon */}
+          <footer
+            className="anim-fade-up mt-16 md:mt-24 border-t border-border-subtle pt-6"
+            style={{ animationDelay: '1.7s' }}
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
+              React · TypeScript · Tailwind · Supabase
+            </p>
+          </footer>
+        </div>
+      </PageContainer>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/WriterProfilePage.tsx">
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
+import type { Article } from '@/types';
+import type { Profile } from '@/services/profileService';
+import { getProfileByUsername } from '@/services/profileService';
+import { getPublishedArticlesByAuthor } from '@/services/articleService';
+import { PageContainer } from '@/components/layout/Navbar';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+
+export function WriterProfilePage() {
+  const { username } = useParams<{ username: string }>();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loadingArticles, setLoadingArticles] = useState(true);
+  const [status, setStatus] = useState<'loading' | 'found' | 'not-found'>('loading');
+
+  useEffect(() => {
+    if (!username) return;
+    let mounted = true;
+
+    setStatus('loading');
+    setProfile(null);
+    setArticles([]);
+    setLoadingArticles(true);
+
+    (async () => {
+      try {
+        const found = await getProfileByUsername(username.toLowerCase());
+        if (!mounted) return;
+        if (!found) {
+          setStatus('not-found');
+          setLoadingArticles(false);
+          return;
+        }
+        setProfile(found);
+        setStatus('found');
+        const writerArticles = await getPublishedArticlesByAuthor(found.id);
+        if (!mounted) return;
+        setArticles(writerArticles);
+      } catch (error) {
+        console.error('Failed to load writer profile:', error);
+        if (!mounted) return;
+        setStatus('not-found');
+      } finally {
+        if (mounted) setLoadingArticles(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [username]);
+
+  const externalLinks = useMemo(() => {
+    if (!profile) return [];
+    return [
+      { label: 'Website', href: profile.website_url },
+      { label: 'GitHub', href: profile.github_url },
+      { label: 'LinkedIn', href: profile.linkedin_url },
+    ].filter((link): link is { label: string; href: string } => Boolean(link.href));
+  }, [profile]);
+
+  const totalLikes = useMemo(
+    () => articles.reduce((sum, article) => sum + article.likes, 0),
+    [articles]
+  );
+
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]" role="status" aria-label="Loading writer profile">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'not-found' || !profile) {
+    return (
+      <PageContainer className="py-24 text-center">
+        <UserX size={32} className="mx-auto text-text-muted mb-4" />
+        <h1 className="font-serif text-2xl font-semibold text-text-primary mb-2">
+          Writer not found
+        </h1>
+        <p className="text-text-muted mb-6">
+          This profile doesn't exist, or the username has changed.
+        </p>
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to articles
+        </Link>
+      </PageContainer>
+    );
+  }
+
+  const initial = profile.display_name.charAt(0).toUpperCase();
+
+  return (
+    <div className="grain">
+      <PageContainer className="py-12 md:py-20">
+        {/* Profile header */}
+        <header className="mx-auto max-w-2xl text-center">
+          <p
+            className="anim-fade-up font-mono text-sm uppercase tracking-[0.25em] text-text-muted"
+            style={{ animationDelay: '0.05s' }}
+          >
+            @{profile.username}
+          </p>
+
+          <div
+            className="anim-fade-up mt-8 flex justify-center"
+            style={{ animationDelay: '0.2s' }}
+          >
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name}
+                className="h-32 w-32 rounded-full border-2 border-border bg-elevated object-cover md:h-36 md:w-36"
+              />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-border bg-elevated font-serif text-4xl font-medium text-text-muted md:h-36 md:w-36">
+                {initial}
+              </div>
+            )}
+          </div>
+
+          <h1
+            className="anim-wipe mt-8 font-serif text-3xl font-medium leading-tight text-text-primary md:text-5xl"
+            style={{ animationDelay: '0.4s' }}
+          >
+            {profile.display_name}
+          </h1>
+
+          {profile.bio && (
+            <p
+              className="anim-fade-up mx-auto mt-5 max-w-md text-base leading-relaxed text-text-secondary"
+              style={{ animationDelay: '0.6s' }}
+            >
+              {profile.bio}
+            </p>
+          )}
+
+          {externalLinks.length > 0 && (
+            <div
+              className="anim-fade-up mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+              style={{ animationDelay: '0.75s' }}
+            >
+              {externalLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+                >
+                  {link.label}
+                  <ArrowUpRight size={13} className="anim-arrow" />
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* Stats */}
+          <div
+            className="anim-fade-up mt-10 flex items-center justify-center gap-8"
+            style={{ animationDelay: '0.9s' }}
+          >
+            <Stat value={articles.length} label={articles.length === 1 ? 'Article' : 'Articles'} />
+            <span className="h-8 w-px bg-border-subtle" aria-hidden="true" />
+            <Stat value={totalLikes} label={totalLikes === 1 ? 'Like' : 'Likes'} />
+          </div>
+        </header>
+
+        {/* Published articles */}
+        <section className="mx-auto mt-12 md:mt-16 max-w-content">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
+            Published writing
+          </h2>
+          {loadingArticles ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <ArticleCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : articles.length === 0 ? (
+            <p className="py-12 text-center text-text-muted">
+              No published articles yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {articles.map((article) => (
+                <ArticleCard key={article.id} article={article} />
+              ))}
+            </div>
+          )}
+        </section>
+      </PageContainer>
+    </div>
+  );
 }
 
-export async function saveProfile(
-  userId: string,
-  values: ProfileSaveValues
-): Promise<Profile> {
-  const payload = {
-    id: userId,
-    display_name: values.display_name,
-    username: values.username ?? null,
-    avatar_url: values.avatar_url ?? null,
-    bio: values.bio ?? null,
-    website_url: values.website_url ?? null,
-    github_url: values.github_url ?? null,
-    linkedin_url: values.linkedin_url ?? null,
-  };
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert(payload, {
-      onConflict: 'id',
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return data as Profile;
-}
-
-export async function uploadAvatar(userId: string, file: File): Promise<string> {
-  const fileExt = file.name.split('.').pop() || 'png';
-  // Save as {userId}/avatar.{ext} so it automatically overwrites the old one
-  const filePath = `${userId}/avatar.${fileExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(filePath, file, { upsert: true, cacheControl: '3600' });
-
-  if (uploadError) throw uploadError;
-
-  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-  
-  // Append timestamp to bypass browser cache when the image updates
-  return `${data.publicUrl}?t=${Date.now()}`;
+function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
+  return (
+    <div className="text-center">
+      <p className="font-serif text-2xl font-medium text-text-primary md:text-3xl">{value}</p>
+      <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+        {label}
+      </p>
+    </div>
+  );
 }
 </file>
 
@@ -2456,26 +2740,36 @@ export default tseslint.config(
 <file path="index.html">
 <!doctype html>
 <html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lallu Syndrome</title>
-    <meta name="description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
-    <meta property="og:title" content="Lallu Syndrome" />
-    <meta property="og:description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
-    <meta property="og:type" content="website" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <meta property="og:image" content="https://bolt.new/static/og_default.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#090909" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Lallu Syndrome" />
+  <title>Lallu Syndrome</title>
+  <meta name="description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
+  <meta property="og:title" content="Lallu Syndrome" />
+  <meta property="og:description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
 </file>
 
@@ -2806,85 +3100,6 @@ export function AuthLink({ to, children }: Readonly<{ to: string; children: Reac
     <Link to={to} className="text-accent hover:text-accent-hover transition-colors font-medium">
       {children}
     </Link>
-  );
-}
-</file>
-
-<file path="src/components/layout/Footer.tsx">
-import { Link } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
-
-const PORTFOLIO_URL = 'https://umerfruit.dev';
-const GITHUB_URL = 'https://github.com/UmerFruit';
-const LINKEDIN_URL = 'https://www.linkedin.com/in/umer-farooq-242130277/';
-
-export function Footer() {
-  return (
-    <footer className="border-t border-border-subtle mt-20">
-      <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="space-y-2">
-            <Link to="/" className="font-serif text-lg font-semibold text-text-primary hover:text-accent transition-colors">
-              Lallu Syndrome
-            </Link>
-            <p className="text-sm text-text-muted max-w-xs">
-              Notes, experiments, and deep dives into technology.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted">Navigate</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link to="/articles" className="text-text-secondary hover:text-text-primary transition-colors">
-                  Articles
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="text-text-secondary hover:text-text-primary transition-colors">
-                  About
-                </Link>
-              </li>
-              <li>
-                <Link to="/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
-                  Dashboard
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted">Elsewhere</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a href={PORTFOLIO_URL} target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-0.5">
-                  Portfolio <ArrowUpRight size={14} />
-                </a>
-              </li>
-              <li>
-                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-0.5">
-                  GitHub <ArrowUpRight size={14} />
-                </a>
-              </li>
-              <li>
-                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-0.5">
-                  LinkedIn <ArrowUpRight size={14} />
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-10 pt-6 border-t border-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <p className="text-xs text-text-muted">
-            &copy; {new Date().getFullYear()} Lallu Syndrome. All rights reserved.
-          </p>
-          <p className="text-xs text-text-muted">
-            by Umer Farooq
-          </p>
-        </div>
-      </div>
-    </footer>
   );
 }
 </file>
@@ -3370,6 +3585,100 @@ export function SignupPage() {
       </form>
     </AuthLayout>
   );
+}
+</file>
+
+<file path="src/services/profileService.ts">
+import { supabase } from '@/lib/supabase';
+
+export type Profile = {
+  id: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  website_url: string | null;
+  github_url: string | null;
+  linkedin_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProfileSaveValues = {
+  display_name: string;
+  username?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  website_url?: string | null;
+  github_url?: string | null;
+  linkedin_url?: string | null;
+};
+
+export async function getProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data as Profile | null;
+}
+
+export async function saveProfile(
+  userId: string,
+  values: ProfileSaveValues
+): Promise<Profile> {
+  const payload = {
+    id: userId,
+    display_name: values.display_name,
+    username: values.username ?? null,
+    avatar_url: values.avatar_url ?? null,
+    bio: values.bio ?? null,
+    website_url: values.website_url ?? null,
+    github_url: values.github_url ?? null,
+    linkedin_url: values.linkedin_url ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(payload, {
+      onConflict: 'id',
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data as Profile;
+}
+
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  const fileExt = file.name.split('.').pop() || 'png';
+  // Save as {userId}/avatar.{ext} so it automatically overwrites the old one
+  const filePath = `${userId}/avatar.${fileExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file, { upsert: true, cacheControl: '3600' });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  
+  // Append timestamp to bypass browser cache when the image updates
+  return `${data.publicUrl}?t=${Date.now()}`;
+}
+
+export async function getProfileByUsername(username: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Profile | null;
 }
 </file>
 
@@ -3964,6 +4273,84 @@ export function LikeButton({ articleId, initialLikes, initiallyLiked = false }: 
 }
 </file>
 
+<file path="src/components/layout/Footer.tsx">
+import { Link } from 'react-router-dom';
+import { ArrowUpRight } from 'lucide-react';
+import { siteConfig } from '@/config/site';
+
+const linkClass =
+  'text-text-secondary hover:text-text-primary transition-colors';
+
+export function Footer() {
+  return (
+    <footer className="border-t border-border-subtle mt-20">
+      <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="space-y-2">
+            <Link
+              to="/"
+              className="font-serif text-lg font-semibold text-text-primary hover:text-accent transition-colors"
+            >
+              {siteConfig.name}
+            </Link>
+            <p className="text-sm text-text-muted max-w-xs">
+              {siteConfig.description}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted">
+              Navigate
+            </h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link to="/articles" className={linkClass}>Articles</Link></li>
+              <li><Link to="/about" className={linkClass}>About</Link></li>
+              <li><Link to="/creator" className={linkClass}>Creator</Link></li>
+              <li><Link to="/dashboard" className={linkClass}>Dashboard</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted">
+              Elsewhere
+            </h3>
+            <ul className="space-y-2 text-sm">
+              {siteConfig.creator.links.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${linkClass} inline-flex items-center gap-0.5`}
+                  >
+                    {link.label} <ArrowUpRight size={14} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-10 pt-6 border-t border-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <p className="text-xs text-text-muted">
+            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+          </p>
+          <p className="text-xs text-text-muted">
+            by{' '}
+            <Link
+              to="/creator"
+              className="text-text-secondary hover:text-text-primary transition-colors"
+            >
+              {siteConfig.creator.name}
+            </Link>
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+</file>
+
 <file path="src/services/categoryService.ts">
 import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types";
@@ -4014,38 +4401,6 @@ export function relativeTime(date: string): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
   return formatDate(date);
-}
-</file>
-
-<file path="tsconfig.app.json">
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-
-    /* Path alias — depth-invariant imports for src (@/foo === src/foo from any file) */
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src"]
 }
 </file>
 
@@ -4250,6 +4605,38 @@ export async function logout(): Promise<void> {
 }
 </file>
 
+<file path="tsconfig.app.json">
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Path alias depth-invariant imports for src (@/foo === src/foo from any file) */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
+</file>
+
 <file path="src/components/interactions/CommentSection.tsx">
 // src/components/interactions/CommentSection.tsx
 import { useEffect, useState, type FormEvent } from 'react';
@@ -4393,8 +4780,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
                 placeholder="Write a comment..."
                 rows={3}
                 maxLength={1000}
-                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-sm resize-y transition-colors focus:border-accent focus:outline-none"
-                aria-label="Write a comment"
+                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
                 disabled={submitting}
               />
               <div className="flex justify-end mt-2">
@@ -4487,8 +4873,7 @@ function CommentItem({
               <button
                 type="button"
                 onClick={() => setIsReplying(!isReplying)}
-                className="text-xs font-medium text-text-muted hover:text-text-secondary transition-colors"
-              >
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
                 {isReplying ? 'Cancel' : 'Reply'}
               </button>
             )}
@@ -4514,8 +4899,7 @@ function CommentItem({
                 placeholder="Write a reply..."
                 rows={2}
                 maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-sm resize-y focus:border-accent focus:outline-none"
-                disabled={submitting}
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" disabled={submitting}
                 autoFocus
               />
               <button
@@ -4545,7 +4929,189 @@ function CommentItem({
           )}
         </div>
       </div>
-    </div>
+    </div >
+  );
+}
+</file>
+
+<file path="src/lib/supabase.ts">
+import { Database } from '@/types/database';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+export const supabase = createClient<Database>(supabaseUrl,supabasePublishableKey);
+</file>
+
+<file path="src/pages/ArticlesPage.tsx">
+import { useEffect, useState } from 'react';
+import type { Article, Category } from '@/types';
+import { getArticles } from '@/services/articleService';
+import { getCategories } from '@/services/categoryService';
+import { CategoryButton } from '@/components/ui/CategoryButton';
+import { PageContainer } from '@/components/layout/Navbar';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+
+export function ArticlesPage() {
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      getArticles(),
+      getCategories(),
+    ]).then(([articlesResults, categoriesResults]) => {
+      setArticles(articlesResults);
+      setCategories(categoriesResults);
+      setLoading(false);
+    });
+  }, []);
+
+  const filtered = activeCategory === 'all'
+    ? articles
+    : articles.filter((a) => a.category === activeCategory);
+
+  let articleContent;
+
+  if (loading) {
+    articleContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 9 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+      </div>
+    );
+  } else if (filtered.length === 0) {
+    articleContent = (
+      <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
+    );
+  } else {
+    articleContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <PageContainer className="py-8 md:py-12">
+      <div className="mb-8">
+        <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight">
+          Articles
+        </h1>
+        <p className="mt-2 text-text-secondary">
+          All published writing, sorted by recency.
+        </p>
+      </div>
+
+      <div className="-mx-4 mb-8 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">        <CategoryButton
+        label="All"
+        active={activeCategory === 'all'}
+        onClick={() => setActiveCategory('all')}
+      />
+        {categories.map((cat) => (
+          <CategoryButton
+            key={cat.slug}
+            label={cat.name}
+            active={activeCategory === cat.slug}
+            onClick={() => setActiveCategory(cat.slug)}
+          />
+        ))}
+      </div>
+
+      {articleContent}
+    </PageContainer>
+  );
+}
+</file>
+
+<file path="vite.config.ts">
+/// <reference types="node" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  server: {
+    host: true,
+    allowedHosts: [
+      'quakier-ascensive-melodie.ngrok-free.dev',
+    ],
+  },
+  optimizeDeps: {
+    include: ['lucide-react'],
+  },
+});
+</file>
+
+<file path="src/components/articles/ArticleContent.tsx">
+import DOMPurify from 'dompurify';
+import { slugify } from '@/utils/slugify';
+
+type ArticleContentProps = {
+  content: string;
+};
+
+export function ArticleContent({
+  content,
+}: Readonly<ArticleContentProps>) {
+  const sanitized = DOMPurify.sanitize(content, {
+    USE_PROFILES: {
+      html: true,
+    },
+    ADD_ATTR: [
+      'target',
+      'rel',
+      'class',
+      'style',
+      'data-width',
+      'data-alignment',
+    ],
+  });
+
+  const document = new DOMParser().parseFromString(
+    sanitized,
+    'text/html'
+  );
+
+  const usedIds = new Set<string>();
+
+  document.querySelectorAll('h1, h2, h3').forEach((heading) => {
+    const text = heading.textContent?.trim() ?? '';
+
+    if (!text) return;
+
+    const baseId = slugify(text);
+    let id = baseId;
+    let counter = 2;
+
+    while (usedIds.has(id)) {
+      id = `${baseId}-${counter++}`;
+    }
+
+    usedIds.add(id);
+    heading.id = id;
+    heading.classList.add('scroll-mt-20');
+  });
+
+  return (
+    <div
+      className="article-prose"
+      dangerouslySetInnerHTML={{
+        __html: document.body.innerHTML,
+      }}
+    />
   );
 }
 </file>
@@ -4561,6 +5127,7 @@ import { UserMenu } from '@/components/layout/UserMenu';
 const navLinks = [
   { label: 'Articles', to: '/articles' },
   { label: 'About', to: '/about' },
+  { label: 'Creator', to: '/creator' },
 ];
 
 export function Navbar() {
@@ -4572,6 +5139,7 @@ export function Navbar() {
   const isActive = (path: string) => {
     if (path === '/articles') return location.pathname.startsWith('/articles');
     if (path === '/about') return location.pathname === '/about';
+    if (path === '/creator') return location.pathname === '/creator';
     return false;
   };
 
@@ -4592,11 +5160,10 @@ export function Navbar() {
             <Link
               key={link.to}
               to={link.to}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${
-                isActive(link.to)
+              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${isActive(link.to)
                   ? 'text-text-primary'
                   : 'text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               {link.label}
             </Link>
@@ -4687,708 +5254,6 @@ export function PageContainer({
     <div className={`max-w-content mx-auto px-4 sm:px-6 ${className ?? ''}`}>
       {children}
     </div>
-  );
-}
-</file>
-
-<file path="src/lib/supabase.ts">
-import { Database } from '@/types/database';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-export const supabase = createClient<Database>(supabaseUrl,supabasePublishableKey);
-</file>
-
-<file path="src/pages/ArticlesPage.tsx">
-import { useEffect, useState } from 'react';
-import type { Article,Category } from '@/types';
-import { getArticles } from '@/services/articleService';
-import { getCategories } from '@/services/categoryService';
-import { CategoryButton } from '@/components/ui/CategoryButton';
-import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
-
-export function ArticlesPage() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-     Promise.all([
-      getArticles(),
-      getCategories(),
-    ]).then(([articlesResults, categoriesResults]) => {
-      setArticles(articlesResults);
-      setCategories(categoriesResults);
-      setLoading(false);
-    });
-  }, []);
-
-  const filtered = activeCategory === 'all'
-    ? articles
-    : articles.filter((a) => a.category === activeCategory);
-
-  let articleContent;
-
-  if (loading) {
-    articleContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 9 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-      </div>
-    );
-  } else if (filtered.length === 0) {
-    articleContent = (
-      <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
-    );
-  } else {
-    articleContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <PageContainer className="py-8 md:py-12">
-      <div className="mb-8">
-        <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight">
-          Articles
-        </h1>
-        <p className="mt-2 text-text-secondary">
-          All published writing, sorted by recency.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-8">
-        <CategoryButton
-          label="All"
-          active={activeCategory === 'all'}
-          onClick={() => setActiveCategory('all')}
-        />
-        {categories.map((cat) => (
-          <CategoryButton
-            key={cat.slug}
-            label={cat.name}
-            active={activeCategory === cat.slug}
-            onClick={() => setActiveCategory(cat.slug)}
-          />
-        ))}
-      </div>
-
-      {articleContent}
-    </PageContainer>
-  );
-}
-</file>
-
-<file path="src/App.tsx">
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { type ReactNode, useEffect } from 'react';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { HomePage } from '@/pages/HomePage';
-import { ArticlesPage } from '@/pages/ArticlesPage';
-import { ArticlePage } from '@/pages/ArticlePage';
-import { CategoryPage } from '@/pages/CategoryPage';
-import { AboutPage } from '@/pages/AboutPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { SignupPage } from '@/pages/auth/SignupPage';
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
-import { SettingsLayout } from '@/components/layout/SettingsLayout';
-import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
-import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
-import { ToastProvider } from '@/contexts/ToastContext';
-
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  return null;
-}
-
-function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
-  );
-}
-
-function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen bg-bg">{children}</div>
-  );
-}
-
-function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-    </div>
-  );
-}
-
-function AppRoutes() {
-  return (
-    <>
-      <ScrollToTop />
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
-        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
-        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
-        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
-        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
-
-        {/* Auth routes */}
-        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
-        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
-        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
-        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
-
-        {/* Dashboard routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route
-          path="/settings"
-          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
-        >
-          <Route index element={<Navigate to="profile" replace />} />
-          <Route path="profile" element={<ProfileSettingsPage />} />
-          <Route path="password" element={<PasswordSettingsPage />} />
-
-        </Route>
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
-  );
-}
-
-export default App;
-</file>
-
-<file path="src/index.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    /* Dark theme (default) */
-    --color-bg: #090909;
-    --color-surface: #111111;
-    --color-elevated: #171717;
-    --color-border: #292929;
-    --color-border-subtle: #1e1e1e;
-    --color-text-primary: #F4F4F4;
-    --color-text-secondary: #A0A0A0;
-    --color-text-muted: #707070;
-    --color-accent: #B00000;
-    --color-accent-hover: #C20A0A;
-  }
-
-  .light {
-    --color-bg: #F7F7F5;
-    /* Main page: soft warm off-white */
-    --color-surface: #F0F0ED;
-    /* Cards/sections: subtle contrast */
-    --color-elevated: #FFFFFF;
-    /* Only elevated elements needing separation */
-
-    --color-border: #D9D9D5;
-    --color-border-subtle: #E8E8E4;
-
-    --color-text-primary: #181818;
-    /* Nearly black, less harsh */
-    --color-text-secondary: #626262;
-    --color-text-muted: #8A8A8A;
-
-    --color-accent: #9E0000;
-    --color-accent-hover: #B00000;
-  }
-
-  * {
-    border-color: var(--color-border);
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    background-color: var(--color-bg);
-    color: var(--color-text-primary);
-    font-family: 'Inter', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    transition: background-color 200ms ease, color 200ms ease;
-  }
-
-  ::selection {
-    background-color: var(--color-accent);
-    color: #ffffff;
-  }
-
-  /* Focus visible */
-  *:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: var(--color-bg);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted);
-  }
-}
-
-@layer components {
-  .article-prose {
-    @apply text-text-secondary leading-[1.75] text-[1.125rem];
-  }
-
-  .article-prose .ProseMirror p {
-    position: relative;
-  }
-
-  .article-prose h1 {
-    @apply font-serif text-3xl md:text-4xl font-medium text-text-primary mt-12 mb-4 leading-[1.2] tracking-tight;
-  }
-
-  .article-prose h2 {
-    @apply font-serif text-2xl md:text-3xl font-medium text-text-primary mt-10 mb-3 leading-[1.25] tracking-tight;
-  }
-
-  .article-prose h3 {
-    @apply font-serif text-xl md:text-2xl font-medium text-text-primary mt-8 mb-2 leading-[1.3] tracking-tight;
-  }
-
-  .article-prose p {
-    @apply my-5;
-  }
-
-  .article-prose a {
-    @apply text-text-primary underline decoration-accent decoration-2 underline-offset-2 hover:text-accent transition-colors duration-200;
-  }
-
-  .article-prose strong {
-    @apply font-semibold text-text-primary;
-  }
-
-  .article-prose em {
-    @apply italic;
-  }
-
-  .article-prose del {
-    @apply text-text-muted;
-  }
-
-  .article-prose ul {
-    @apply my-5 pl-6 list-disc space-y-2;
-  }
-
-  .article-prose ol {
-    @apply my-5 pl-6 list-decimal space-y-2;
-  }
-
-  .article-prose li {
-    @apply text-text-secondary;
-  }
-
-  .article-prose blockquote {
-    @apply my-6 pl-5 border-l-2 border-accent text-text-primary italic font-serif text-lg leading-relaxed;
-  }
-
-  .article-prose code {
-    @apply font-mono text-[0.875em] px-1.5 py-0.5 rounded bg-elevated text-text-primary;
-  }
-
-  .article-prose pre {
-    @apply my-6 rounded-card overflow-hidden;
-  }
-
-  .article-prose pre code {
-    @apply bg-transparent p-0 text-sm;
-  }
-
-  .article-prose img {
-    @apply block rounded-card my-6 max-w-full h-auto;
-  }
-
-  .article-prose table {
-    @apply my-6 w-full border-collapse text-sm;
-  }
-
-  .article-prose th {
-    @apply text-left font-semibold text-text-primary border border-border px-4 py-2.5 bg-surface;
-  }
-
-  .article-prose td {
-    @apply text-text-secondary border border-border px-4 py-2.5;
-  }
-
-  .article-prose hr {
-    @apply my-10 border-border;
-  }
-
-  .tiptap-code-block {
-    @apply my-6 overflow-hidden rounded-card border border-border bg-elevated;
-  }
-
-  .tiptap-code-block__header {
-    @apply flex items-center justify-between border-b border-border bg-surface px-3 py-2;
-  }
-
-  .tiptap-code-block__language {
-    @apply bg-transparent text-xs font-mono text-text-secondary outline-none;
-  }
-
-  .tiptap-code-block__actions {
-    @apply flex items-center gap-1;
-  }
-
-  .tiptap-code-block__action {
-    @apply inline-flex items-center justify-center rounded p-1.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
-  }
-
-  .tiptap-code-block__action--danger {
-    @apply hover:text-accent;
-  }
-
-  .tiptap-code-block__content {
-    @apply overflow-x-auto p-4 font-mono text-sm leading-relaxed text-text-primary;
-  }
-
-  .tiptap-code-block__content .ProseMirror {
-    @apply m-0 min-h-0 bg-transparent p-0 outline-none font-mono text-sm text-text-primary;
-  }
-
-}
-
-/* ── AboutPage animations ─────────────────────────────── */
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.anim-fade-up {
-  opacity: 0;
-  animation: fadeUp 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-}
-
-@keyframes blink {
-
-  0%,
-  50% {
-    opacity: 1;
-  }
-
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.anim-blink {
-  animation: blink 1.1s steps(1) infinite;
-}
-
-@keyframes rotateGradient {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.avatar-ring::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background: conic-gradient(from 0deg,
-      transparent 0deg,
-      rgba(220, 38, 38, 0.9) 40deg,
-      transparent 90deg,
-      transparent 360deg);
-  animation: rotateGradient 6s linear infinite;
-  z-index: 0;
-}
-
-.avatar-ring>img {
-  position: relative;
-  z-index: 1;
-}
-
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.anim-marquee {
-  animation: marquee 35s linear infinite;
-}
-
-.marquee-mask {
-  mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
-}
-
-.link-underline {
-  position: relative;
-}
-
-.link-underline::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -2px;
-  height: 1px;
-  width: 100%;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: right center;
-  transition: transform 450ms cubic-bezier(0.7, 0, 0.2, 1);
-}
-
-.link-underline:hover::after {
-  transform: scaleX(1);
-  transform-origin: left center;
-}
-
-@keyframes wipe {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
-.anim-wipe {
-  animation: wipe 1.2s cubic-bezier(0.7, 0, 0.2, 1) forwards;
-}
-
-.grain::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.035;
-  z-index: 1;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
-.anim-arrow {
-  transition: transform 350ms ease;
-}
-
-.link-underline:hover .anim-arrow {
-  transform: translate(2px, -2px);
-}
-
-.avatar-hover {
-  transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 500ms ease;
-}
-
-.avatar-hover:hover {
-  transform: scale(1.03);
-  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4), 0 20px 40px -10px rgba(220, 38, 38, 0.15);
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .text-pretty {
-    text-wrap: pretty;
-  }
-}
-
-/* Tiptap — borderless, page-flush */
-.ProseMirror {
-  outline: none;
-}
-
-.ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-  color: var(--color-text-muted);
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-</file>
-
-<file path="vite.config.ts">
-/// <reference types="node" />
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { fileURLToPath, URL } from 'node:url';
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
-  server: {
-    host: true,
-    allowedHosts: [
-      'quakier-ascensive-melodie.ngrok-free.dev',
-    ],
-  },
-  optimizeDeps: {
-    include: ['lucide-react'],
-  },
-});
-</file>
-
-<file path="src/components/articles/ArticleContent.tsx">
-import DOMPurify from 'dompurify';
-import { slugify } from '@/utils/slugify';
-
-type ArticleContentProps = {
-  content: string;
-};
-
-export function ArticleContent({
-  content,
-}: Readonly<ArticleContentProps>) {
-  const sanitized = DOMPurify.sanitize(content, {
-    USE_PROFILES: {
-      html: true,
-    },
-    ADD_ATTR: [
-      'target',
-      'rel',
-      'class',
-      'style',
-      'data-width',
-      'data-alignment',
-    ],
-  });
-
-  const document = new DOMParser().parseFromString(
-    sanitized,
-    'text/html'
-  );
-
-  const usedIds = new Set<string>();
-
-  document.querySelectorAll('h1, h2, h3').forEach((heading) => {
-    const text = heading.textContent?.trim() ?? '';
-
-    if (!text) return;
-
-    const baseId = slugify(text);
-    let id = baseId;
-    let counter = 2;
-
-    while (usedIds.has(id)) {
-      id = `${baseId}-${counter++}`;
-    }
-
-    usedIds.add(id);
-    heading.id = id;
-    heading.classList.add('scroll-mt-20');
-  });
-
-  return (
-    <div
-      className="article-prose"
-      dangerouslySetInnerHTML={{
-        __html: document.body.innerHTML,
-      }}
-    />
   );
 }
 </file>
@@ -5513,163 +5378,6 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
-}
-</file>
-
-<file path="src/pages/AboutPage.tsx">
-import { PageContainer } from '@/components/layout/Navbar';
-import { ArrowUpRight } from 'lucide-react';
-import { getCategories } from '@/services/categoryService';
-import { useEffect, useState } from 'react';
-import type { Category } from '@/types';
-
-const PORTFOLIO_URL = 'https://umerfruit.dev';
-const GITHUB_URL = 'https://github.com/UmerFruit';
-const LINKEDIN_URL = 'https://www.linkedin.com/in/umer-farooq-242130277/';
-const Avatar_Photo =
-  'https://pvbcyuflhlucnmcnlgfh.supabase.co/storage/v1/object/public/avatars/d30e44ea-4558-40d6-a3ef-b05ead808f06/avatar.png';
-
-const externalLinks = [
-  { label: 'Portfolio', href: PORTFOLIO_URL },
-  { label: 'GitHub', href: GITHUB_URL },
-  { label: 'LinkedIn', href: LINKEDIN_URL },
-];
-
-export function AboutPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    getCategories()
-      .then(setCategories)
-      .catch(() => setCategories([]));
-  }, []);
-
-  const marqueeItems = [...categories, ...categories];
-
-  return (
-    <div className="grain">
-      <PageContainer className="py-16 md:py-24">
-        <div className="relative mx-auto max-w-2xl">
-          {/* Top label */}
-          <p
-            className="anim-fade-up text-center font-mono text-xl uppercase tracking-[0.25em] text-text-muted"
-            style={{ animationDelay: '0.05s' }}
-          >
-            About me
-          </p>
-
-          {/* Avatar */}
-          <div
-            className="anim-fade-up mt-10 flex justify-center"
-            style={{ animationDelay: '0.25s' }}
-          >
-            <div className="avatar-ring relative inline-block rounded-full anim-breathe">
-              <img
-                src={Avatar_Photo}
-                alt="Umer Farooq"
-                className="avatar-hover h-44 w-44 rounded-full border-4 border-bg object-cover md:h-52 md:w-52"
-              />
-            </div>
-          </div>
-
-          {/* Title */}
-          <h1
-            className="anim-wipe mt-10 text-center font-serif text-4xl leading-tight text-text-primary md:text-6xl"
-            style={{ animationDelay: '0.5s' }}
-          >
-            Umer Farooq
-          </h1>
-
-          {/* Bio */}
-          <p
-            className="anim-fade-up mx-auto mt-8 max-w-md text-center text-base leading-relaxed text-text-secondary md:text-lg"
-            style={{ animationDelay: '0.85s' }}
-          >
-            A generalist and a computer enthusiast. Writing here to think out loud,
-            document what I learn. A quiet corner of the internet for technical
-            writing and long-running experiments.
-          </p>
-
-          {/* Links */}
-          <div
-            className="anim-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
-            style={{ animationDelay: '1.05s' }}
-          >
-            {externalLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
-              >
-                {link.label}
-                <ArrowUpRight size={13} className="anim-arrow" />
-              </a>
-            ))}
-          </div>
-
-          {/* Divider */}
-          <div
-            className="anim-fade-up my-20 flex items-center gap-4"
-            style={{ animationDelay: '1.25s' }}
-          >
-            <span className="h-px flex-1 bg-border-subtle" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
-              Topics
-            </span>
-            <span className="h-px flex-1 bg-border-subtle" />
-          </div>
-
-          {/* Infinite marquee */}
-          {categories.length > 0 && (
-            <div
-              className="anim-fade-up marquee-mask overflow-hidden"
-              style={{ animationDelay: '1.4s' }}
-            >
-              <div className="anim-marquee flex w-max gap-12 whitespace-nowrap py-2">
-                {marqueeItems.map((cat, i) => (
-                  <span
-                    key={`${cat.slug}-${i}`}
-                    className="font-serif text-2xl text-text-primary md:text-3xl"
-                  >
-                    {cat.name}
-                    <span className="mx-12 text-text-muted">/</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Publication statement */}
-          <div
-            className="anim-fade-up mt-20"
-            style={{ animationDelay: '1.55s' }}
-          >
-            <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
-              Lallu Syndrome is a technology publication{' '}
-              <span className="text-accent">.</span>
-            </p>
-            <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-              A place to share Lallu and fangirl about how amazing the things we
-              use daily really are under the hood. This is a personal project and
-              not affiliated with any company or organization.
-            </p>
-          </div>
-
-          {/* Colophon */}
-          <footer
-            className="anim-fade-up mt-24 border-t border-border-subtle pt-6"
-            style={{ animationDelay: '1.7s' }}
-          >
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
-              React · TypeScript · Tailwind · Supabase
-            </p>
-          </footer>
-        </div>
-      </PageContainer>
-    </div>
-  );
 }
 </file>
 
@@ -5836,6 +5544,732 @@ export function extractStorageImagePaths(content: string): string[] {
 }
 </file>
 
+<file path="src/App.tsx">
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { type ReactNode, useEffect } from 'react';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { HomePage } from '@/pages/HomePage';
+import { ArticlesPage } from '@/pages/ArticlesPage';
+import { ArticlePage } from '@/pages/ArticlePage';
+import { CategoryPage } from '@/pages/CategoryPage';
+import { AboutPage } from '@/pages/AboutPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
+import { LoginPage } from '@/pages/auth/LoginPage';
+import { SignupPage } from '@/pages/auth/SignupPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { SettingsLayout } from '@/components/layout/SettingsLayout';
+import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
+import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
+import { ToastProvider } from '@/contexts/ToastContext';
+import { CreatorPage } from '@/pages/CreatorPage';
+import { WriterProfilePage } from '@/pages/WriterProfilePage';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
+function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
+function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen bg-bg">{children}</div>
+  );
+}
+
+function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <>
+      <ScrollToTop />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
+        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
+        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
+        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
+        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
+        <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
+        <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
+
+        {/* Auth routes */}
+        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
+        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
+        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
+        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
+
+        {/* Dashboard routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
+        >
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="password" element={<PasswordSettingsPage />} />
+
+        </Route>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
+</file>
+
+<file path="src/pages/AboutPage.tsx">
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
+import { getCategories } from '@/services/categoryService';
+import type { Category } from '@/types';
+
+const principles = [
+  {
+    id: '01',
+    title: 'Depth over noise',
+    body: 'Articles are written to be useful in six months, not six hours. Nothing padded, nothing rushed.',
+  },
+  {
+    id: '02',
+    title: 'Show the work',
+    body: 'Code, configs, and failure notes included. Reproduce it, improve it, or disagree with it.',
+  },
+  {
+    id: '03',
+    title: 'Stay independent',
+    body: 'No sponsors, no affiliates, no engagement bait. The opinions here belong to the authors alone.',
+  },
+];
+
+export function AboutPage() {
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
+
+  const marqueeItems = [...categories, ...categories];
+
+  return (
+    <div className="grain">
+      <PageContainer className="py-12 md:py-24">
+        <div className="relative mx-auto max-w-2xl">
+          {/* Eyebrow */}
+          <p
+            className="anim-fade-up text-center font-mono text-xl uppercase tracking-[0.25em] text-text-muted"
+            style={{ animationDelay: '0.05s' }}
+          >
+            The publication
+          </p>
+
+          {/* Title */}
+          <h1
+            className="anim-wipe mt-10 text-center font-serif text-4xl leading-tight text-text-primary md:text-6xl"
+            style={{ animationDelay: '0.3s' }}
+          >
+            Lallu Syndrome<span className="text-accent">.</span>
+          </h1>
+
+          {/* Lead */}
+          <p
+            className="anim-fade-up mx-auto mt-8 max-w-md text-center text-base leading-relaxed text-text-secondary md:text-lg"
+            style={{ animationDelay: '0.65s' }}
+          >
+            An independent technology publication. Notes, experiments, and
+            deep dives into the systems we use every day written slowly,
+            published carefully.
+          </p>
+
+          {/* Quick links */}
+          <div
+            className="anim-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+            style={{ animationDelay: '0.85s' }}
+          >
+            <Link
+              to="/articles"
+              className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+            >
+              Browse the writing
+              <ArrowRight size={13} className="anim-arrow" />
+            </Link>
+            <Link
+              to="/creator"
+              className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+            >
+              Meet the creator
+              <ArrowRight size={13} className="anim-arrow" />
+            </Link>
+          </div>
+
+          {/* Mission */}
+          <div
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
+            style={{ animationDelay: '1.05s' }}
+          >
+            <span className="h-px flex-1 bg-border-subtle" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+              Mission
+            </span>
+            <span className="h-px flex-1 bg-border-subtle" />
+          </div>
+
+          <div className="anim-fade-up space-y-5" style={{ animationDelay: '1.2s' }}>
+            <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
+              Write to understand. Publish to remember<span className="text-accent">.</span>
+            </p>
+            <p className="text-sm leading-relaxed text-text-secondary">
+              Most of the web is marketing. This is the opposite. Slow, careful
+              writing about how things actually work. Operating systems, compilers,
+              networks, security, and the occasional piece of hardware: taken
+              apart, explained, and put back together.
+            </p>
+          </div>
+
+          {/* Topics */}
+          <div
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
+            style={{ animationDelay: '1.35s' }}
+          >
+            <span className="h-px flex-1 bg-border-subtle" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+              Topics
+            </span>
+            <span className="h-px flex-1 bg-border-subtle" />
+          </div>
+
+          {categories.length > 0 && (
+            <div
+              className="anim-fade-up marquee-mask overflow-hidden"
+              style={{ animationDelay: '1.5s' }}
+            >
+              <div className="anim-marquee flex w-max gap-12 whitespace-nowrap py-2">
+                {marqueeItems.map((cat, i) => (
+                  <span
+                    key={`${cat.slug}-${i}`}
+                    className="font-serif text-2xl text-text-primary md:text-3xl"
+                  >
+                    {cat.name}
+                    <span className="mx-12 text-text-muted">/</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Principles */}
+          <div
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
+            style={{ animationDelay: '1.65s' }}
+          >
+            <span className="h-px flex-1 bg-border-subtle" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+              Principles
+            </span>
+            <span className="h-px flex-1 bg-border-subtle" />
+          </div>
+
+          <div className="space-y-10">
+            {principles.map((principle, index) => (
+              <div
+                key={principle.id}
+                className="anim-fade-up flex gap-6"
+                style={{ animationDelay: `${1.8 + index * 0.15}s` }}
+              >
+                <span className="font-mono text-sm text-accent">{principle.id}</span>
+                <div>
+                  <h2 className="font-serif text-lg font-medium text-text-primary">
+                    {principle.title}
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                    {principle.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Independence note */}
+          <p
+            className="anim-fade-up mt-16 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted"
+            style={{ animationDelay: '2.3s' }}
+          >
+            A personal project · Not affiliated with any company or organization
+          </p>
+        </div>
+      </PageContainer>
+    </div>
+  );
+}
+</file>
+
+<file path="src/index.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark theme (default) */
+    --color-bg: #090909;
+    --color-surface: #111111;
+    --color-elevated: #171717;
+    --color-border: #292929;
+    --color-border-subtle: #1e1e1e;
+    --color-text-primary: #F4F4F4;
+    --color-text-secondary: #A0A0A0;
+    --color-text-muted: #707070;
+    --color-accent: #B00000;
+    --color-accent-hover: #C20A0A;
+  }
+
+  .light {
+    --color-bg: #F7F7F5;
+    /* Main page: soft warm off-white */
+    --color-surface: #F0F0ED;
+    /* Cards/sections: subtle contrast */
+    --color-elevated: #FFFFFF;
+    /* Only elevated elements needing separation */
+
+    --color-border: #D9D9D5;
+    --color-border-subtle: #E8E8E4;
+
+    --color-text-primary: #181818;
+    /* Nearly black, less harsh */
+    --color-text-secondary: #626262;
+    --color-text-muted: #8A8A8A;
+
+    --color-accent: #9E0000;
+    --color-accent-hover: #B00000;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: #ffffff;
+  }
+
+  /* Focus visible */
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+  }
+}
+
+@layer components {
+  .article-prose {
+    @apply text-text-secondary leading-[1.75] text-[1.125rem];
+  }
+
+  .article-prose {
+    @apply text-text-secondary leading-[1.7] text-base sm:leading-[1.75] sm:text-[1.125rem];
+  }
+
+  .article-prose p {
+    @apply my-4 sm:my-5;
+  }
+
+  .article-prose h1 {
+    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-medium text-text-primary mt-8 sm:mt-12 mb-4 leading-[1.2] tracking-tight;
+  }
+
+  .article-prose h2 {
+    @apply font-serif text-xl sm:text-2xl md:text-3xl font-medium text-text-primary mt-8 sm:mt-10 mb-3 leading-[1.25] tracking-tight;
+  }
+
+  .article-prose h3 {
+    @apply font-serif text-lg sm:text-xl md:text-2xl font-medium text-text-primary mt-6 sm:mt-8 mb-2 leading-[1.3] tracking-tight;
+  }
+
+  .article-prose blockquote {
+    @apply my-5 sm:my-6 pl-4 sm:pl-5 border-l-2 border-accent text-text-primary italic font-serif text-base sm:text-lg leading-relaxed;
+  }
+
+  .article-prose .ProseMirror p {
+    position: relative;
+  }
+
+  .article-prose a {
+    @apply text-text-primary underline decoration-accent decoration-2 underline-offset-2 hover:text-accent transition-colors duration-200;
+  }
+
+  .article-prose strong {
+    @apply font-semibold text-text-primary;
+  }
+
+  .article-prose em {
+    @apply italic;
+  }
+
+  .article-prose del {
+    @apply text-text-muted;
+  }
+
+  .article-prose ul {
+    @apply my-5 pl-6 list-disc space-y-2;
+  }
+
+  .article-prose ol {
+    @apply my-5 pl-6 list-decimal space-y-2;
+  }
+
+  .article-prose li {
+    @apply text-text-secondary;
+  }
+
+  .article-prose code {
+    @apply font-mono text-[0.875em] px-1.5 py-0.5 rounded bg-elevated text-text-primary;
+  }
+
+  .article-prose pre {
+    @apply my-6 rounded-card overflow-hidden;
+  }
+
+  .article-prose pre code {
+    @apply bg-transparent p-0 text-sm;
+  }
+
+  .article-prose img {
+    @apply block rounded-card my-6 max-w-full h-auto;
+  }
+
+  .article-prose table {
+    @apply my-6 w-full border-collapse text-sm;
+  }
+
+  .article-prose th {
+    @apply text-left font-semibold text-text-primary border border-border px-4 py-2.5 bg-surface;
+  }
+
+  .article-prose td {
+    @apply text-text-secondary border border-border px-4 py-2.5;
+  }
+
+  .article-prose hr {
+    @apply my-10 border-border;
+  }
+
+  .tiptap-code-block {
+    @apply my-6 overflow-hidden rounded-card border border-border bg-elevated;
+  }
+
+  .tiptap-code-block__header {
+    @apply flex items-center justify-between border-b border-border bg-surface px-3 py-2;
+  }
+
+  .tiptap-code-block__language {
+    @apply bg-transparent text-xs font-mono text-text-secondary outline-none;
+  }
+
+  .tiptap-code-block__actions {
+    @apply flex items-center gap-1;
+  }
+
+  .tiptap-code-block__action {
+    @apply inline-flex items-center justify-center rounded p-1.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
+  }
+
+  .tiptap-code-block__action--danger {
+    @apply hover:text-accent;
+  }
+
+  .tiptap-code-block__content {
+    @apply overflow-x-auto p-4 font-mono text-sm leading-relaxed text-text-primary;
+  }
+
+  .tiptap-code-block__content .ProseMirror {
+    @apply m-0 min-h-0 bg-transparent p-0 outline-none font-mono text-sm text-text-primary;
+  }
+
+}
+.tiptap-code-block__action {
+  @apply inline-flex items-center justify-center rounded p-2.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
+}
+
+/* ── AboutPage animations ─────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anim-fade-up {
+  opacity: 0;
+  animation: fadeUp 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.anim-blink {
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes rotateGradient {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.avatar-ring::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg,
+      transparent 0deg,
+      rgba(220, 38, 38, 0.9) 40deg,
+      transparent 90deg,
+      transparent 360deg);
+  animation: rotateGradient 6s linear infinite;
+  z-index: 0;
+}
+
+.avatar-ring>img {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.anim-marquee {
+  animation: marquee 35s linear infinite;
+}
+
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
+}
+
+.link-underline {
+  position: relative;
+}
+
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 450ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+
+.link-underline:hover::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+@keyframes wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.anim-wipe {
+  animation: wipe 1.2s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.anim-arrow {
+  transition: transform 350ms ease;
+}
+
+.link-underline:hover .anim-arrow {
+  transform: translate(2px, -2px);
+}
+
+.avatar-hover {
+  transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 500ms ease;
+}
+
+.avatar-hover:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4), 0 20px 40px -10px rgba(220, 38, 38, 0.15);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* Oval portrait — the house avatar shape (4:5, egg-framed) */
+.avatar {
+  aspect-ratio: 4 / 5;
+  border-radius: 9999px;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Tiptap borderless, page-flush */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</file>
+
 <file path="src/pages/DashboardPage.tsx">
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -5922,7 +6356,7 @@ export function DashboardPage() {
               >
                 {article.title}
               </Link>
-              <div className="flex items-center gap-3 mt-1">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Badge variant="muted">{article.category}</Badge>
                 <span className="font-mono text-xs text-text-muted">
                   {article.publishedAt && formatDate(article.publishedAt)}
@@ -6014,259 +6448,13 @@ function TabButton({ label, count, active, onClick }: Readonly<{ label: string; 
       type="button"
       onClick={onClick}
       className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
-          ? 'border-accent text-text-primary'
-          : 'border-transparent text-text-muted hover:text-text-secondary'
+        ? 'border-accent text-text-primary'
+        : 'border-transparent text-text-muted hover:text-text-secondary'
         }`}
     >
       {label}
       <span className="ml-1.5 font-mono text-xs text-text-muted">{count}</span>
     </button>
-  );
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "vite-react-typescript-starter",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.112.3",
-    "@tiptap/extension-image": "^3.30.1",
-    "@tiptap/extension-link": "^3.30.1",
-    "@tiptap/extension-placeholder": "^3.30.1",
-    "@tiptap/extension-text-align": "^3.30.1",
-    "@tiptap/extension-underline": "^3.30.1",
-    "@tiptap/pm": "^3.30.1",
-    "@tiptap/react": "^3.30.1",
-    "@tiptap/starter-kit": "^3.30.1",
-    "@tiptap/suggestion": "^3.30.1",
-    "dompurify": "^3.4.13",
-    "lucide-react": "^0.446.0",
-    "ogl": "^1.0.11",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2",
-    "tippy.js": "^6.3.7"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.9.1",
-    "@types/node": "^26.2.0",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.18",
-    "eslint": "^9.9.1",
-    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
-    "eslint-plugin-react-refresh": "^0.4.11",
-    "globals": "^15.9.0",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^8.3.0",
-    "vite": "^5.4.2"
-  },
-  "allowScripts": {
-    "esbuild@0.21.5": true
-  }
-}
-</file>
-
-<file path="src/pages/ArticlePage.tsx">
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import type { Article } from '@/types';
-import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
-import { formatDateLong } from '@/utils/date';
-import { ArticleContent } from '@/components/articles/ArticleContent';
-import { ArticleProgress } from '@/components/articles/ArticleProgress';
-import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
-import { RelatedArticles } from '@/components/articles/RelatedArticles';
-import { LikeButton } from '@/components/interactions/LikeButton';
-import { ShareButton } from '@/components/interactions/ShareButton';
-import { CommentSection } from '@/components/interactions/CommentSection';
-import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
-import { Badge } from '@/components/ui/Badge';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
-
-export function ArticlePage() {
-  const { slug } = useParams<{ slug: string }>();
-  const [article, setArticle] = useState<Article | null>(null);
-  const [related, setRelated] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [liked, setLiked] = useState(false);
-
-  useEffect(() => {
-    async function loadArticle() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        setError(false);
-        setArticle(null);
-        setRelated([]);
-        setLiked(false);
-
-        const articleData = await getArticleBySlug(slug);
-
-        if (!articleData) {
-          setError(true);
-          return;
-        }
-
-        setArticle(articleData);
-
-        const [relatedData, likedData] = await Promise.all([
-          getRelatedArticles(articleData, 3),
-          isLiked(articleData.id),
-        ]);
-
-        setRelated(relatedData);
-        setLiked(likedData);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadArticle();
-  }, [slug]);
-
-  if (loading) {
-    return (
-      <>
-        <ArticleProgress />
-        <ArticlePageSkeleton />
-      </>
-    );
-  }
-
-  if (error || !article) {
-    return (
-      <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
-        <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />
-        <h1 className="font-serif text-2xl text-text-primary mb-2">
-          Something went wrong while loading this article.
-        </h1>
-        <p className="text-text-muted mb-6">The article may have been moved or deleted.</p>
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to articles
-        </Link>
-      </div>
-    );
-  }
-
-  const headings = extractHeadings(article.content);
-  const articleUrl = window.location.href;
-
-  return (
-    <>
-      <ArticleProgress />
-
-      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-6">
-        {/* Header */}
-
-
-        <header className="mb-8">
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
-            {article.title}
-          </h1>
-
-          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
-            <span>
-              <Badge variant="accent">{article.category}</Badge>
-            </span>
-            <span>•</span>
-            {formatDateLong(article.publishedAt ?? article.createdAt)}
-            <span>•</span>
-            <span>{article.readingTime} min read</span>
-          </div>
-        </header>
-
-        {/* Cover Image */}
-        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
-          <img
-            src={article.coverImage}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        </div>
-      </article>
-
-      {/* Content + TOC */}
-      < div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12" >
-        <div className="max-w-article lg:max-w-none lg:col-start-1 lg:row-start-1">
-          <ArticleContent content={article.content} />
-
-          {/* Interactions */}
-          <div className="flex items-center gap-3 mt-12 pt-8 border-t border-border-subtle">
-            <LikeButton
-              articleId={article.id}
-              initialLikes={article.likes}
-              initiallyLiked={liked}
-            />
-            <ShareButton url={articleUrl} title={article.title} />
-          </div>
-
-          {/* Comments */}
-          <CommentSection articleId={article.id} />
-
-          {/* Related */}
-          <RelatedArticles articles={related} />
-        </div>
-
-        {/* TOC Sidebar */}
-        <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            {/* Author Info */}
-            <div className="text-center mb-6 pb-6 border-b border-border-subtle">
-              {article.author.avatar && (
-                <img
-                  src={article.author.avatar}
-                  alt={article.author.name}
-                  className="w-14 h-14 rounded-full border-2 border-border bg-elevated mx-auto mb-2.5"
-                />
-              )}
-
-              <h3 className="text-sm font-semibold text-text-primary mb-1">
-                {article.author.name}
-              </h3>
-
-              <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                <span>{article.author.bio ?? "Writing about Linux & open source"}</span>
-              </div>
-            </div>
-
-            {/* Table of Contents */}
-            <TableOfContents headings={headings} />
-          </div>
-        </div>
-      </div >
-
-      <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
-        >
-          <ArrowLeft size={16} />
-          All articles
-        </Link>
-      </div>
-    </>
   );
 }
 </file>
@@ -6286,6 +6474,18 @@ import { CategoryButton } from '@/components/ui/CategoryButton';
 
 const ParticleText = lazy(() => import('@/components/ui/ParticleText'));
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    setMatches(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
+}
+
 export function HomePage() {
   const [featured, setFeatured] = useState<Article | null>(null);
   const [latest, setLatest] = useState<Article[]>([]);
@@ -6293,6 +6493,8 @@ export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   useEffect(() => {
     async function loadHome() {
@@ -6353,25 +6555,37 @@ export function HomePage() {
   return (
     <PageContainer className="py-8 md:py-12">
 
-      <div className="w-full h-[360px] bg-bg">
-        <Suspense fallback={null}>
-          <ParticleText
-            text="Lallu Syndrome"
-            particleSize={2.3}
-            density={4}
-            scatter={190}
-            gatherDuration={2000}
-            stagger={420}
-            pointerRepel={38}
-            repelRadius={100}
-            idleDrift={0}
-            trigger="mount"
-            fontSize="clamp(3.5rem, 13vw, 9rem)"
-            fontWeight={800}
-            fontFamily="inherit"
-            glow={false}
-          />
-        </Suspense>
+      <div className="w-full h-[220px] sm:h-[300px] md:h-[360px] bg-bg">
+        {prefersReducedMotion ? (
+          <div className="flex h-full items-center justify-center px-4">
+            <h1 className="text-center font-serif text-4xl font-extrabold tracking-tight text-text-primary sm:text-6xl md:text-7xl">
+              Lallu Syndrome
+            </h1>
+          </div>
+        ) : (
+          <Suspense fallback={null}>
+            <ParticleText
+              text="Lallu Syndrome"
+              particleSize={isMobile ? 1 : 2.3}
+              density={isMobile ? 2 : 4}
+              scatter={isMobile ? 100 : 190}
+              gatherDuration={isMobile ? 1500 : 2000}
+              stagger={isMobile ? 250 : 420}
+              pointerRepel={isMobile ? 0 : 38}
+              repelRadius={isMobile ? 0 : 100}
+              idleDrift={0}
+              trigger="mount"
+              fontSize={
+                isMobile
+                  ? "clamp(2.5rem, 15vw, 4.5rem)"
+                  : "clamp(4rem, 13vw, 9rem)"
+              }
+              fontWeight={400}
+              fontFamily="inherit"
+              glow={isMobile}
+            />
+          </Suspense>
+        )}
       </div>
 
       {/* Featured Article */}
@@ -6404,7 +6618,7 @@ export function HomePage() {
 
       {/* Category Filters */}
       <section className="mb-8">
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <CategoryButton
             label="All"
             active={activeCategory === 'all'}
@@ -6437,6 +6651,7 @@ export type ArticleStatus = 'draft' | 'published';
 
 export type Author = {
   name: string;
+  username?: string;
   avatar?: string;
   bio?: string;
 };
@@ -6482,6 +6697,61 @@ export type AuthState = {
   user: User | null;
   isLoading: boolean;
 };
+</file>
+
+<file path="package.json">
+{
+  "name": "vite-react-typescript-starter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "@tiptap/extension-image": "^3.30.1",
+    "@tiptap/extension-link": "^3.30.1",
+    "@tiptap/extension-placeholder": "^3.30.1",
+    "@tiptap/extension-text-align": "^3.30.1",
+    "@tiptap/extension-underline": "^3.30.1",
+    "@tiptap/pm": "^3.30.1",
+    "@tiptap/react": "^3.30.1",
+    "@tiptap/starter-kit": "^3.30.1",
+    "@tiptap/suggestion": "^3.30.1",
+    "dompurify": "^3.4.13",
+    "lucide-react": "^0.446.0",
+    "ogl": "^1.0.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.2",
+    "tippy.js": "^6.3.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@types/node": "^26.2.0",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "eslint": "^9.9.1",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "globals": "^15.9.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.3.0",
+    "vite": "^5.4.2"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
 </file>
 
 <file path="src/components/editor/TiptapEditor.tsx">
@@ -6843,39 +7113,39 @@ export function TiptapEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('bold')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('bold')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Bold"
         >
-          <Bold size={15} />
+          <Bold size={16} />
         </button>
 
         {/* Italic */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('italic')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('italic')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Italic"
         >
-          <Italic size={15} />
+          <Italic size={16} />
         </button>
 
         {/* Strike */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('strike')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('strike')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Strikethrough"
         >
-          <Strikethrough size={15} />
+          <Strikethrough size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -6884,39 +7154,39 @@ export function TiptapEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
+          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Heading 1"
         >
-          <Heading1 size={15} />
+          <Heading1 size={16} />
         </button>
 
         {/* Heading 2 */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
+          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Heading 2"
         >
-          <Heading2 size={15} />
+          <Heading2 size={16} />
         </button>
 
         {/* Heading 3 */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
+          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Heading 3"
         >
-          <Heading3 size={15} />
+          <Heading3 size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -6931,13 +7201,13 @@ export function TiptapEditor({
               editor.chain().focus().setTextAlign('justify').run();
             }
           }}
-          className={`p-1.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
+          className={`p-2.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Justify text"
         >
-          <AlignJustify size={15} />
+          <AlignJustify size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -6946,49 +7216,49 @@ export function TiptapEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('blockquote')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('blockquote')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Quote"
         >
-          <Quote size={15} />
+          <Quote size={16} />
         </button>
 
         {/* Inline Code */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleCode().run()}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('code')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('code')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Inline code"
         >
-          <Code size={15} />
+          <Code size={16} />
         </button>
 
         {/* Clear formatting */}
         <button
           type="button"
           onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
-          className="p-1.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+          className="p-2.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
           title="Clear formatting"
         >
-          <Eraser size={15} />
+          <Eraser size={16} />
         </button>
 
         {/* Link */}
         <button
           type="button"
           onClick={setLink}
-          className={`p-1.5 rounded transition-colors ${editor.isActive('link')
+          className={`p-2.5 rounded transition-colors ${editor.isActive('link')
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Add link"
         >
-          <LinkIcon size={15} />
+          <LinkIcon size={16} />
         </button>
       </BubbleMenu>
       {/* ====== IMAGE BUBBLE MENU ====== */}
@@ -7003,13 +7273,13 @@ export function TiptapEditor({
           onClick={() =>
             editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
           }
-          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
+          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Align image left"
         >
-          <AlignLeft size={15} />
+          <AlignLeft size={16} />
         </button>
 
         <button
@@ -7017,13 +7287,13 @@ export function TiptapEditor({
           onClick={() =>
             editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
           }
-          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
+          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Center image"
         >
-          <AlignCenter size={15} />
+          <AlignCenter size={16} />
         </button>
 
         <button
@@ -7031,13 +7301,13 @@ export function TiptapEditor({
           onClick={() =>
             editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
           }
-          className={`p-1.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
+          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
             ? 'text-accent bg-surface'
             : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }`}
           title="Align image right"
         >
-          <AlignRight size={15} />
+          <AlignRight size={16} />
         </button>
 
         <div className="w-px h-5 bg-border" />
@@ -7055,7 +7325,7 @@ export function TiptapEditor({
             onClick={() =>
               editor.chain().focus().updateAttributes('image', { width }).run()
             }
-            className={`p-1.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
+            className={`p-2.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
               ? 'text-accent bg-surface'
               : 'text-text-secondary hover:text-text-primary hover:bg-surface'
               }`}
@@ -7067,6 +7337,238 @@ export function TiptapEditor({
       </BubbleMenu>
 
       <EditorContent editor={editor} />
+    </>
+  );
+}
+</file>
+
+<file path="src/pages/ArticlePage.tsx">
+import { useEffect, useRef, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import type { Article } from '@/types';
+import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
+import { formatDateLong } from '@/utils/date';
+import { ArticleContent } from '@/components/articles/ArticleContent';
+import { ArticleProgress } from '@/components/articles/ArticleProgress';
+import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
+import { RelatedArticles } from '@/components/articles/RelatedArticles';
+import { LikeButton } from '@/components/interactions/LikeButton';
+import { ShareButton } from '@/components/interactions/ShareButton';
+import { CommentSection } from '@/components/interactions/CommentSection';
+import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
+import { Badge } from '@/components/ui/Badge';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
+
+function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
+  return (
+    <div className="rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5">
+      <div className="flex flex-col items-center gap-3">
+        {author.avatar && (
+          <img src={author.avatar} alt={author.name} className="avatar shrink-0 border border-border-subtle bg-elevated" />
+        )}
+        {author.username ? (
+          <Link to={`/writers/${author.username}`} className="link-underline text-center text-sm font-medium text-text-primary transition-colors hover:text-accent">
+            {author.name}
+          </Link>
+        ) : (
+          <span className="text-center text-sm font-medium text-text-primary">{author.name}</span>
+        )}
+      </div>
+      {author.bio && (
+        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">{author.bio}</p>
+      )}
+    </div>
+  );
+}
+
+export function ArticlePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const [article, setArticle] = useState<Article | null>(null);
+  const [related, setRelated] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [liked, setLiked] = useState(false);
+
+  // Scroll-triggered animation state for the author card
+  const authorCardRef = useRef<HTMLDivElement>(null);
+  const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
+
+  useEffect(() => {
+    async function loadArticle() {
+      if (!slug) return;
+      try {
+        setLoading(true);
+        setError(false);
+        setArticle(null);
+        setRelated([]);
+        setLiked(false);
+
+        const articleData = await getArticleBySlug(slug);
+
+        if (!articleData) {
+          setError(true);
+          return;
+        }
+
+        setArticle(articleData);
+
+        const [relatedData, likedData] = await Promise.all([
+          getRelatedArticles(articleData, 3),
+          isLiked(articleData.id),
+        ]);
+
+        setRelated(relatedData);
+        setLiked(likedData);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadArticle();
+  }, [slug]);
+
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const card = authorCardRef.current;
+      if (!card) return;
+
+      const rect = card.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight * 0.9;
+
+      if (isVisible && !isAuthorCardVisible) {
+        setIsAuthorCardVisible(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Check on mount
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isAuthorCardVisible]);
+  if (loading) {
+    return (
+      <>
+        <ArticleProgress />
+        <ArticlePageSkeleton />
+      </>
+    );
+  }
+
+  if (error || !article) {
+    return (
+      <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
+        <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />
+        <h1 className="font-serif text-2xl text-text-primary mb-2">
+          Something went wrong while loading this article.
+        </h1>
+        <p className="text-text-muted mb-6">The article may have been moved or deleted.</p>
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to articles
+        </Link>
+      </div>
+    );
+  }
+
+  const headings = extractHeadings(article.content);
+  const articleUrl = window.location.href;
+
+  return (
+    <>
+      <ArticleProgress />
+
+      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
+        {/* Header */}
+        <header className="mb-6">
+          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
+            {article.title}
+          </h1>
+
+          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
+            <span>
+              <Badge variant="accent">{article.category}</Badge>
+            </span>
+            <span>•</span>
+            {formatDateLong(article.publishedAt ?? article.createdAt)}
+            <span>•</span>
+            <span>{article.readingTime} min read</span>
+          </div>
+        </header>
+
+        {/* Cover Image */}
+        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
+          <img
+            src={article.coverImage}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </div>
+      </article>
+
+      {/* Content + TOC */}
+      <div className="max-w-content mx-auto px-4 sm:px-6 mt-10 grid grid-cols-1 gap-8 lg:mt-12 lg:grid-cols-[1fr_220px] lg:gap-12">
+        <div className="max-w-article lg:col-start-1 lg:row-start-1 lg:max-w-none">
+          {headings.length >= 3 && (
+            <details className="mb-8 rounded-card border border-border-subtle bg-surface lg:hidden">
+              <summary className="cursor-pointer list-none px-4 py-3 font-mono text-xs uppercase tracking-wider text-text-muted">
+                On this page
+              </summary>
+              <ul className="space-y-1 border-t border-border-subtle px-4 py-3">
+                {headings.map((h) => (
+                  <li key={h.id}>
+                    <a
+                      href={`#${h.id}`}
+                      className={`block py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary ${h.level === 3 ? 'pl-4' : ''}`}
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <ArticleContent content={article.content} />
+
+          {/* Author card — visible on mobile, hidden here on desktop (it moves to sidebar) */}
+          <div className="mt-10 lg:hidden">
+            <AuthorCard author={article.author} />
+          </div>
+
+          <div className="mt-10 flex items-center gap-3 border-t border-border-subtle pt-8">
+            <LikeButton articleId={article.id} initialLikes={article.likes} initiallyLiked={liked} />
+            <ShareButton url={articleUrl} title={article.title} />
+          </div>
+
+          <CommentSection articleId={article.id} />
+          <RelatedArticles articles={related} />
+        </div>
+
+        {/* Desktop sidebar: author + sticky TOC */}
+        <div className="hidden lg:col-start-2 lg:row-start-1 lg:block">
+          <div className="mb-8">
+            <AuthorCard author={article.author} />
+          </div>
+          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            <TableOfContents headings={headings} />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} />
+          All articles
+        </Link>
+      </div>
     </>
   );
 }
@@ -7085,16 +7587,17 @@ type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
 const ARTICLE_SELECT = `
-  *,
-  categories (slug),
-  profiles!articles_author_id_fkey (
-    display_name,
-    avatar_url,
-    bio
-  ),
-  article_likes (
-    count
-  )
+*,
+categories (slug),
+profiles!articles_author_id_fkey (
+display_name,
+username,
+avatar_url,
+bio
+),
+article_likes (
+count
+)
 `;
 
 const articleQuery = supabase
@@ -7112,7 +7615,7 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     throw new Error(`Profile not found for article ${article.id}`);
   }
 
-  
+
   const likes = article.article_likes?.[0]?.count ?? 0;
 
   return {
@@ -7124,6 +7627,7 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     coverImage: article.cover_image ?? '',
     author: {
       name: article.profiles.display_name,
+      username: article.profiles.username ?? undefined,
       avatar: article.profiles.avatar_url ?? undefined,
       bio: article.profiles.bio ?? undefined,
     },
@@ -7165,9 +7669,9 @@ function mapSupabaseComment(
 export function calculateReadingTime(content: string): number {
   const wordsPerMinute = 220;
 
-  const doc = new DOMParser().parseFromString(content,"text/html");
+  const doc = new DOMParser().parseFromString(content, "text/html");
   const plaintext = (doc.body.textContent || '').trim();
-  
+
   if (!plaintext) return 1;
 
   const words = plaintext.split(/\s+/).length;
@@ -7246,6 +7750,17 @@ export async function getArticlesByCategory(categorySlug: string): Promise<Artic
     .eq('category_id', category.id)
     .order('published_at', { ascending: false });
 
+  if (error) throw error;
+  return data.map(mapSupabaseArticle);
+}
+
+export async function getPublishedArticlesByAuthor(authorId: string): Promise<Article[]> {
+  const { data, error } = await supabase
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .eq('author_id', authorId)
+    .eq('status', 'published')
+    .order('published_at', { ascending: false });
   if (error) throw error;
   return data.map(mapSupabaseArticle);
 }
@@ -7392,7 +7907,7 @@ export async function updateArticle(id: string, data: Partial<ArticleInput>): Pr
   if (data.status !== undefined) {
     updateData.status = data.status;
   }
-  
+
   if (data.publishedAt !== undefined) {
     updateData.published_at = data.publishedAt;
   }
@@ -7638,12 +8153,12 @@ export async function isLiked(articleId: string): Promise<boolean> {
   return data !== null;
 }
 export async function getMyArticles(userId: string): Promise<Article[]> {
-  const {data, error} = await supabase
-  .from("articles")
-  .select(ARTICLE_SELECT)
-  .eq("author_id", userId)
-  .order("created_at",{ascending: false});
-  
+  const { data, error } = await supabase
+    .from("articles")
+    .select(ARTICLE_SELECT)
+    .eq("author_id", userId)
+    .order("created_at", { ascending: false });
+
   if (error) throw error;
   return data.map(mapSupabaseArticle);
 }
@@ -7901,9 +8416,11 @@ export function ArticleEditorPage() {
   return (
     <div>
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle relative overflow-hidden">
+      <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle overflow-hidden">
         <div
-          className={`absolute inset-0 z-0 pointer-events-none flex items-center transition-opacity duration-300 ${saveState === 'saving' ? 'opacity-100' : 'opacity-20'}`}
+          className={`absolute inset-0 z-0 hidden pointer-events-none items-center transition-opacity duration-300 md:flex 
+            ${saveState === 'saving' ? 'opacity-100' : 'opacity-20'
+            }`}
           aria-hidden="true"
         >
           <div className="relative w-full h-[600px]">
@@ -7940,7 +8457,8 @@ export function ArticleEditorPage() {
               className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
             >
               <ArrowLeft size={16} />
-              Save & Exit
+              <span className="hidden sm:inline">Save & Exit</span>
+              <span className="sm:hidden">Exit</span>
             </button>
             <div className="flex items-center gap-1.5 text-xs font-mono text-text-muted">
               {saveState === 'saving' && (
@@ -7952,7 +8470,7 @@ export function ArticleEditorPage() {
               {saveState === 'saved' && (
                 <span className="flex items-center gap-1 text-accent">
                   <Check size={12} />
-                  Saved{savedTime && ` ${savedTime}`}
+                  Saved{savedTime && <span className="hidden sm:inline">&nbsp;{savedTime}</span>}
                 </span>
               )}
             </div>
@@ -7964,7 +8482,7 @@ export function ArticleEditorPage() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${preview ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'}`}
             >
               <Eye size={15} />
-              Preview
+              <span className="hidden sm:inline" aria-label="Toggle preview">Preview</span>
             </button>
             <button
               type="button"
@@ -7972,7 +8490,7 @@ export function ArticleEditorPage() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'}`}
             >
               <SettingsIcon size={15} />
-              Settings
+              <span className="hidden sm:inline" aria-label="Post settings">Settings</span>
             </button>
             <Button type="button" size="sm" onClick={handlePublish}>
               Publish
@@ -8103,8 +8621,8 @@ export function ArticleEditorPage() {
       ) : (
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">
-            <label className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
-              <ImagePlus size={15} />
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-border-subtle px-3 py-2 text-sm text-text-muted transition-colors hover:border-text-muted hover:text-text-secondary">
+            <ImagePlus size={15} />
               Cover
               <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
             </label>
@@ -8139,8 +8657,7 @@ export function ArticleEditorPage() {
             value={formData.title}
             onChange={(e) => handleChange('title', e.target.value)}
             placeholder="Article title"
-            className="w-full bg-transparent font-serif text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3"
-            aria-label="Article title"
+            className="w-full bg-transparent font-serif text-3xl sm:text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3" aria-label="Article title"
           />
           <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border-subtle">
             <select

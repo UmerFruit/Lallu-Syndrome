@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const inputClass =
-  'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
+  'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
 const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
 
 export function PasswordSettingsPage() {

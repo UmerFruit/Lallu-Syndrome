@@ -22,7 +22,7 @@ const initialForm: FormState = {
 };
 
 const inputClass =
-    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
+    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
 
 const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
 
@@ -293,16 +293,16 @@ export function ProfileSettingsPage() {
                         Avatar
                     </label>
 
-                    <div className="mt-3 flex items-start gap-6">
+                    <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
                         {/* Avatar preview */}
                         {form.avatar_url.trim() ? (
                             <img
                                 src={normalizeUrl(form.avatar_url)}
                                 alt="Avatar preview"
-                                className="h-36 w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
+                                className="h-28 w-28 sm:h-36 sm:w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
                             />
                         ) : (
-                            <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
+                            <div className="flex h-28 w-28 sm:h-36 sm:w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
                                 No image
                             </div>
                         )}
@@ -343,7 +343,7 @@ export function ProfileSettingsPage() {
 
                                     <label
                                         htmlFor="avatar-upload"
-                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
+                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
                                                 ? 'pointer-events-none opacity-50'
                                                 : ''
                                             }`}

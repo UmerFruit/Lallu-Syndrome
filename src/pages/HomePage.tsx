@@ -12,6 +12,18 @@ import { CategoryButton } from '@/components/ui/CategoryButton';
 
 const ParticleText = lazy(() => import('@/components/ui/ParticleText'));
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    setMatches(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
+}
+
 export function HomePage() {
   const [featured, setFeatured] = useState<Article | null>(null);
   const [latest, setLatest] = useState<Article[]>([]);
@@ -19,6 +31,8 @@ export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   useEffect(() => {
     async function loadHome() {
@@ -79,25 +93,37 @@ export function HomePage() {
   return (
     <PageContainer className="py-8 md:py-12">
 
-      <div className="w-full h-[360px] bg-bg">
-        <Suspense fallback={null}>
-          <ParticleText
-            text="Lallu Syndrome"
-            particleSize={2.3}
-            density={4}
-            scatter={190}
-            gatherDuration={2000}
-            stagger={420}
-            pointerRepel={38}
-            repelRadius={100}
-            idleDrift={0}
-            trigger="mount"
-            fontSize="clamp(3.5rem, 13vw, 9rem)"
-            fontWeight={800}
-            fontFamily="inherit"
-            glow={false}
-          />
-        </Suspense>
+      <div className="w-full h-[220px] sm:h-[300px] md:h-[360px] bg-bg">
+        {prefersReducedMotion ? (
+          <div className="flex h-full items-center justify-center px-4">
+            <h1 className="text-center font-serif text-4xl font-extrabold tracking-tight text-text-primary sm:text-6xl md:text-7xl">
+              Lallu Syndrome
+            </h1>
+          </div>
+        ) : (
+          <Suspense fallback={null}>
+            <ParticleText
+              text="Lallu Syndrome"
+              particleSize={isMobile ? 1 : 2.3}
+              density={isMobile ? 2 : 4}
+              scatter={isMobile ? 100 : 190}
+              gatherDuration={isMobile ? 1500 : 2000}
+              stagger={isMobile ? 250 : 420}
+              pointerRepel={isMobile ? 0 : 38}
+              repelRadius={isMobile ? 0 : 100}
+              idleDrift={0}
+              trigger="mount"
+              fontSize={
+                isMobile
+                  ? "clamp(2.5rem, 15vw, 4.5rem)"
+                  : "clamp(4rem, 13vw, 9rem)"
+              }
+              fontWeight={400}
+              fontFamily="inherit"
+              glow={isMobile}
+            />
+          </Suspense>
+        )}
       </div>
 
       {/* Featured Article */}
@@ -130,7 +156,7 @@ export function HomePage() {
 
       {/* Category Filters */}
       <section className="mb-8">
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <CategoryButton
             label="All"
             active={activeCategory === 'all'}

@@ -100,7 +100,7 @@ export function WriterProfilePage() {
 
   return (
     <div className="grain">
-      <PageContainer className="py-16 md:py-20">
+      <PageContainer className="py-12 md:py-20">
         {/* Profile header */}
         <header className="mx-auto max-w-2xl text-center">
           <p
@@ -175,7 +175,7 @@ export function WriterProfilePage() {
         </header>
 
         {/* Published articles */}
-        <section className="mx-auto mt-16 max-w-content">
+        <section className="mx-auto mt-12 md:mt-16 max-w-content">
           <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
             Published writing
           </h2>

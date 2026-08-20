@@ -140,8 +140,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
                 placeholder="Write a comment..."
                 rows={3}
                 maxLength={1000}
-                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-sm resize-y transition-colors focus:border-accent focus:outline-none"
-                aria-label="Write a comment"
+                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
                 disabled={submitting}
               />
               <div className="flex justify-end mt-2">
@@ -234,8 +233,7 @@ function CommentItem({
               <button
                 type="button"
                 onClick={() => setIsReplying(!isReplying)}
-                className="text-xs font-medium text-text-muted hover:text-text-secondary transition-colors"
-              >
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
                 {isReplying ? 'Cancel' : 'Reply'}
               </button>
             )}
@@ -261,8 +259,7 @@ function CommentItem({
                 placeholder="Write a reply..."
                 rows={2}
                 maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-sm resize-y focus:border-accent focus:outline-none"
-                disabled={submitting}
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" disabled={submitting}
                 autoFocus
               />
               <button
@@ -292,6 +289,6 @@ function CommentItem({
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 }

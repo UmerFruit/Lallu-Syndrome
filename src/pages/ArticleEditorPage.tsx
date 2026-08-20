@@ -249,9 +249,11 @@ export function ArticleEditorPage() {
   return (
     <div>
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle relative overflow-hidden">
+      <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle overflow-hidden">
         <div
-          className={`absolute inset-0 z-0 pointer-events-none flex items-center transition-opacity duration-300 ${saveState === 'saving' ? 'opacity-100' : 'opacity-20'}`}
+          className={`absolute inset-0 z-0 hidden pointer-events-none items-center transition-opacity duration-300 md:flex 
+            ${saveState === 'saving' ? 'opacity-100' : 'opacity-20'
+            }`}
           aria-hidden="true"
         >
           <div className="relative w-full h-[600px]">
@@ -288,7 +290,8 @@ export function ArticleEditorPage() {
               className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
             >
               <ArrowLeft size={16} />
-              Save & Exit
+              <span className="hidden sm:inline">Save & Exit</span>
+              <span className="sm:hidden">Exit</span>
             </button>
             <div className="flex items-center gap-1.5 text-xs font-mono text-text-muted">
               {saveState === 'saving' && (
@@ -300,7 +303,7 @@ export function ArticleEditorPage() {
               {saveState === 'saved' && (
                 <span className="flex items-center gap-1 text-accent">
                   <Check size={12} />
-                  Saved{savedTime && ` ${savedTime}`}
+                  Saved{savedTime && <span className="hidden sm:inline">&nbsp;{savedTime}</span>}
                 </span>
               )}
             </div>
@@ -312,7 +315,7 @@ export function ArticleEditorPage() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${preview ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'}`}
             >
               <Eye size={15} />
-              Preview
+              <span className="hidden sm:inline" aria-label="Toggle preview">Preview</span>
             </button>
             <button
               type="button"
@@ -320,7 +323,7 @@ export function ArticleEditorPage() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${showSettings ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-elevated'}`}
             >
               <SettingsIcon size={15} />
-              Settings
+              <span className="hidden sm:inline" aria-label="Post settings">Settings</span>
             </button>
             <Button type="button" size="sm" onClick={handlePublish}>
               Publish
@@ -451,8 +454,8 @@ export function ArticleEditorPage() {
       ) : (
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">
-            <label className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors">
-              <ImagePlus size={15} />
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-border-subtle px-3 py-2 text-sm text-text-muted transition-colors hover:border-text-muted hover:text-text-secondary">
+            <ImagePlus size={15} />
               Cover
               <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
             </label>
@@ -487,8 +490,7 @@ export function ArticleEditorPage() {
             value={formData.title}
             onChange={(e) => handleChange('title', e.target.value)}
             placeholder="Article title"
-            className="w-full bg-transparent font-serif text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3"
-            aria-label="Article title"
+            className="w-full bg-transparent font-serif text-3xl sm:text-4xl md:text-5xl font-semibold text-text-primary placeholder:text-text-muted tracking-tight focus:outline-none mb-3" aria-label="Article title"
           />
           <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border-subtle">
             <select

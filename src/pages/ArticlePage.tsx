@@ -14,6 +14,28 @@ import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 
+function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
+  return (
+    <div className="rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5">
+      <div className="flex flex-col items-center gap-3">
+        {author.avatar && (
+          <img src={author.avatar} alt={author.name} className="avatar shrink-0 border border-border-subtle bg-elevated" />
+        )}
+        {author.username ? (
+          <Link to={`/writers/${author.username}`} className="link-underline text-center text-sm font-medium text-text-primary transition-colors hover:text-accent">
+            {author.name}
+          </Link>
+        ) : (
+          <span className="text-center text-sm font-medium text-text-primary">{author.name}</span>
+        )}
+      </div>
+      {author.bio && (
+        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">{author.bio}</p>
+      )}
+    </div>
+  );
+}
+
 export function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const [article, setArticle] = useState<Article | null>(null);
@@ -116,7 +138,7 @@ export function ArticlePage() {
     <>
       <ArticleProgress />
 
-      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-6">
+      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
@@ -145,59 +167,48 @@ export function ArticlePage() {
       </article>
 
       {/* Content + TOC */}
-      <div className="max-w-content mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-8 lg:gap-12 mt-12">
-        <div className="max-w-article lg:max-w-none lg:col-start-1 lg:row-start-1">
+      <div className="max-w-content mx-auto px-4 sm:px-6 mt-10 grid grid-cols-1 gap-8 lg:mt-12 lg:grid-cols-[1fr_220px] lg:gap-12">
+        <div className="max-w-article lg:col-start-1 lg:row-start-1 lg:max-w-none">
+          {headings.length >= 3 && (
+            <details className="mb-8 rounded-card border border-border-subtle bg-surface lg:hidden">
+              <summary className="cursor-pointer list-none px-4 py-3 font-mono text-xs uppercase tracking-wider text-text-muted">
+                On this page
+              </summary>
+              <ul className="space-y-1 border-t border-border-subtle px-4 py-3">
+                {headings.map((h) => (
+                  <li key={h.id}>
+                    <a
+                      href={`#${h.id}`}
+                      className={`block py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary ${h.level === 3 ? 'pl-4' : ''}`}
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           <ArticleContent content={article.content} />
 
-          {/* Interactions */}
-          <div className="flex items-center gap-3 mt-12 pt-8 border-t border-border-subtle">
-            <LikeButton
-              articleId={article.id}
-              initialLikes={article.likes}
-              initiallyLiked={liked}
-            />
+          {/* Author card — visible on mobile, hidden here on desktop (it moves to sidebar) */}
+          <div className="mt-10 lg:hidden">
+            <AuthorCard author={article.author} />
+          </div>
+
+          <div className="mt-10 flex items-center gap-3 border-t border-border-subtle pt-8">
+            <LikeButton articleId={article.id} initialLikes={article.likes} initiallyLiked={liked} />
             <ShareButton url={articleUrl} title={article.title} />
           </div>
 
-          {/* Comments */}
           <CommentSection articleId={article.id} />
-
-          {/* Related */}
           <RelatedArticles articles={related} />
         </div>
 
-        {/* TOC Sidebar */}
-        <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-          <div className="mb-8 rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5">
-            <div className="flex flex-col items-center gap-3">
-              {article.author.avatar && (
-                <img
-                  src={article.author.avatar}
-                  alt={article.author.name}
-                  className="avatar  shrink-0 border border-border-subtle bg-elevated" />
-              )}
-              {'username' in article.author && article.author.username ? (
-                <Link
-                  to={`/writers/${article.author.username}`}
-                  className="link-underline text-center text-sm font-medium text-text-primary transition-colors hover:text-accent"
-                >
-                  {article.author.name}
-                </Link>
-              ) : (
-                <span className="text-center text-sm font-medium text-text-primary">
-                  {article.author.name}
-                </span>
-              )}
-            </div>
-
-            {article.author.bio && (
-              <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">
-                {article.author.bio}
-              </p>
-            )}
+        {/* Desktop sidebar: author + sticky TOC */}
+        <div className="hidden lg:col-start-2 lg:row-start-1 lg:block">
+          <div className="mb-8">
+            <AuthorCard author={article.author} />
           </div>
-
-          {/* Table of Contents — stays sticky */}
           <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
             <TableOfContents headings={headings} />
           </div>

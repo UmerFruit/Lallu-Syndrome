@@ -20,7 +20,7 @@ export function CreatorPage() {
 
   return (
     <div className="grain">
-      <PageContainer className="py-16 md:py-24">
+      <PageContainer className="py-12 md:py-24">
         <div className="relative mx-auto max-w-2xl">
           {/* Top label */}
           <p
@@ -82,7 +82,7 @@ export function CreatorPage() {
 
           {/* Divider */}
           <div
-            className="anim-fade-up my-20 flex items-center gap-4"
+            className="anim-fade-up my-14 md:my-20 flex items-center gap-4"
             style={{ animationDelay: '1.25s' }}
           >
             <span className="h-px flex-1 bg-border-subtle" />
@@ -93,7 +93,7 @@ export function CreatorPage() {
           </div>
 
           {/* Statement */}
-          <div className="anim-fade-up mt-20" style={{ animationDelay: '1.55s' }}>
+          <div className="anim-fade-up mt-14 md:mt-20" style={{ animationDelay: '1.55s' }}>
             <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
               I build in public<span className="text-accent">.</span>
             </p>
@@ -114,7 +114,7 @@ export function CreatorPage() {
 
           {/* Colophon */}
           <footer
-            className="anim-fade-up mt-24 border-t border-border-subtle pt-6"
+            className="anim-fade-up mt-16 md:mt-24 border-t border-border-subtle pt-6"
             style={{ animationDelay: '1.7s' }}
           >
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">

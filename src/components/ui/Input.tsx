@@ -30,8 +30,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             type={inputType}
-            className={`w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-sm transition-colors duration-200 focus:border-accent focus:outline-none ${error ? 'border-accent' : ''} ${className ?? ''}`}
-            aria-invalid={!!error}
+            className={`w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm transition-colors duration-200 focus:border-accent focus:outline-none ${error ? 'border-accent' : ''} ${className ?? ''}`} aria-invalid={!!error}
             aria-describedby={error ? `${inputId}-error` : undefined}
             {...props}
           />
