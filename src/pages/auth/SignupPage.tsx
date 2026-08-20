@@ -4,18 +4,23 @@ import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { signup } from '@/services/authService';
+import { Turnstile } from '@/components/auth/Turnstile';
 
+// Replace with your actual Cloudflare Turnstile Site Key
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
 export function SignupPage() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     name?: string;
     email?: string;
     password?: string;
     confirmPassword?: string;
+    captcha?: string;
     form?: string;
   }>({});
   const [loading, setLoading] = useState(false);
@@ -30,6 +35,7 @@ export function SignupPage() {
     else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
     if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
     else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -39,7 +45,7 @@ export function SignupPage() {
     if (!validate()) return;
     setLoading(true);
     try {
-      await signup(name, email, password);
+      await signup(name, email, password, captchaToken ?? undefined);
       navigate('/dashboard');
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
@@ -108,6 +114,21 @@ export function SignupPage() {
           autoComplete="new-password"
           required
         />
+
+        {/* Turnstile Captcha */}
+        <div>
+          <Turnstile
+            siteKey={TURNSTILE_SITE_KEY}
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              setErrors((prev) => ({ ...prev, captcha: undefined }));
+            }}
+          />
+          {errors.captcha && (
+            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
+          )}
+        </div>
+
         <Button type="submit" className="w-full" loading={loading}>
           Create account
         </Button>
