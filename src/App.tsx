@@ -23,6 +23,8 @@ import { CreatorPage } from '@/pages/CreatorPage';
 import { WriterProfilePage } from '@/pages/WriterProfilePage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { AdminPage } from '@/pages/AdminPage';
+
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -69,7 +71,25 @@ function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
     </div>
   );
 }
+function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, profile, isLoading, isProfileLoading } = useAuth();
 
+  if (isLoading || isProfileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (!profile?.is_admin) { 
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
 function AppRoutes() {
   return (
     <>
@@ -103,6 +123,10 @@ function AppRoutes() {
           <Route path="password" element={<PasswordSettingsPage />} />
 
         </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin" element={<AdminRoute><AppLayout><AdminPage /></AppLayout></AdminRoute>} />
+
         {/* Fallback */}
         <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
       </Routes>

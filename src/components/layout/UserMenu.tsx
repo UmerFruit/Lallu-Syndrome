@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type UserMenuProps = {
@@ -105,6 +105,17 @@ export function UserMenu({ onNavigate }: Readonly<UserMenuProps>) {
               <LayoutDashboard size={16} />
               Dashboard
             </Link>
+            {profile?.is_admin && (
+              <Link
+                to="/admin"
+                onClick={closeAndNavigate}
+                role="menuitem"
+                className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
+              >
+                <Shield size={16} />
+                Admin Panel
+              </Link>
+            )}
 
             <Link
               to="/settings/profile"

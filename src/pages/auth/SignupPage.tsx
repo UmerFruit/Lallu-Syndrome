@@ -4,10 +4,10 @@ import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { signup } from '@/services/authService';
-import { Turnstile } from '@/components/auth/Turnstile';
+// import { Turnstile } from '@/components/auth/Turnstile';
 
 // Replace with your actual Cloudflare Turnstile Site Key
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
+// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
 export function SignupPage() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
@@ -116,7 +116,7 @@ export function SignupPage() {
         />
 
         {/* Turnstile Captcha */}
-        <div>
+        {/* <div>
           <Turnstile
             siteKey={TURNSTILE_SITE_KEY}
             onVerify={(token) => {
@@ -127,7 +127,7 @@ export function SignupPage() {
           {errors.captcha && (
             <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
           )}
-        </div>
+        </div> */}
 
         <Button type="submit" className="w-full" loading={loading}>
           Create account

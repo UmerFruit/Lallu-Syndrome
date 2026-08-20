@@ -32,7 +32,7 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env
+- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env, **/ParticleText.tsx, **/Strands.tsx
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -41,9 +41,7 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
-public/
-  favicon.svg
-src/
+[src]/
   components/
     articles/
       ArticleCard.tsx
@@ -52,6 +50,8 @@ src/
       FeaturedArticle.tsx
       RelatedArticles.tsx
       TableOfContents.tsx
+    auth/
+      Turnstile.tsx
     editor/
       AlignedImage.ts
       CodeBlock.tsx
@@ -77,6 +77,7 @@ src/
       ConfirmationModal.tsx
       Input.tsx
       Skeleton.tsx
+    ErrorBoundary.tsx
   config/
     site.ts
   contexts/
@@ -95,6 +96,7 @@ src/
       PasswordSettingsPage.tsx
       ProfileSettingsPage.tsx
     AboutPage.tsx
+    AdminPage.tsx
     ArticleEditorPage.tsx
     ArticlePage.tsx
     ArticlesPage.tsx
@@ -102,8 +104,10 @@ src/
     CreatorPage.tsx
     DashboardPage.tsx
     HomePage.tsx
+    NotFoundPage.tsx
     WriterProfilePage.tsx
   services/
+    adminService.ts
     articleService.ts
     authService.ts
     categoryService.ts
@@ -114,39 +118,666 @@ src/
     index.ts
   utils/
     date.ts
+    image.ts
     slugify.ts
   App.tsx
   index.css
   main.tsx
   vite-env.d.ts
-supabase/
-  migrations/
-    20260819121429_schema.sql
-    20260819121432_functions_triggers.sql
-    20260819121436_rls_grants.sql
-    20260819121440_storage.sql
-    20260819121445_seed.sql
-.gitignore
-eslint.config.js
-index.html
-package.json
-postcss.config.js
-repomix.config.json
-tailwind.config.js
-tsconfig.app.json
-tsconfig.json
-tsconfig.node.json
-vite.config.ts
+
+[supabase/migrations]/
+  20260819121429_schema.sql
+  20260819121432_functions_triggers.sql
+  20260819121436_rls_grants.sql
+  20260819121440_storage.sql
+  20260819121445_seed.sql
+  20260820033358_fixes.sql
+  20260820072952_reverse_roles.sql
+  20260820083616_reverse_setup_and_new.sql
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
 
-<file path="public/favicon.svg">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#090909"/>
-  <text x="16" y="22" font-family="Georgia, serif" font-size="16" font-weight="600" fill="#F4F4F4" text-anchor="middle">LS</text>
-</svg>
+<file path="src/pages/AdminPage.tsx">
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Trash2, Shield, MessageSquare, FileText, Users, ArrowLeft } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatDate, relativeTime } from '@/utils/date';
+import { Badge } from '@/components/ui/Badge';
+import {
+  getAllProfiles,
+  updateUserAdminStatus,
+  getAllComments,
+  adminDeleteComment,
+  getAllArticlesAdmin,
+  adminDeleteArticle,
+  type AdminProfile,
+  type AdminComment,
+  type AdminArticle,
+} from '@/services/adminService';
+
+type Tab = 'users' | 'comments' | 'articles';
+
+export function AdminPage() {
+  const { profile } = useAuth();
+  const [tab, setTab] = useState<Tab>('users');
+
+  // Only admins can access this page (enforced by AdminRoute)
+    if (!profile?.is_admin) return null; 
+
+
+  return (
+    <PageContainer className="py-8 md:py-12">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <Shield size={24} className="text-accent" />
+          <h1 className="font-serif text-3xl font-semibold text-text-primary tracking-tight">
+            Admin Panel
+          </h1>
+        </div>
+        <p className="text-sm text-text-secondary">
+          Manage users, moderate comments, and oversee all articles.
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-border mb-6">
+        <TabButton
+          icon={<Users size={16} />}
+          label="Users"
+          active={tab === 'users'}
+          onClick={() => setTab('users')}
+        />
+        <TabButton
+          icon={<MessageSquare size={16} />}
+          label="Comments"
+          active={tab === 'comments'}
+          onClick={() => setTab('comments')}
+        />
+        <TabButton
+          icon={<FileText size={16} />}
+          label="Articles"
+          active={tab === 'articles'}
+          onClick={() => setTab('articles')}
+        />
+      </div>
+
+      {/* Tab Content */}
+      {tab === 'users' && <UsersTab />}
+      {tab === 'comments' && <CommentsTab />}
+      {tab === 'articles' && <ArticlesTab />}
+
+      {/* Back link */}
+      <div className="mt-12">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to Dashboard
+        </Link>
+      </div>
+    </PageContainer>
+  );
+}
+
+// ─── Users Tab ───────────────────────────────────────────────
+function UsersTab() {
+  const [profiles, setProfiles] = useState<AdminProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAllProfiles()
+      .then(setProfiles)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleAdminToggle = async (userId: string, isAdmin: boolean) => {
+    setUpdatingId(userId);
+    try {
+      await updateUserAdminStatus(userId, isAdmin);
+      setProfiles((prev) =>
+        prev.map((p) => (p.id === userId ? { ...p, is_admin: isAdmin } : p))
+      );
+    } catch (error) {
+      console.error('Failed to update admin status:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  if (loading) return <LoadingSkeleton rows={5} />;
+
+  return (
+    <div className="space-y-2">
+      {profiles.map((p) => (
+        <div
+          key={p.id}
+          className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
+        >
+          {/* Avatar */}
+          {p.avatar_url ? (
+            <img
+              src={p.avatar_url}
+              alt={p.display_name}
+              className="w-9 h-9 rounded-full object-cover border border-border-subtle"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary">
+              {p.display_name.charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-primary truncate">
+              {p.display_name}
+            </p>
+            <p className="text-xs text-text-muted truncate">
+              {p.username ? `@${p.username}` : p.id.slice(0, 8)}
+              {' · '}Joined {formatDate(p.created_at)}
+            </p>
+          </div>
+
+          {/* Role Selector */}
+          <select
+            value={p.is_admin ? 'admin' : 'user'}
+            onChange={(e) => handleAdminToggle(p.id, e.target.value === 'admin')}
+            disabled={updatingId === p.id}
+            className="rounded border border-border bg-bg px-2.5 py-1.5 text-xs font-mono text-text-secondary focus:border-accent focus:outline-none disabled:opacity-50"
+          >
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+
+          {/* Role Badge */}
+          <Badge variant={p.is_admin ? 'accent' : 'muted'}>
+            {p.is_admin ? 'admin' : 'user'}
+          </Badge>
+        </div>
+      ))}
+    </div>
+  );
+}
+// ─── Comments Tab ────────────────────────────────────────────
+function CommentsTab() {
+  const [comments, setComments] = useState<AdminComment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAllComments()
+      .then(setComments)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (commentId: string) => {
+    if (!confirm('Delete this comment permanently?')) return;
+    setDeletingId(commentId);
+    try {
+      await adminDeleteComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) return <LoadingSkeleton rows={5} />;
+
+  if (comments.length === 0) {
+    return <p className="text-text-muted py-12 text-center">No comments yet.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {comments.map((comment) => (
+        <div
+          key={comment.id}
+          className="flex items-start gap-4 p-4 rounded border border-border-subtle bg-surface"
+        >
+          {/* Avatar */}
+          {comment.author_avatar ? (
+            <img
+              src={comment.author_avatar}
+              alt={comment.author_name}
+              className="w-8 h-8 rounded-full object-cover border border-border-subtle mt-0.5"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-elevated flex items-center justify-center text-xs font-medium text-text-secondary mt-0.5">
+              {comment.author_name.charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium text-text-primary">
+                {comment.author_name}
+              </span>
+              <span className="font-mono text-xs text-text-muted">
+                {relativeTime(comment.created_at)}
+              </span>
+              {comment.parent_id && (
+                <Badge variant="muted">reply</Badge>
+              )}
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">
+              {comment.content}
+            </p>
+            <p className="mt-1 text-xs text-text-muted">
+              on <span className="text-text-secondary">{comment.article_title}</span>
+            </p>
+          </div>
+
+          {/* Delete */}
+          <button
+            type="button"
+            onClick={() => handleDelete(comment.id)}
+            disabled={deletingId === comment.id}
+            className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors disabled:opacity-50"
+            aria-label="Delete comment"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Articles Tab ────────────────────────────────────────────
+function ArticlesTab() {
+  const [articles, setArticles] = useState<AdminArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAllArticlesAdmin()
+      .then(setArticles)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (articleId: string) => {
+    if (!confirm('Delete this article permanently? This cannot be undone.')) return;
+    setDeletingId(articleId);
+    try {
+      await adminDeleteArticle(articleId);
+      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+    } catch (error) {
+      console.error('Failed to delete article:', error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) return <LoadingSkeleton rows={5} />;
+
+  if (articles.length === 0) {
+    return <p className="text-text-muted py-12 text-center">No articles yet.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {articles.map((article) => (
+        <div
+          key={article.id}
+          className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
+        >
+          {/* Status indicator */}
+          <div
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              article.status === 'published' ? 'bg-emerald-500' : 'bg-text-muted'
+            }`}
+          />
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-primary truncate">
+              {article.title}
+            </p>
+            <p className="text-xs text-text-muted">
+              by <span className="text-text-secondary">{article.author_name}</span>
+              {' · '}
+              {article.category_name}
+              {' · '}
+              {article.status === 'published' && article.published_at
+                ? `Published ${formatDate(article.published_at)}`
+                : `Draft · Created ${formatDate(article.created_at)}`
+              }
+            </p>
+          </div>
+
+          {/* Status Badge */}
+          <Badge variant={article.status === 'published' ? 'accent' : 'muted'}>
+            {article.status}
+          </Badge>
+
+          {/* View Link */}
+          {article.status === 'published' && (
+            <Link
+              to={`/articles/${article.slug}`}
+              className="text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              View
+            </Link>
+          )}
+
+          {/* Delete */}
+          <button
+            type="button"
+            onClick={() => handleDelete(article.id)}
+            disabled={deletingId === article.id}
+            className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors disabled:opacity-50"
+            aria-label="Delete article"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Shared Components ───────────────────────────────────────
+function TabButton({
+  icon,
+  label,
+  active,
+  onClick,
+}: Readonly<{
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${
+        active
+          ? 'border-accent text-text-primary'
+          : 'border-transparent text-text-muted hover:text-text-secondary'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function LoadingSkeleton({ rows }: Readonly<{ rows: number }>) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="h-16 rounded border border-border-subtle bg-surface animate-pulse"
+        />
+      ))}
+    </div>
+  );
+}
+</file>
+
+<file path="src/services/adminService.ts">
+import { supabase } from '@/lib/supabase';
+import type { Profile } from '@/types';
+
+
+export type AdminProfile = Profile
+
+export type AdminComment = {
+  id: string;
+  article_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  parent_id: string | null;
+  author_name: string;
+  author_avatar: string | null;
+  article_title: string;
+};
+
+export type AdminArticle = {
+  id: string;
+  title: string;
+  slug: string;
+  status: 'draft' | 'published';
+  created_at: string;
+  published_at: string | null;
+  author_name: string;
+  author_id: string;
+  category_name: string;
+};
+
+// ─── Users ───────────────────────────────────────────────────
+export async function getAllProfiles(): Promise<AdminProfile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data as AdminProfile[];
+}
+
+export async function updateUserAdminStatus(
+  userId: string,
+  isAdmin: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_admin: isAdmin })
+    .eq('id', userId);
+
+  if (error) throw error;
+}
+// ─── Comments ────────────────────────────────────────────────
+export async function getAllComments(): Promise<AdminComment[]> {
+  const { data, error } = await supabase
+    .from('comments')
+    .select(`
+      id,
+      article_id,
+      author_id,
+      content,
+      created_at,
+      parent_id,
+      profiles!comments_author_id_fkey (
+        display_name,
+        avatar_url
+      ),
+      articles!comments_article_id_fkey (
+        title
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    article_id: row.article_id,
+    author_id: row.author_id,
+    content: row.content,
+    created_at: row.created_at,
+    parent_id: row.parent_id,
+    author_name: row.profiles?.display_name ?? 'Unknown',
+    author_avatar: row.profiles?.avatar_url ?? null,
+    article_title: row.articles?.title ?? 'Unknown Article',
+  }));
+}
+
+export async function adminDeleteComment(commentId: string): Promise<void> {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId);
+
+  if (error) throw error;
+}
+
+// ─── Articles ────────────────────────────────────────────────
+export async function getAllArticlesAdmin(): Promise<AdminArticle[]> {
+  const { data, error } = await supabase
+    .from('articles')
+    .select(`
+      id,
+      title,
+      slug,
+      status,
+      created_at,
+      published_at,
+      author_id,
+      profiles!articles_author_id_fkey (
+        display_name
+      ),
+      categories (
+        name
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    status: row.status,
+    created_at: row.created_at,
+    published_at: row.published_at,
+    author_id: row.author_id,
+    author_name: row.profiles?.display_name ?? 'Unknown',
+    category_name: row.categories?.name ?? 'Uncategorized',
+  }));
+}
+
+export async function adminDeleteArticle(articleId: string): Promise<void> {
+  const { error } = await supabase
+    .from('articles')
+    .delete()
+    .eq('id', articleId);
+
+  if (error) throw error;
+}
+</file>
+
+<file path="supabase/migrations/20260820083616_reverse_setup_and_new.sql">
+-- Drop new policies
+drop policy if exists "Published articles are publicly readable" on public.articles;
+drop policy if exists "Authors can read their own articles" on public.articles;
+drop policy if exists "Admins can read all articles" on public.articles;
+drop policy if exists "Writers can create articles" on public.articles;
+drop policy if exists "Writers can update their own articles" on public.articles;
+drop policy if exists "Writers can delete their own articles" on public.articles;
+drop policy if exists "Admins can delete any article" on public.articles;
+drop policy if exists "Users can delete their own comments" on public.comments;
+drop policy if exists "Admins can delete any comment" on public.comments;
+drop policy if exists "Users can update their own profile" on public.profiles;
+drop policy if exists "Admins can update any profile" on public.profiles;
+
+-- Restore original policies
+create policy "Published articles are publicly readable"
+on public.articles for select to anon, authenticated
+using (status = 'published');
+
+create policy "Authors can read their own articles"
+on public.articles for select to authenticated
+using (auth.uid() = author_id);
+
+create policy "Authors can create their own articles"
+on public.articles for insert to authenticated
+with check (auth.uid() = author_id);
+
+create policy "Authors can update their own articles"
+on public.articles for update to authenticated
+using (auth.uid() = author_id)
+with check (auth.uid() = author_id);
+
+create policy "Authors can delete their own articles"
+on public.articles for delete to authenticated
+using (auth.uid() = author_id);
+
+create policy "Users can delete their own comments"
+on public.comments for delete to authenticated
+using (auth.uid() = author_id);
+
+create policy "Users can update their own profile"
+on public.profiles for update to authenticated
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+-- Drop functions, column, enum
+drop function if exists public.is_admin(uuid);
+drop function if exists public.is_writer(uuid);
+alter table public.profiles drop column if exists role;
+drop type if exists public.user_role;
+
+
+-- 1. Add is_admin flag
+alter table public.profiles
+add column is_admin boolean not null default false;
+
+-- 2. Helper function
+create or replace function public.is_admin(user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = user_id and is_admin = true
+  );
+$$;
+
+-- 3. Admin can read ALL articles (for admin panel)
+create policy "Admins can read all articles"
+on public.articles for select to authenticated
+using (public.is_admin(auth.uid()));
+
+-- 4. Admin can delete ANY article
+create policy "Admins can delete any article"
+on public.articles for delete to authenticated
+using (public.is_admin(auth.uid()));
+
+-- 5. Admin can delete ANY comment
+create policy "Admins can delete any comment"
+on public.comments for delete to authenticated
+using (public.is_admin(auth.uid()));
+
+-- 6. Prevent users from setting themselves as admin
+drop policy if exists "Users can update their own profile" on public.profiles;
+
+create policy "Users can update their own profile"
+on public.profiles for update to authenticated
+using (auth.uid() = id)
+with check (
+  auth.uid() = id
+  AND is_admin = (select p.is_admin from public.profiles p where p.id = auth.uid())
+);
+
+-- 7. Admins can update any profile (to grant/revoke admin)
+create policy "Admins can update any profile"
+on public.profiles for update to authenticated
+using (public.is_admin(auth.uid()))
+with check (public.is_admin(auth.uid()));
+
+
+update public.profiles set is_admin = true where id = '1d571977-83a0-4cf0-a573-7fe1e92fea8b';
 </file>
 
 <file path="src/components/articles/ArticleProgress.tsx">
@@ -207,6 +838,68 @@ export function RelatedArticles({ articles }: Readonly<RelatedArticlesProps>) {
       </div>
     </section>
   );
+}
+</file>
+
+<file path="src/components/auth/Turnstile.tsx">
+import { useEffect, useRef } from 'react';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          callback: (token: string) => void;
+          theme?: 'dark' | 'light' | 'auto';
+        }
+      ) => string;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
+type TurnstileProps = {
+  siteKey: string;
+  onVerify: (token: string) => void;
+};
+
+export function Turnstile({ siteKey, onVerify }: Readonly<TurnstileProps>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const renderWidget = () => {
+      if (containerRef.current && window.turnstile) {
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          callback: onVerify,
+          theme: 'dark',
+        });
+      }
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const interval = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+      }
+    };
+  }, [siteKey, onVerify]);
+
+  return <div ref={containerRef} />;
 }
 </file>
 
@@ -414,7 +1107,7 @@ export function SettingsLayout() {
 <file path="src/components/layout/UserMenu.tsx">
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type UserMenuProps = {
@@ -519,6 +1212,17 @@ export function UserMenu({ onNavigate }: Readonly<UserMenuProps>) {
               <LayoutDashboard size={16} />
               Dashboard
             </Link>
+            {profile?.is_admin && (
+              <Link
+                to="/admin"
+                onClick={closeAndNavigate}
+                role="menuitem"
+                className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
+              >
+                <Shield size={16} />
+                Admin Panel
+              </Link>
+            )}
 
             <Link
               to="/settings/profile"
@@ -616,6 +1320,54 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 Button.displayName = 'Button';
+</file>
+
+<file path="src/components/ErrorBoundary.tsx">
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+
+type Props = { children: ReactNode };
+type State = { hasError: boolean };
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // In the future, send this to Sentry/LogRocket
+    console.error('Uncaught app error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+          <div className="max-w-md text-center space-y-4">
+            <h1 className="font-serif text-3xl font-semibold text-text-primary">Something went wrong.</h1>
+            <p className="text-text-secondary">
+              The application encountered an unexpected error. Please try refreshing the page.
+            </p>
+            <Link
+              to="/"
+              onClick={() => this.setState({ hasError: false })}
+              className="inline-block px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors"
+            >
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 </file>
 
 <file path="src/config/site.ts">
@@ -728,379 +1480,50 @@ export function LoginPage() {
 }
 </file>
 
-<file path="src/types/database.ts">
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+<file path="src/pages/NotFoundPage.tsx">
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
 
-export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.15"
-  }
-  public: {
-    Tables: {
-      article_likes: {
-        Row: {
-          article_id: string
-          created_at: string
-          user_id: string
-        }
-        Insert: {
-          article_id: string
-          created_at?: string
-          user_id: string
-        }
-        Update: {
-          article_id?: string
-          created_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_likes_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_likes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      articles: {
-        Row: {
-          author_id: string
-          category_id: number
-          content: string
-          cover_image: string | null
-          created_at: string
-          id: string
-          published_at: string | null
-          reading_time: number | null
-          slug: string
-          status: Database["public"]["Enums"]["article_status"]
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          author_id: string
-          category_id: number
-          content: string
-          cover_image?: string | null
-          created_at?: string
-          id?: string
-          published_at?: string | null
-          reading_time?: number | null
-          slug: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string
-          category_id?: number
-          content?: string
-          cover_image?: string | null
-          created_at?: string
-          id?: string
-          published_at?: string | null
-          reading_time?: number | null
-          slug?: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "articles_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "articles_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          created_at: string
-          id: number
-          name: string
-          slug: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          name: string
-          slug: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          name?: string
-          slug?: string
-        }
-        Relationships: []
-      }
-      comments: {
-        Row: {
-          article_id: string
-          author_id: string
-          content: string
-          created_at: string
-          id: string
-          parent_id: string | null
-        }
-        Insert: {
-          article_id: string
-          author_id: string
-          content: string
-          created_at?: string
-          id?: string
-          parent_id?: string | null
-        }
-        Update: {
-          article_id?: string
-          author_id?: string
-          content?: string
-          created_at?: string
-          id?: string
-          parent_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comments_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          bio: string | null
-          created_at: string
-          display_name: string
-          github_url: string | null
-          id: string
-          linkedin_url: string | null
-          updated_at: string
-          username: string | null
-          website_url: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          display_name: string
-          github_url?: string | null
-          id: string
-          linkedin_url?: string | null
-          updated_at?: string
-          username?: string | null
-          website_url?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          display_name?: string
-          github_url?: string | null
-          id?: string
-          linkedin_url?: string | null
-          updated_at?: string
-          username?: string | null
-          website_url?: string | null
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      article_status: "draft" | "published"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
+export function NotFoundPage() {
+  return (
+    <PageContainer className="py-24 text-center">
+      <p className="font-mono text-sm uppercase tracking-[0.25em] text-text-muted mb-4">404</p>
+      <h1 className="font-serif text-4xl md:text-5xl font-medium text-text-primary mb-4 tracking-tight">
+        Page not found<span className="text-accent">.</span>
+      </h1>
+      <p className="text-text-secondary mb-8 max-w-md mx-auto">
+        The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+      </p>
+      <Link
+        to="/"
+        className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+      >
+        <ArrowLeft size={16} />
+        Back to home
+      </Link>
+    </PageContainer>
+  );
 }
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      article_status: ["draft", "published"],
-    },
-  },
-} as const
 </file>
 
-<file path="src/utils/slugify.ts">
-export function slugify(text: string): string {
-return text
-.toString()
-.normalize('NFD') // Split accented characters into base character + diacritic
-.replace(/[\u0300-\u036f]/g, '') // Remove the diacritics
-.toLowerCase()
-.trim()
-.replace(/\s+/g, '-') // Replace spaces with hyphens
-.replace(/[^a-z0-9\s-]/g, '') // Remove remaining non-ASCII characters
-.replace(/-+/g, '-') // Replace multiple hyphens with a single hyphen
-.replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+<file path="src/utils/image.ts">
+import { getPublicUrl } from '@/services/storageService';
+const FALLBACK_COUNT = 8;
+
+export function getFallbackImage(articleId: string): string {
+  if (!articleId) return getPublicUrl('defaults/sample-1.jpg');
+
+  let hash = 0;
+
+  for (let i = 0; i < articleId.length; i++) {
+    hash = (hash << 5) - hash + (articleId.codePointAt(i) ?? 0);
+    hash = Math.trunc(hash);
+  }
+
+  const index = (Math.abs(hash) % FALLBACK_COUNT) + 1;
+
+  return getPublicUrl(`defaults/sample-${index}.jpg`);
 }
 </file>
 
@@ -1379,92 +1802,6 @@ grant select on public.article_likes to anon, authenticated;
 grant insert, delete on public.article_likes to authenticated;
 </file>
 
-<file path="supabase/migrations/20260819121440_storage.sql">
--- ============================================================
--- 004_storage.sql
--- Storage buckets + policies
--- ============================================================
-
--- ── Buckets ─────────────────────────────────────────────────
-insert into storage.buckets (id, name, public)
-values ('media', 'media', true)
-on conflict (id) do nothing;
-
-insert into storage.buckets (id, name, public)
-values ('avatars', 'avatars', true)
-on conflict (id) do nothing;
-
--- ── Media bucket: authors manage their article images ──────
-create policy "Authors can view article media metadata"
-  on storage.objects for select to authenticated
-  using (
-    bucket_id = 'media'
-    and split_part(name, '/', 1) = 'articles'
-    and split_part(name, '/', 2) <> ''
-    and exists (
-      select 1 from public.articles
-      where articles.id::text = split_part(storage.objects.name, '/', 2)
-        and articles.author_id = auth.uid()
-    )
-  );
-
-create policy "Authors can upload article media"
-  on storage.objects for insert to authenticated
-  with check (
-    bucket_id = 'media'
-    and split_part(name, '/', 1) = 'articles'
-    and split_part(name, '/', 2) <> ''
-    and exists (
-      select 1 from public.articles
-      where articles.id::text = split_part(storage.objects.name, '/', 2)
-        and articles.author_id = auth.uid()
-    )
-  );
-
-create policy "Authors can delete article media"
-  on storage.objects for delete to authenticated
-  using (
-    bucket_id = 'media'
-    and split_part(name, '/', 1) = 'articles'
-    and split_part(name, '/', 2) <> ''
-    and exists (
-      select 1 from public.articles
-      where articles.id::text = split_part(storage.objects.name, '/', 2)
-        and articles.author_id = auth.uid()
-    )
-  );
-
--- ── Avatars bucket ──────────────────────────────────────────
-create policy "Avatar images are publicly accessible"
-  on storage.objects for select to public
-  using (bucket_id = 'avatars');
-
-create policy "Users can upload their own avatar"
-  on storage.objects for insert to authenticated
-  with check (
-    bucket_id = 'avatars'
-    and split_part(name, '/', 1) = auth.uid()::text
-  );
-
-create policy "Users can update their own avatar"
-  on storage.objects for update to authenticated
-  using (
-    bucket_id = 'avatars'
-    and split_part(name, '/', 1) = auth.uid()::text
-  )
-  with check (
-    bucket_id = 'avatars'
-    and split_part(name, '/', 1) = auth.uid()::text
-  );
-
-create policy "Users can delete their own avatar"
-  on storage.objects for delete to authenticated
-  using (
-    bucket_id = 'avatars'
-    and split_part(name, '/', 1) = auth.uid()::text
-  );
-</file>
-
 <file path="supabase/migrations/20260819121445_seed.sql">
 -- ============================================================
 -- 005_seed.sql
@@ -1482,191 +1819,32 @@ insert into public.categories (slug, name) values
 on conflict (slug) do nothing;
 </file>
 
-<file path=".gitignore">
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+<file path="supabase/migrations/20260820072952_reverse_roles.sql">
+-- 1. Drop the new policies
+drop policy if exists "Writers can create their own articles" on public.articles;
+drop policy if exists "Writers can update their own articles" on public.articles;
+drop policy if exists "Writers can delete their own articles" on public.articles;
+drop policy if exists "Admins can delete any comment" on public.comments;
 
-node_modules
-dist
-dist-ssr
-*.local
+-- 2. Recreate the original article policies (from your initial migrations)
+create policy "Authors can create their own articles"
+on public.articles for insert to authenticated
+with check (auth.uid() = author_id);
 
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.env
-</file>
+create policy "Authors can update their own articles"
+on public.articles for update to authenticated
+using (auth.uid() = author_id)
+with check (auth.uid() = author_id);
 
-<file path="eslint.config.js">
-import js from '@eslint/js';
-import globals from 'globals';
-import reactHooks from 'eslint-plugin-react-hooks';
-import reactRefresh from 'eslint-plugin-react-refresh';
-import tseslint from 'typescript-eslint';
+create policy "Authors can delete their own articles"
+on public.articles for delete to authenticated
+using (auth.uid() = author_id);
 
-export default tseslint.config(
-  { ignores: ['dist'] },
-  {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
-    plugins: {
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-    },
-    rules: {
-      ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
-    },
-  }
-);
-</file>
-
-<file path="postcss.config.js">
-export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-</file>
-
-<file path="repomix.config.json">
-{
-  "output": {
-    "filePath": "repomix-output.xml",
-    "style": "xml"
-  },
-  "ignore": {
-    "customPatterns": [
-      "supabase/.temp/**",
-      "src/components/ui/Strands.tsx",
-      "src/components/ui/ParticleText.tsx",
-      ".bolt/**",
-      ".env"
-    ]
-  }
-}
-</file>
-
-<file path="tailwind.config.js">
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        bg: 'var(--color-bg)',
-        surface: 'var(--color-surface)',
-        elevated: 'var(--color-elevated)',
-        border: {
-          DEFAULT: 'var(--color-border)',
-          subtle: 'var(--color-border-subtle)',
-        },
-        text: {
-          primary: 'var(--color-text-primary)',
-          secondary: 'var(--color-text-secondary)',
-          muted: 'var(--color-text-muted)',
-        },
-        accent: {
-          DEFAULT: 'var(--color-accent)',
-          hover: 'var(--color-accent-hover)',
-        },
-      },
-      fontFamily: {
-        serif: ['"Newsreader"', 'Georgia', 'serif'],
-        sans: ['"Inter"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
-      },
-      borderRadius: {
-        DEFAULT: '6px',
-        card: '8px',
-      },
-      transitionDuration: {
-        DEFAULT: '200ms',
-      },
-      maxWidth: {
-        article: '680px',
-        wide: '1200px',
-        content: '1080px',
-      },
-      animation: {
-        'fade-in': 'fadeIn 200ms ease-out',
-        'slide-up': 'slideUp 200ms ease-out',
-        'pulse-once': 'pulseOnce 300ms ease-out',
-      },
-      keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        pulseOnce: {
-          '0%': { transform: 'scale(1)' },
-          '50%': { transform: 'scale(1.25)' },
-          '100%': { transform: 'scale(1)' },
-        },
-      },
-    },
-  },
-  plugins: [],
-};
-</file>
-
-<file path="tsconfig.json">
-{
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
-}
-</file>
-
-<file path="tsconfig.node.json">
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2023"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["vite.config.ts"]
-}
+-- 3. Drop functions, column, and enum
+drop function if exists public.is_admin(uuid);
+drop function if exists public.is_writer(uuid);
+alter table public.profiles drop column if exists role;
+drop type if exists public.user_role;
 </file>
 
 <file path="src/components/editor/CodeBlockComponent.tsx">
@@ -1773,50 +1951,6 @@ export default function CodeBlockComponent({ node, updateAttributes, deleteNode 
       </div>
     </NodeViewWrapper>
   );
-}
-</file>
-
-<file path="src/components/editor/processPastedHtml.ts">
-function decodeHtmlEntities(value: string): string {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = value;
-  return textarea.value;
-}
-
-function normalizeHtml(html: string): string {
-  let result = html;
-  for (let i = 0; i < 3; i++) {
-    if (!result.includes('&lt;')) break;
-    const decoded = decodeHtmlEntities(result);
-    if (decoded === result) break;
-    result = decoded;
-  }
-  return result;
-}
-
-export type PastedImage = {
-  originalSrc: string;
-};
-
-export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
-  const normalizedHtml = normalizeHtml(html);
-  const document = new DOMParser().parseFromString(normalizedHtml, 'text/html');
-  const images = Array.from(document.querySelectorAll('img'));
-  const imagesToUpload: PastedImage[] = [];
-
-  images.forEach((image) => {
-    const src = image.getAttribute('src');
-    if (!src) { return; }
-
-    // if already stored in our Supabase bucket. Don't re-upload.
-    if (src.includes('/storage/v1/object/public/media/')) { return; }
-
-    imagesToUpload.push({ originalSrc: src });
-    image.removeAttribute('srcset');
-    image.removeAttribute('sizes');
-
-  })
-  return { html: document.body.innerHTML, images: imagesToUpload };
 }
 </file>
 
@@ -2415,126 +2549,6 @@ export function ResetPasswordPage() {
         />
         <Button type="submit" className="w-full" loading={loading}>
           Reset password
-        </Button>
-      </form>
-    </AuthLayout>
-  );
-}
-</file>
-
-<file path="src/pages/auth/SignupPage.tsx">
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { signup } from '@/services/authService';
-
-export function SignupPage() {
-  const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    form?: string;
-  }>({});
-  const [loading, setLoading] = useState(false);
-
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!name) e.name = 'Name is required.';
-    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
-    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      await signup(name, email, password);
-      navigate('/dashboard');
-    } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <AuthLayout
-      title="Create account"
-      subtitle="Start writing and publishing on Lallu Syndrome."
-      footer={
-        <>
-          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
-          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
-          </div>
-        )}
-        <Input
-          label="Name"
-          type="text"
-          name="name"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={errors.name}
-          autoComplete="name"
-          required
-        />
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-          required
-        />
-        <Input
-          label="Confirm password"
-          isPassword
-          name="confirmPassword"
-          placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          error={errors.confirmPassword}
-          autoComplete="new-password"
-          required
-        />
-        <Button type="submit" className="w-full" loading={loading}>
-          Create account
         </Button>
       </form>
     </AuthLayout>
@@ -3503,29 +3517,7 @@ function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
 
 <file path="src/services/profileService.ts">
 import { supabase } from '@/lib/supabase';
-
-export type Profile = {
-  id: string;
-  display_name: string;
-  username: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  website_url: string | null;
-  github_url: string | null;
-  linkedin_url: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ProfileSaveValues = {
-  display_name: string;
-  username?: string | null;
-  avatar_url?: string | null;
-  bio?: string | null;
-  website_url?: string | null;
-  github_url?: string | null;
-  linkedin_url?: string | null;
-};
+import type { Profile, ProfileSaveValues } from '@/types';
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -3595,171 +3587,556 @@ export async function getProfileByUsername(username: string): Promise<Profile | 
 }
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="en" class="dark">
+<file path="src/types/database.ts">
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#090909" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Lallu Syndrome" />
-  <title>Lallu Syndrome</title>
-  <meta name="description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
-  <meta property="og:title" content="Lallu Syndrome" />
-  <meta property="og:description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
-  <meta property="og:type" content="website" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-    rel="stylesheet" />
-  <meta property="og:image" content="https://bolt.new/static/og_default.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
-</html>
-</file>
-
-<file path="src/components/articles/ArticleCard.tsx">
-import { Link } from 'react-router-dom';
-import type { Article } from '@/types';
-import { formatDate } from '@/utils/date';
-import { Badge } from '@/components/ui/Badge';
-
-type ArticleCardProps = {
-  article: Article;
-};
-
-export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
-  return (
-    <Link
-      to={`/articles/${article.slug}`}
-      className="group block space-y-3 transition-transform duration-200 hover:-translate-y-0.5"
-    >
-      <div className="overflow-hidden rounded-card border border-border-subtle">
-        <div className="aspect-[16/9] overflow-hidden bg-elevated">
-          <img
-            src={article.coverImage}
-            alt={article.title}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Badge variant="accent">{article.category}</Badge>
-        <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
-      </div>
-
-      <h3 className="font-serif text-lg font-medium text-text-primary leading-snug tracking-tight group-hover:text-accent transition-colors duration-200">
-        {article.title}
-      </h3>
-
-      <time className="block font-mono text-xs text-text-muted">
-        {article.publishedAt && formatDate(article.publishedAt)}
-      </time>
-    </Link>
-  );
-}
-</file>
-
-<file path="src/components/articles/TableOfContents.tsx">
-import { useEffect, useState } from 'react';
-import { slugify } from '@/utils/slugify';
-
-type Heading = {
-  id: string;
-  text: string;
-  level: number;
-};
-
-export function extractHeadings(html: string): Heading[] {
-  const document = new DOMParser().parseFromString(html, 'text/html');
-
-  const headings = Array.from(
-    document.querySelectorAll('h1, h2, h3')
-  );
-
-  return headings.map((heading) => {
-    const text = heading.textContent?.trim() ?? '';
-
-    return {
-      id: slugify(text),
-      text,
-      level: Number(heading.tagName.substring(1)),
-    };
-  });
-}
-
-type TableOfContentsProps = {
-  headings: Heading[];
-};
-
-export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
-  const [activeId, setActiveId] = useState<string>('');
-
-  useEffect(() => {
-    if (headings.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveId(entry.target.id);
-          }
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
+  public: {
+    Tables: {
+      article_likes: {
+        Row: {
+          article_id: string
+          created_at: string
+          user_id: string
         }
-      },
-      { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
-    );
-
-    for (const h of headings) {
-      const el = document.getElementById(h.id);
-      if (el) observer.observe(el);
+        Insert: {
+          article_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_likes_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      articles: {
+        Row: {
+          author_id: string
+          category_id: number
+          content: string
+          cover_image: string | null
+          created_at: string
+          id: string
+          published_at: string | null
+          reading_time: number | null
+          slug: string
+          status: Database["public"]["Enums"]["article_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          category_id: number
+          content: string
+          cover_image?: string | null
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          reading_time?: number | null
+          slug: string
+          status?: Database["public"]["Enums"]["article_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          category_id?: number
+          content?: string
+          cover_image?: string | null
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          reading_time?: number | null
+          slug?: string
+          status?: Database["public"]["Enums"]["article_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          article_id: string
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          parent_id: string | null
+        }
+        Insert: {
+          article_id: string
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+        }
+        Update: {
+          article_id?: string
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string
+          github_url: string | null
+          id: string
+          is_admin: boolean
+          linkedin_url: string | null
+          updated_at: string
+          username: string | null
+          website_url: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name: string
+          github_url?: string | null
+          id: string
+          is_admin?: boolean
+          linkedin_url?: string | null
+          updated_at?: string
+          username?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          github_url?: string | null
+          id?: string
+          is_admin?: boolean
+          linkedin_url?: string | null
+          updated_at?: string
+          username?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
     }
-
-    return () => observer.disconnect();
-  }, [headings]);
-
-  if (headings.length < 3) return null;
-
-  return (
-    <nav className="hidden lg:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-      <h4 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
-        On this page
-      </h4>
-      <ul className="space-y-1.5 border-l border-border-subtle">
-        {headings.map((h) => (
-          <li key={h.id}>
-            <a
-              href={`#${h.id}`}
-              className={`block py-1 text-sm transition-colors duration-200 ${
-                h.level === 3 ? 'pl-6' : 'pl-3'
-              } ${
-                activeId === h.id
-                  ? 'text-accent border-l-2 border-accent -ml-px'
-                  : 'text-text-muted hover:text-text-secondary'
-              }`}
-            >
-              {h.text}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      is_admin: { Args: { user_id: string }; Returns: boolean }
+    }
+    Enums: {
+      article_status: "draft" | "published"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      article_status: ["draft", "published"],
+    },
+  },
+} as const
+</file>
+
+<file path="src/utils/slugify.ts">
+function randomSlugSuffix(length = 6): string {
+    return Math.random().toString(36).substring(2, 2 + length).padEnd(length, '0'); // NOSONAR
+}
+
+export function slugify(text: string, appendRandomSuffix = true): string {
+	const baseSlug = text
+		.toString()
+		.normalize('NFD') // Split accented characters into base character + diacritic
+		.replace(/[\u0300-\u036f]/g, '') // Remove the diacritics
+		.toLowerCase()
+		.trim()
+		.replace(/\s+/g, '-') // Replace spaces with hyphens
+		.replace(/[^a-z0-9\s-]/g, '') // Remove remaining non-ASCII characters
+		.replace(/-+/g, '-') // Replace multiple hyphens with a single hyphen
+		.replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+
+	if (!appendRandomSuffix) return baseSlug;
+
+	const suffix = randomSlugSuffix();
+	return baseSlug ? `${baseSlug}-${suffix}` : suffix;
+}
+</file>
+
+<file path="supabase/migrations/20260819121440_storage.sql">
+-- ============================================================
+-- 004_storage.sql
+-- Storage buckets + policies
+-- ============================================================
+
+-- ── Buckets ─────────────────────────────────────────────────
+-- Note: The 'media' bucket is public, so images are downloadable by anyone with the URL.
+-- This SELECT policy only restricts users from using the API to LIST the contents of folders they don't own.
+insert into storage.buckets (id, name, public)
+values ('media', 'media', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+-- ── Media bucket: authors manage their article images ──────
+create policy "Authors can view article media metadata"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'media'
+    and split_part(name, '/', 1) = 'articles'
+    and split_part(name, '/', 2) <> ''
+    and exists (
+      select 1 from public.articles
+      where articles.id::text = split_part(storage.objects.name, '/', 2)
+        and articles.author_id = auth.uid()
+    )
+  );
+
+create policy "Authors can upload article media"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'media'
+    and split_part(name, '/', 1) = 'articles'
+    and split_part(name, '/', 2) <> ''
+    and exists (
+      select 1 from public.articles
+      where articles.id::text = split_part(storage.objects.name, '/', 2)
+        and articles.author_id = auth.uid()
+    )
+  );
+
+create policy "Authors can delete article media"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'media'
+    and split_part(name, '/', 1) = 'articles'
+    and split_part(name, '/', 2) <> ''
+    and exists (
+      select 1 from public.articles
+      where articles.id::text = split_part(storage.objects.name, '/', 2)
+        and articles.author_id = auth.uid()
+    )
+  );
+
+-- ── Avatars bucket ──────────────────────────────────────────
+create policy "Avatar images are publicly accessible"
+  on storage.objects for select to public
+  using (bucket_id = 'avatars');
+
+create policy "Users can upload their own avatar"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+
+create policy "Users can update their own avatar"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+
+create policy "Users can delete their own avatar"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+</file>
+
+<file path="supabase/migrations/20260820033358_fixes.sql">
+create trigger articles_handle_publication_insert
+before insert on public.articles
+for each row execute function public.handle_article_publication();
+
+drop policy if exists "Users can like articles"
+on public.article_likes;
+
+drop policy if exists "Users can like published articles"
+on public.article_likes;
+
+create policy "Users can like published articles"
+on public.article_likes
+for insert
+to authenticated
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1
+    from public.articles
+    where articles.id = article_likes.article_id
+      and articles.status = 'published'
+  )
+);
+
+---------------adding admin role-----------------
+-- 1. Create Role Enum
+create type public.user_role as enum ('reader', 'writer', 'admin');
+
+-- 2. Add Role Column to Profiles (defaults to 'reader')
+alter table public.profiles
+add column role public.user_role not null default 'reader';
+
+-- 3. Helper Functions for RLS (Row Level Security)
+create or replace function public.is_admin(user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select role = 'admin' from public.profiles where id = user_id;
+$$;
+
+create or replace function public.is_writer(user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select role in ('writer', 'admin') from public.profiles where id = user_id;
+$$;
+
+-- 4. Update Articles RLS (Drop old, create new)
+drop policy if exists "Authors can create their own articles" on public.articles;
+drop policy if exists "Authors can update their own articles" on public.articles;
+drop policy if exists "Authors can delete their own articles" on public.articles;
+
+create policy "Writers can create their own articles"
+on public.articles for insert to authenticated
+with check (auth.uid() = author_id and public.is_writer(auth.uid()));
+
+create policy "Writers can update their own articles"
+on public.articles for update to authenticated
+using (auth.uid() = author_id and public.is_writer(auth.uid()))
+with check (auth.uid() = author_id and public.is_writer(auth.uid()));
+
+create policy "Writers can delete their own articles"
+on public.articles for delete to authenticated
+using (auth.uid() = author_id and public.is_writer(auth.uid()));
+
+-- 5. Admin Comment Moderation RLS (Allows admins to delete ANY comment)
+create policy "Admins can delete any comment"
+on public.comments for delete to authenticated
+using (public.is_admin(auth.uid()));
 </file>
 
 <file path="src/components/editor/AlignedImage.ts">
@@ -3845,6 +4222,50 @@ export const AlignedImage = Image.extend({
     ];
   },
 });
+</file>
+
+<file path="src/components/editor/processPastedHtml.ts">
+function decodeHtmlEntities(value: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+}
+
+function normalizeHtml(html: string): string {
+  let result = html;
+  for (let i = 0; i < 3; i++) {
+    if (!result.includes('&lt;')) break;
+    const decoded = decodeHtmlEntities(result);
+    if (decoded === result) break;
+    result = decoded;
+  }
+  return result;
+}
+
+export type PastedImage = {
+  originalSrc: string;
+};
+
+export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
+  const normalizedHtml = normalizeHtml(html);
+  const parsedDoc = new DOMParser().parseFromString(normalizedHtml, 'text/html');
+  const images = Array.from(parsedDoc.querySelectorAll('img'));
+  const imagesToUpload: PastedImage[] = [];
+
+  images.forEach((image) => {
+    const src = image.getAttribute('src');
+    if (!src) { return; }
+
+    // if already stored in our Supabase bucket. Don't re-upload.
+    if (src.includes('/storage/v1/object/public/media/')) { return; }
+
+    imagesToUpload.push({ originalSrc: src });
+    image.removeAttribute('srcset');
+    image.removeAttribute('sizes');
+
+  })
+  return { html: parsedDoc.body.innerHTML, images: imagesToUpload };
+}
 </file>
 
 <file path="src/components/editor/SlashCommand.tsx">
@@ -4300,6 +4721,147 @@ export function Footer() {
 }
 </file>
 
+<file path="src/pages/auth/SignupPage.tsx">
+import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { signup } from '@/services/authService';
+// import { Turnstile } from '@/components/auth/Turnstile';
+
+// Replace with your actual Cloudflare Turnstile Site Key
+// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    captcha?: string;
+    form?: string;
+  }>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = (): boolean => {
+    const e: typeof errors = {};
+    if (!name) e.name = 'Name is required.';
+    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
+    if (!email) e.email = 'Email is required.';
+    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
+    if (!password) e.password = 'Password is required.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
+    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
+    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      await signup(name, email, password, captchaToken ?? undefined);
+      navigate('/dashboard');
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Create account"
+      subtitle="Start writing and publishing on Lallu Syndrome."
+      footer={
+        <>
+          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errors.form && (
+          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
+            {errors.form}
+          </div>
+        )}
+        <Input
+          label="Name"
+          type="text"
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+          autoComplete="name"
+          required
+        />
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          autoComplete="email"
+          required
+        />
+        <Input
+          label="Password"
+          isPassword
+          name="password"
+          placeholder="At least 6 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          autoComplete="new-password"
+          required
+        />
+        <Input
+          label="Confirm password"
+          isPassword
+          name="confirmPassword"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          error={errors.confirmPassword}
+          autoComplete="new-password"
+          required
+        />
+
+        {/* Turnstile Captcha */}
+        {/* <div>
+          <Turnstile
+            siteKey={TURNSTILE_SITE_KEY}
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              setErrors((prev) => ({ ...prev, captcha: undefined }));
+            }}
+          />
+          {errors.captcha && (
+            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
+          )}
+        </div> */}
+
+        <Button type="submit" className="w-full" loading={loading}>
+          Create account
+        </Button>
+      </form>
+    </AuthLayout>
+  );
+}
+</file>
+
 <file path="src/services/categoryService.ts">
 import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types";
@@ -4353,62 +4915,160 @@ export function relativeTime(date: string): string {
 }
 </file>
 
-<file path="src/components/articles/FeaturedArticle.tsx">
+<file path="src/components/articles/ArticleCard.tsx">
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
 import type { Article } from '@/types';
 import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
+import { getFallbackImage } from '@/utils/image';
 
-type FeaturedArticleProps = {
+type ArticleCardProps = {
   article: Article;
 };
 
-export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
+export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
+  const [imgError, setImgError] = useState(false);
+  const fallback = getFallbackImage(article.id);
+  
+  // Use fallback if coverImage is empty OR if the image failed to load
+  const imageSrc = imgError || !article.coverImage ? fallback : article.coverImage;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-      <Link
-        to={`/articles/${article.slug}`}
-        className="group block overflow-hidden rounded-card border border-border-subtle"
-      >
-        <div className="relative aspect-video overflow-hidden bg-elevated">
+    <Link
+      to={`/articles/${article.slug}`}
+      className="group block space-y-3 transition-transform duration-200 hover:-translate-y-0.5"
+    >
+      <div className="overflow-hidden rounded-card border border-border-subtle">
+        <div className="aspect-[16/9] overflow-hidden bg-elevated">
           <img
-            src={article.coverImage}
+            src={imageSrc}
             alt={article.title}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
           />
         </div>
-      </Link>
-
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Badge variant="accent">{article.category}</Badge>
-          <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
-        </div>
-
-        <h2 className="font-serif text-3xl md:text-4xl font-medium text-text-primary leading-[1.15] tracking-tight text-balance">
-          <Link
-            to={`/articles/${article.slug}`}
-            className="hover:text-accent transition-colors duration-200"
-          >
-            {article.title}
-          </Link>
-        </h2>
-
-        <div className="flex items-center gap-3 pt-2">
-          <Link
-            to={`/articles/${article.slug}`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-accent transition-colors duration-200"
-          >
-            Read the article
-            <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-          </Link>
-          <span className="font-mono text-xs text-text-muted">
-            {article.publishedAt && formatDate(article.publishedAt)}
-          </span>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Badge variant="accent">{article.category}</Badge>
+        <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
+      </div>
+      
+      <h3 className="font-serif text-lg font-medium text-text-primary leading-snug tracking-tight group-hover:text-accent transition-colors duration-200">
+        {article.title}
+      </h3>
+      
+      {/* Author & Date Row */}
+      <div className="flex items-center gap-2.5 pt-1">
+        {article.author.avatar ? (
+          <img 
+            src={article.author.avatar} 
+            alt="" 
+            className="w-6 h-6 rounded-full object-cover border border-border-subtle bg-elevated shrink-0" 
+          />
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-elevated border border-border-subtle flex items-center justify-center text-[10px] font-semibold text-text-secondary shrink-0">
+            {article.author.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono min-w-0">
+          <span className="text-text-secondary font-medium truncate">{article.author.name}</span>
+          <span>•</span>
+          <time className="whitespace-nowrap">
+            {article.publishedAt ? formatDate(article.publishedAt) : 'Draft'}
+          </time>
         </div>
       </div>
-    </div>
+    </Link>
+  );
+}
+</file>
+
+<file path="src/components/articles/TableOfContents.tsx">
+import { useEffect, useState } from 'react';
+import { slugify } from '@/utils/slugify';
+
+type Heading = {
+  id: string;
+  text: string;
+  level: number;
+};
+
+export function extractHeadings(html: string): Heading[] {
+  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
+
+  const headings = Array.from(
+    parsedDoc.querySelectorAll('h1, h2, h3')
+  );
+
+  return headings.map((heading) => {
+    const text = heading.textContent?.trim() ?? '';
+
+    return {
+      id: slugify(text),
+      text,
+      level: Number(heading.tagName.substring(1)),
+    };
+  });
+}
+
+type TableOfContentsProps = {
+  headings: Heading[];
+};
+
+export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
+  const [activeId, setActiveId] = useState<string>('');
+
+  useEffect(() => {
+    if (headings.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveId(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+    );
+
+    for (const h of headings) {
+      const el = document.getElementById(h.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [headings]);
+
+  if (headings.length < 3) return null;
+
+  return (
+    <nav className="hidden lg:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <h4 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
+        On this page
+      </h4>
+      <ul className="space-y-1.5 border-l border-border-subtle">
+        {headings.map((h) => (
+          <li key={h.id}>
+            <a
+              href={`#${h.id}`}
+              className={`block py-1 text-sm transition-colors duration-200 ${
+                h.level === 3 ? 'pl-6' : 'pl-3'
+              } ${
+                activeId === h.id
+                  ? 'text-accent border-l-2 border-accent -ml-px'
+                  : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              {h.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 </file>
@@ -4489,6 +5149,75 @@ export function CategoryPage() {
 }
 </file>
 
+<file path="src/components/articles/FeaturedArticle.tsx">
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import type { Article } from '@/types';
+import { formatDate } from '@/utils/date';
+import { Badge } from '@/components/ui/Badge';
+import { getFallbackImage } from '@/utils/image';
+
+type FeaturedArticleProps = {
+  article: Article;
+};
+
+export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
+  const [imgError, setImgError] = useState(false);
+  const fallback = getFallbackImage(article.id);
+  const imageSrc = imgError || !article.coverImage ? fallback : article.coverImage;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+      <Link
+        to={`/articles/${article.slug}`}
+        className="group block overflow-hidden rounded-card border border-border-subtle"
+      >
+        <div className="relative aspect-video overflow-hidden bg-elevated">
+          <img
+            src={imageSrc}
+            alt={article.title}
+            onError={() => setImgError(true)}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        </div>
+      </Link>
+
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Badge variant="accent">{article.category}</Badge>
+          <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
+        </div>
+        <h2 className="font-serif text-3xl md:text-4xl font-medium text-text-primary leading-[1.15] tracking-tight text-balance">
+          <Link to={`/articles/${article.slug}`} className="hover:text-accent transition-colors duration-200">
+            {article.title}
+          </Link>
+        </h2>
+        <div className="flex items-center gap-3 pt-2">
+          <Link to={`/articles/${article.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-accent transition-colors duration-200">
+            Read the article
+            <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+          </Link>
+          <span className="font-mono text-xs text-text-muted">
+            {article.publishedAt && formatDate(article.publishedAt)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/lib/supabase.ts">
+import { Database } from '@/types/database';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+export const supabase = createClient<Database>(supabaseUrl,supabasePublishableKey);
+</file>
+
 <file path="src/services/authService.ts">
 import { supabase } from '@/lib/supabase';
 import type { AuthState } from '@/types';
@@ -4517,19 +5246,21 @@ export async function getAuthState(): Promise<AuthState> {
 export async function login(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) { throw new Error(error.message);}
+  if (error) { throw new Error(error.message); }
 
   return data.user;
 }
 
-export async function signup(name: string, email: string, password: string) {
+export async function signup(name: string, email: string, password: string, captchaToken?: string) {
   const { data, error } = await supabase.auth.signUp({
-    email, password,
-    options: { data: {name} }
+    email,
+    password,
+    options: {
+      data: { name },
+      captchaToken,
+    },
   });
-
-  if (error) { throw new Error(error.message);}
-
+  if (error) { throw new Error(error.message); }
   return data.user;
 }
 
@@ -4538,445 +5269,19 @@ export async function forgotPassword(email: string): Promise<void> {
     email, { redirectTo: `${window.location.origin}/reset-password` }
   );
 
-  if (error) { throw new Error(error.message);}
+  if (error) { throw new Error(error.message); }
 }
 
 export async function resetPassword(password: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ password });
 
-  if (error) { throw new Error(error.message);}
+  if (error) { throw new Error(error.message); }
 }
 
 export async function logout(): Promise<void> {
   const { error } = await supabase.auth.signOut();
 
-  if (error) { throw new Error(error.message);}
-}
-</file>
-
-<file path="tsconfig.app.json">
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-
-    /* Path alias depth-invariant imports for src (@/foo === src/foo from any file) */
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src"]
-}
-</file>
-
-<file path="src/lib/supabase.ts">
-import { Database } from '@/types/database';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-export const supabase = createClient<Database>(supabaseUrl,supabasePublishableKey);
-</file>
-
-<file path="vite.config.ts">
-/// <reference types="node" />
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { fileURLToPath, URL } from 'node:url';
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
-  server: {
-    host: true,
-    allowedHosts: [
-      'quakier-ascensive-melodie.ngrok-free.dev',
-    ],
-  },
-  optimizeDeps: {
-    include: ['lucide-react'],
-  },
-});
-</file>
-
-<file path="src/components/articles/ArticleContent.tsx">
-import DOMPurify from 'dompurify';
-import { slugify } from '@/utils/slugify';
-
-type ArticleContentProps = {
-  content: string;
-};
-
-export function ArticleContent({
-  content,
-}: Readonly<ArticleContentProps>) {
-  const sanitized = DOMPurify.sanitize(content, {
-    USE_PROFILES: {
-      html: true,
-    },
-    ADD_ATTR: [
-      'target',
-      'rel',
-      'class',
-      'style',
-      'data-width',
-      'data-alignment',
-    ],
-  });
-
-  const document = new DOMParser().parseFromString(
-    sanitized,
-    'text/html'
-  );
-
-  const usedIds = new Set<string>();
-
-  document.querySelectorAll('h1, h2, h3').forEach((heading) => {
-    const text = heading.textContent?.trim() ?? '';
-
-    if (!text) return;
-
-    const baseId = slugify(text);
-    let id = baseId;
-    let counter = 2;
-
-    while (usedIds.has(id)) {
-      id = `${baseId}-${counter++}`;
-    }
-
-    usedIds.add(id);
-    heading.id = id;
-    heading.classList.add('scroll-mt-20');
-  });
-
-  return (
-    <div
-      className="article-prose"
-      dangerouslySetInnerHTML={{
-        __html: document.body.innerHTML,
-      }}
-    />
-  );
-}
-</file>
-
-<file path="src/components/interactions/CommentSection.tsx">
-// src/components/interactions/CommentSection.tsx
-import { useEffect, useState, type FormEvent } from 'react';
-import { Send } from 'lucide-react';
-import type { Comment } from '@/types';
-import { getComments, addComment } from '@/services/articleService';
-import { useAuth } from '@/contexts/AuthContext';
-import { relativeTime } from '@/utils/date';
-import type { User } from '@supabase/supabase-js';
-
-type CommentSectionProps = {
-  articleId: string;
-};
-
-export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { user, profile } = useAuth();
-
-  useEffect(() => {
-    let mounted = true;
-    const loadComments = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await getComments(articleId);
-        if (mounted) setComments(result);
-      } catch {
-        if (mounted) setError('Unable to load comments.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    loadComments();
-    return () => { mounted = false; };
-  }, [articleId]);
-
-  // Helper to add a new comment/reply to the local state
-  const handleAddComment = (newComment: Comment) => {
-    setComments((prev) => [...prev, newComment]);
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmedContent = content.trim();
-    if (!trimmedContent || !user || submitting) return;
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      const newComment = await addComment(articleId, trimmedContent);
-      handleAddComment(newComment);
-      setContent('');
-    } catch {
-      setError('Unable to post your comment. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const topLevel = comments.filter((comment) => comment.parentId === null);
-  const getReplies = (parentId: string) =>
-    comments.filter((comment) => comment.parentId === parentId);
-
-  let commentsContent: JSX.Element;
-  if (loading) {
-    commentsContent = (
-      <div className="space-y-6">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="animate-pulse">
-            <div className="flex gap-3">
-              <div className="w-9 h-9 rounded-full bg-elevated" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-24 bg-elevated rounded" />
-                <div className="h-4 w-full bg-elevated rounded" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  } else if (error && comments.length === 0) {
-    commentsContent = <p className="text-sm text-text-muted">{error}</p>;
-  } else if (topLevel.length === 0) {
-    commentsContent = (
-      <p className="text-sm text-text-muted">
-        No comments yet. Be the first to say something.
-      </p>
-    );
-  } else {
-    commentsContent = (
-      <div className="space-y-6">
-        {topLevel.map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            replies={getReplies(comment.id)}
-            articleId={articleId}
-            user={user}
-            onReplyAdded={handleAddComment}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <section className="mt-16 pt-10 border-t border-border-subtle">
-      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
-        Comments
-      </h3>
-
-      {/* Top-level comment form */}
-      {user ? (
-        <form onSubmit={handleSubmit} className="mb-8">
-          <div className="flex gap-3">
-            {profile?.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name ?? 'User'}
-                className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-                {(profile?.display_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                placeholder="Write a comment..."
-                rows={3}
-                maxLength={1000}
-                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
-                disabled={submitting}
-              />
-              <div className="flex justify-end mt-2">
-                <button
-                  type="submit"
-                  disabled={!content.trim() || submitting}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  <Send size={14} />
-                  {submitting ? 'Posting...' : 'Comment'}
-                </button>
-              </div>
-            </div>
-          </div>
-          {error && <p className="mt-3 text-sm text-accent">{error}</p>}
-        </form>
-      ) : (
-        <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
-          <a href="/login" className="text-accent hover:underline">Sign in</a> to leave a comment.
-        </div>
-      )}
-
-      {commentsContent}
-    </section>
-  );
-}
-
-// Recursive Comment Item component
-function CommentItem({
-  comment,
-  replies,
-  articleId,
-  user,
-  onReplyAdded,
-}: Readonly<{
-  comment: Comment;
-  replies: Comment[];
-  articleId: string;
-  user: User | null;
-  onReplyAdded: (newComment: Comment) => void;
-}>) {
-  const [isReplying, setIsReplying] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmed = replyContent.trim();
-    if (!trimmed || !user || submitting) return;
-
-    try {
-      setSubmitting(true);
-      // Pass the parent comment's ID to create a threaded reply
-      const newComment = await addComment(articleId, trimmed, comment.id);
-      onReplyAdded(newComment);
-      setReplyContent('');
-      setIsReplying(false);
-    } catch (error) {
-      console.error('Failed to post reply:', error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-3">
-        {comment.avatar ? (
-          <img
-            src={comment.avatar}
-            alt={comment.author}
-            className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-            {comment.author.charAt(0).toUpperCase()}
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-          {/* Header with Reply button */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-sm font-medium text-text-primary">
-              {comment.author}
-            </span>
-            <span className="font-mono text-xs text-text-muted">
-              {relativeTime(comment.createdAt)}
-            </span>
-            {user && (
-              <button
-                type="button"
-                onClick={() => setIsReplying(!isReplying)}
-                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
-                {isReplying ? 'Cancel' : 'Reply'}
-              </button>
-            )}
-          </div>
-
-          {/* Comment Content */}
-          <p className="text-sm text-text-secondary leading-relaxed">
-            {comment.content}
-          </p>
-
-          {/* Inline Reply Form */}
-          {isReplying && (
-            <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
-              <textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                placeholder="Write a reply..."
-                rows={2}
-                maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" disabled={submitting}
-                autoFocus
-              />
-              <button
-                type="submit"
-                disabled={!replyContent.trim() || submitting}
-                className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send size={14} />
-              </button>
-            </form>
-          )}
-
-          {/* Nested Replies */}
-          {replies.length > 0 && (
-            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
-              {replies.map((reply) => (
-                <CommentItem
-                  key={reply.id}
-                  comment={reply}
-                  replies={[]} // Keeps UI clean at 1 level of visual nesting
-                  articleId={articleId}
-                  user={user}
-                  onReplyAdded={onReplyAdded}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div >
-  );
+  if (error) { throw new Error(error.message); }
 }
 </file>
 
@@ -5330,14 +5635,416 @@ export function ArticlesPage() {
 }
 </file>
 
+<file path="src/components/articles/ArticleContent.tsx">
+import { useMemo } from 'react';
+import DOMPurify from 'dompurify';
+import { slugify } from '@/utils/slugify';
+
+type ArticleContentProps = {
+  content: string;
+};
+
+export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
+  const finalHtml = useMemo(() => {
+    if (!content) return '';
+
+    const sanitized = DOMPurify.sanitize(content, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['target', 'rel', 'class', 'style', 'data-width', 'data-alignment'],
+    });
+
+    const parsedDoc = new DOMParser().parseFromString(sanitized, 'text/html');
+
+    // Handle External Links
+    parsedDoc.querySelectorAll<HTMLAnchorElement>('a[href^="http"]').forEach((link) => {
+      try {
+        const url = new URL(link.href);
+        if (url.hostname !== window.location.hostname) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+      } catch {
+        // Keep malformed URLs from retaining unsafe link attributes.
+        link.removeAttribute('target');
+        link.removeAttribute('rel');
+      }
+    });
+
+    // Handle Headings (TOC)
+    const usedIds = new Set<string>();
+    parsedDoc.querySelectorAll('h1, h2, h3').forEach((heading) => {
+      const text = heading.textContent?.trim() ?? '';
+      if (!text) return;
+
+      const baseId = slugify(text);
+      let id = baseId;
+      let counter = 2;
+
+      while (usedIds.has(id)) {
+        id = `${baseId}-${counter++}`;
+      }
+
+      usedIds.add(id);
+      heading.id = id;
+      heading.classList.add('scroll-mt-20');
+    });
+
+    return parsedDoc.body.innerHTML;
+  }, [content]); // <--- Only re-runs if the 'content' string changes
+
+  return (
+    <div
+      className="article-prose"
+      dangerouslySetInnerHTML={{ __html: finalHtml }}
+    />
+  );
+}
+</file>
+
+<file path="src/components/interactions/CommentSection.tsx">
+// src/components/interactions/CommentSection.tsx
+import { useEffect, useState, type FormEvent } from 'react';
+import { Send, Trash2 } from 'lucide-react';
+import type { Comment } from '@/types';
+import { getComments, addComment, deleteComment } from '@/services/articleService';
+import { useAuth } from '@/contexts/AuthContext';
+import { relativeTime } from '@/utils/date';
+import type { User } from '@supabase/supabase-js';
+
+type CommentSectionProps = {
+  articleId: string;
+};
+
+export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+
+  useEffect(() => {
+    let mounted = true;
+    const loadComments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await getComments(articleId);
+        if (mounted) setComments(result);
+      } catch {
+        if (mounted) setError('Unable to load comments.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadComments();
+    return () => { mounted = false; };
+  }, [articleId]);
+
+  // Helper to add a new comment/reply to the local state
+  const handleAddComment = (newComment: Comment) => {
+    setComments((prev) => [...prev, newComment]);
+  };
+
+  // Helper to remove a deleted comment (and its nested replies) from local state
+  const handleDeleteComment = (commentId: string) => {
+    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
+  };
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmedContent = content.trim();
+    if (!trimmedContent || !user || submitting) return;
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      const newComment = await addComment(articleId, trimmedContent);
+      handleAddComment(newComment);
+      setContent('');
+    } catch {
+      setError('Unable to post your comment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const topLevel = comments.filter((comment) => comment.parentId === null);
+  const getReplies = (parentId: string) =>
+    comments.filter((comment) => comment.parentId === parentId);
+
+  let commentsContent: JSX.Element;
+  if (loading) {
+    commentsContent = (
+      <div className="space-y-6">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="animate-pulse">
+            <div className="flex gap-3">
+              <div className="w-9 h-9 rounded-full bg-elevated" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 bg-elevated rounded" />
+                <div className="h-4 w-full bg-elevated rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else if (error && comments.length === 0) {
+    commentsContent = <p className="text-sm text-text-muted">{error}</p>;
+  } else if (topLevel.length === 0) {
+    commentsContent = (
+      <p className="text-sm text-text-muted">
+        No comments yet. Be the first to say something.
+      </p>
+    );
+  } else {
+    commentsContent = (
+      <div className="space-y-6">
+        {topLevel.map((comment) => (
+          <CommentItem
+            key={comment.id}
+            comment={comment}
+            replies={getReplies(comment.id)}
+            articleId={articleId}
+            user={user}
+            onReplyAdded={handleAddComment}
+            onDelete={handleDeleteComment} // <-- ADD THIS
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section className="mt-16 pt-10 border-t border-border-subtle">
+      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
+        Comments
+      </h3>
+
+      {/* Top-level comment form */}
+      {user ? (
+        <form onSubmit={handleSubmit} className="mb-8">
+          <div className="flex gap-3">
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name ?? 'User'}
+                className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
+                {(profile?.display_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1">
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Write a comment..."
+                rows={3}
+                maxLength={1000}
+                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
+                disabled={submitting}
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  type="submit"
+                  disabled={!content.trim() || submitting}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  <Send size={14} />
+                  {submitting ? 'Posting...' : 'Comment'}
+                </button>
+              </div>
+            </div>
+          </div>
+          {error && <p className="mt-3 text-sm text-accent">{error}</p>}
+        </form>
+      ) : (
+        <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
+          <a href="/login" className="text-accent hover:underline">Sign in</a> to leave a comment.
+        </div>
+      )}
+
+      {commentsContent}
+    </section>
+  );
+}
+
+// Recursive Comment Item component
+function CommentItem({
+  comment,
+  replies,
+  articleId,
+  user,
+  onReplyAdded,
+  onDelete,
+}: Readonly<{
+  comment: Comment;
+  replies: Comment[];
+  articleId: string;
+  user: User | null;
+  onReplyAdded: (newComment: Comment) => void;
+  onDelete: (commentId: string) => void;
+}>) {
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- MODERATION LOGIC ---
+  // Replace with your actual UUID from Supabase Auth dashboard
+  // const ADMIN_UUID = 'YOUR-AUTH-UUID-HERE'; 
+  // const isAdmin = user?.id === ADMIN_UUID;
+  const isOwner = user?.id === comment.authorId;
+  const canDelete = isOwner // || isAdmin;
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this comment?')) return;
+    setIsDeleting(true);
+    try {
+      await deleteComment(comment.id);
+      onDelete(comment.id);
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = replyContent.trim();
+    if (!trimmed || !user || submitting) return;
+    try {
+      setSubmitting(true);
+      const newComment = await addComment(articleId, trimmed, comment.id);
+      onReplyAdded(newComment);
+      setReplyContent('');
+      setIsReplying(false);
+    } catch (error) {
+      console.error('Failed to post reply:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        {comment.avatar ? (
+          <img
+            src={comment.avatar}
+            alt={comment.author}
+            className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
+            {comment.author.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {/* Header with Reply & Delete buttons */}
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-sm font-medium text-text-primary">
+              {comment.author}
+            </span>
+            <span className="font-mono text-xs text-text-muted">
+              {relativeTime(comment.createdAt)}
+            </span>
+            {user && (
+              <button
+                type="button"
+                onClick={() => setIsReplying(!isReplying)}
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
+                {isReplying ? 'Cancel' : 'Reply'}
+              </button>
+            )}
+            {/* DELETE BUTTON */}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                aria-label="Delete comment"
+              >
+                {isDeleting ? '...' : <Trash2 size={14} />}
+              </button>
+            )}
+          </div>
+          
+          {/* Comment Content */}
+          <p className="text-sm text-text-secondary leading-relaxed">
+            {comment.content}
+          </p>
+
+          {/* Inline Reply Form */}
+          {isReplying && (
+            <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Write a reply..."
+                rows={2}
+                maxLength={1000}
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" 
+                disabled={submitting}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!replyContent.trim() || submitting}
+                className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={14} />
+              </button>
+            </form>
+          )}
+
+          {/* Nested Replies */}
+          {replies.length > 0 && (
+            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
+              {replies.map((reply) => (
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  replies={[]} 
+                  articleId={articleId}
+                  user={user}
+                  onReplyAdded={onReplyAdded}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/services/storageService.ts">
 import { supabase } from '@/lib/supabase';
 
 const BUCKET = 'media';
 
 export interface StorageUploadResult {
-    path: string;
-    publicUrl: string;
+  path: string;
+  publicUrl: string;
 }
 export async function cleanupArticleContentMedia(
   articleId: string,
@@ -5386,98 +6093,101 @@ export async function cleanupArticleContentMedia(
 }
 export async function upload(articleId: string, file: File, type: 'cover' | 'content'): Promise<StorageUploadResult> {
 
-    let filePath = `articles/${articleId}/`;
-    const extension = file.name.split('.').pop()?.toLowerCase() || file.type.split("/").pop()?.toLowerCase();
-    if (!extension) {
-        throw new Error('Unable to determine file extension.');
-    }
-    if (type === "content") {
-        filePath += `${type}/${crypto.randomUUID()}.${extension}`
-    } else {
-        filePath += `cover.${extension}`
-    }
-    const { data, error } = await supabase.storage.from(BUCKET).upload(filePath, file)
-    if (error) {
-        throw error
-    }
-    return {
-        path: data.path,
-        publicUrl: getPublicUrl(data.path),
-    };
+  const MAX_CONTENT_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error('Unsupported image type.');
+  if (file.size > MAX_CONTENT_IMAGE_SIZE) throw new Error('Image must be under 5 MB.');
+
+  let filePath = `articles/${articleId}/`;
+  const extension = file.name.split('.').pop()?.toLowerCase() || file.type.split("/").pop()?.toLowerCase();
+  if (!extension) {
+    throw new Error('Unable to determine file extension.');
+  }
+  if (type === "content") {
+    filePath += `${type}/${crypto.randomUUID()}.${extension}`
+  } else {
+    filePath += `cover.${extension}`
+  }
+  const { data, error } = await supabase.storage.from(BUCKET).upload(filePath, file)
+  if (error) {
+    throw error
+  }
+  return {
+    path: data.path,
+    publicUrl: getPublicUrl(data.path),
+  };
 }
 
 export async function deleteArticleMedia(
-    content: string,
-    coverImage: string | null,
+  content: string,
+  coverImage: string | null,
 ): Promise<void> {
-    const paths = extractStorageImagePaths(content);
+  const paths = extractStorageImagePaths(content);
 
-    if (coverImage) {
-        const prefix =
-            `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
-
-        if (coverImage.startsWith(prefix)) {
-            paths.push(coverImage.slice(prefix.length));
-        }
-    }
-
-    const uniquePaths = [...new Set(paths)];
-
-    if (uniquePaths.length === 0) {
-        return;
-    }
-
-    for (let i = 0; i < uniquePaths.length; i += 1000) {
-        const batch = uniquePaths.slice(i, i + 1000);
-
-        const { error } = await supabase
-            .storage
-            .from(BUCKET)
-            .remove(batch);
-
-        if (error) {
-            throw error;
-        }
-    }
-}
-export async function deleteCoverImage(path: string): Promise<void> {
+  if (coverImage) {
     const prefix =
-        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+      `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
 
-    if (!path.startsWith(prefix)) {
-        return;
+    if (coverImage.startsWith(prefix)) {
+      paths.push(coverImage.slice(prefix.length));
     }
+  }
 
-    const storagePath = path.slice(prefix.length);
+  const uniquePaths = [...new Set(paths)];
 
-    const { error } = await supabase.storage
-        .from(BUCKET)
-        .remove([storagePath]);
+  if (uniquePaths.length === 0) {
+    return;
+  }
+
+  for (let i = 0; i < uniquePaths.length; i += 1000) {
+    const batch = uniquePaths.slice(i, i + 1000);
+
+    const { error } = await supabase
+      .storage
+      .from(BUCKET)
+      .remove(batch);
 
     if (error) {
-        throw error;
+      throw error;
     }
+  }
+}
+export async function deleteCoverImage(path: string): Promise<void> {
+  const prefix =
+    `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+
+  if (!path.startsWith(prefix)) {
+    return;
+  }
+
+  const storagePath = path.slice(prefix.length);
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .remove([storagePath]);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export function getPublicUrl(path: string): string {
-    const { data } = supabase
-        .storage
-        .from(BUCKET)
-        .getPublicUrl(path)
-    return data["publicUrl"]
+  const { data } = supabase
+    .storage
+    .from(BUCKET)
+    .getPublicUrl(path)
+  return data["publicUrl"]
 }
 export function extractStorageImagePaths(content: string): string[] {
   const publicUrlPrefix =
     `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
 
-  const document = new DOMParser().parseFromString(
-    content,
-    'text/html'
-  );
+  const parsedDoc = new DOMParser().parseFromString(content,'text/html');
 
   const paths: string[] = [];
 
-  document.querySelectorAll('img[src]').forEach((image) => {
+  parsedDoc.querySelectorAll('img[src]').forEach((image) => {
     const src = image.getAttribute('src');
 
     if (!src) {
@@ -5517,6 +6227,10 @@ import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { CreatorPage } from '@/pages/CreatorPage';
 import { WriterProfilePage } from '@/pages/WriterProfilePage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { AdminPage } from '@/pages/AdminPage';
+
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -5563,7 +6277,25 @@ function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
     </div>
   );
 }
+function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, profile, isLoading, isProfileLoading } = useAuth();
 
+  if (isLoading || isProfileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (!profile?.is_admin) { 
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
 function AppRoutes() {
   return (
     <>
@@ -5597,8 +6329,12 @@ function AppRoutes() {
           <Route path="password" element={<PasswordSettingsPage />} />
 
         </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin" element={<AdminRoute><AppLayout><AdminPage /></AppLayout></AdminRoute>} />
+
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
       </Routes>
     </>
   );
@@ -5610,7 +6346,9 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>
       </ToastProvider>
@@ -6531,6 +7269,7 @@ export function HomePage() {
               }
               fontWeight={400}
               fontFamily="inherit"
+              widthScale={1.05}
               glow={isMobile}
             />
           </Suspense>
@@ -6613,6 +7352,7 @@ export type ArticleInput = Pick<
 export type Comment = {
   id: string;
   articleId: string;
+  authorId: string;
   author: string;
   avatar?: string;
   content: string;
@@ -6646,61 +7386,30 @@ export type AuthState = {
   user: User | null;
   isLoading: boolean;
 };
-</file>
 
-<file path="package.json">
-{
-  "name": "vite-react-typescript-starter",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.112.3",
-    "@tiptap/extension-image": "^3.30.1",
-    "@tiptap/extension-link": "^3.30.1",
-    "@tiptap/extension-placeholder": "^3.30.1",
-    "@tiptap/extension-text-align": "^3.30.1",
-    "@tiptap/extension-underline": "^3.30.1",
-    "@tiptap/pm": "^3.30.1",
-    "@tiptap/react": "^3.30.1",
-    "@tiptap/starter-kit": "^3.30.1",
-    "@tiptap/suggestion": "^3.30.1",
-    "dompurify": "^3.4.13",
-    "lucide-react": "^0.446.0",
-    "ogl": "^1.0.11",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2",
-    "tippy.js": "^6.3.7"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.9.1",
-    "@types/node": "^26.2.0",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.18",
-    "eslint": "^9.9.1",
-    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
-    "eslint-plugin-react-refresh": "^0.4.11",
-    "globals": "^15.9.0",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^8.3.0",
-    "vite": "^5.4.2"
-  },
-  "allowScripts": {
-    "esbuild@0.21.5": true
-  }
-}
+export type Profile = {
+  id: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  website_url: string | null;
+  github_url: string | null;
+  linkedin_url: string | null;
+  is_admin: boolean; 
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProfileSaveValues = {
+  display_name: string;
+  username?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  website_url?: string | null;
+  github_url?: string | null;
+  linkedin_url?: string | null;
+};
 </file>
 
 <file path="src/components/editor/TiptapEditor.tsx">
@@ -7292,7 +8001,7 @@ export function TiptapEditor({
 </file>
 
 <file path="src/pages/ArticlePage.tsx">
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
@@ -7307,6 +8016,8 @@ import { CommentSection } from '@/components/interactions/CommentSection';
 import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getFallbackImage } from '@/utils/image';
 
 function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
   return (
@@ -7337,11 +8048,13 @@ export function ArticlePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [liked, setLiked] = useState(false);
-
-  // Scroll-triggered animation state for the author card
+  const { user } = useAuth();
+  
   const authorCardRef = useRef<HTMLDivElement>(null);
   const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
+  const [coverImgError, setCoverImgError] = useState(false);
 
+  // 1. Data Fetching Effect
   useEffect(() => {
     async function loadArticle() {
       if (!slug) return;
@@ -7351,6 +8064,7 @@ export function ArticlePage() {
         setArticle(null);
         setRelated([]);
         setLiked(false);
+        setCoverImgError(false); // Reset image error when navigating to a new article
 
         const articleData = await getArticleBySlug(slug);
 
@@ -7363,7 +8077,7 @@ export function ArticlePage() {
 
         const [relatedData, likedData] = await Promise.all([
           getRelatedArticles(articleData, 3),
-          isLiked(articleData.id),
+          isLiked(articleData.id, user?.id),
         ]);
 
         setRelated(relatedData);
@@ -7376,9 +8090,9 @@ export function ArticlePage() {
     }
 
     loadArticle();
-  }, [slug]);
+  }, [slug, user?.id]); // Added user?.id to deps so likes update if auth resolves late
 
-
+  // 2. Scroll Effect
   useEffect(() => {
     const handleScroll = () => {
       const card = authorCardRef.current;
@@ -7393,10 +8107,18 @@ export function ArticlePage() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check on mount
+    handleScroll(); 
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isAuthorCardVisible]);
+
+  // 3. Memoized Headings (MUST be before conditional returns)
+  const headings = useMemo(
+    () => extractHeadings(article?.content ?? ''), 
+    [article?.content]
+  );
+
+  // --- Conditional Returns (Early Exits) ---
   if (loading) {
     return (
       <>
@@ -7425,7 +8147,9 @@ export function ArticlePage() {
     );
   }
 
-  const headings = extractHeadings(article.content);
+  // --- Safe to use `article` here, it is guaranteed to be non-null ---
+  const coverFallback = getFallbackImage(article.id);
+  const coverSrc = coverImgError || !article.coverImage ? coverFallback : article.coverImage;
   const articleUrl = window.location.href;
 
   return (
@@ -7453,8 +8177,9 @@ export function ArticlePage() {
         {/* Cover Image */}
         <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
           <img
-            src={article.coverImage}
+            src={coverSrc}
             alt=""
+            onError={() => setCoverImgError(true)}
             className="absolute inset-0 h-full w-full object-cover"
           />
         </div>
@@ -7607,6 +8332,7 @@ function mapSupabaseComment(
   return {
     id: comment.id,
     articleId: comment.article_id,
+    authorId: comment.author_id,
     author: profile.display_name,
     avatar: profile.avatar_url ?? undefined,
     content: comment.content,
@@ -7618,8 +8344,8 @@ function mapSupabaseComment(
 export function calculateReadingTime(content: string): number {
   const wordsPerMinute = 220;
 
-  const doc = new DOMParser().parseFromString(content, "text/html");
-  const plaintext = (doc.body.textContent || '').trim();
+  const parsedDoc = new DOMParser().parseFromString(content, "text/html");
+  const plaintext = (parsedDoc.body.textContent || '').trim();
 
   if (!plaintext) return 1;
 
@@ -8081,20 +8807,14 @@ export async function toggleLike(
   };
 }
 
-export async function isLiked(articleId: string): Promise<boolean> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-
-  if (authError || !user) return false;
+export async function isLiked(articleId: string, userId?: string | null): Promise<boolean> {
+  if (!userId) return false;
 
   const { data, error } = await supabase
     .from('article_likes')
     .select('article_id')
     .eq('article_id', articleId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -8110,6 +8830,14 @@ export async function getMyArticles(userId: string): Promise<Article[]> {
 
   if (error) throw error;
   return data.map(mapSupabaseArticle);
+}
+export async function deleteComment(commentId: string): Promise<void> {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId);
+  
+  if (error) throw error;
 }
 </file>
 
@@ -8159,7 +8887,8 @@ export function ArticleEditorPage() {
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
 
-  const handleChange = (field: string, value: string) => {
+  type FormField = keyof typeof formData;
+  const handleChange = (field: FormField, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -8248,10 +8977,6 @@ export function ArticleEditorPage() {
   }, [formData, saveArticle, loading]);
 
   const handlePublish = async () => {
-    if (!formData.coverImage) {
-      toast.error('Cover image is required for published articles.');
-      return;
-    }
     if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
       toast.error('Publication date cannot be in the future.');
       return;
@@ -8342,11 +9067,23 @@ export function ArticleEditorPage() {
 
   const uploadContentImage = async (file: File): Promise<string> => {
     const articleId = articleRef.current?.id ?? id;
+
     if (!articleId || articleId === 'new') {
-      throw new Error('Save the article before inserting an image.');
+      const errorMsg = 'Please type something to auto-save the article before inserting an image.';
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
     }
-    const result = await upload(articleId, file, 'content');
-    return result.publicUrl;
+
+    try {
+      // The service handles the size/type checks and the actual upload
+      const result = await upload(articleId, file, 'content');
+      return result.publicUrl;
+    } catch (error: any) {
+      console.error('Content image upload failed:', error);
+      // If your service throws "Image must be under 5 MB.", it will be printed right here!
+      toast.error(error.message || 'Failed to upload image. Please try again.');
+      throw error;
+    }
   };
 
   // Inline local datetime for the max attribute
@@ -8571,7 +9308,7 @@ export function ArticleEditorPage() {
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-border-subtle px-3 py-2 text-sm text-text-muted transition-colors hover:border-text-muted hover:text-text-secondary">
-            <ImagePlus size={15} />
+              <ImagePlus size={15} />
               Cover
               <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
             </label>

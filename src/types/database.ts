@@ -185,6 +185,7 @@ export type Database = {
           display_name: string
           github_url: string | null
           id: string
+          is_admin: boolean
           linkedin_url: string | null
           updated_at: string
           username: string | null
@@ -197,6 +198,7 @@ export type Database = {
           display_name: string
           github_url?: string | null
           id: string
+          is_admin?: boolean
           linkedin_url?: string | null
           updated_at?: string
           username?: string | null
@@ -209,6 +211,7 @@ export type Database = {
           display_name?: string
           github_url?: string | null
           id?: string
+          is_admin?: boolean
           linkedin_url?: string | null
           updated_at?: string
           username?: string | null
@@ -221,7 +224,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { user_id: string }; Returns: boolean }
     }
     Enums: {
       article_status: "draft" | "published"

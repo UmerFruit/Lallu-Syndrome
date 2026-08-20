@@ -1,27 +1,5 @@
 import { supabase } from '@/lib/supabase';
-
-export type Profile = {
-  id: string;
-  display_name: string;
-  username: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  website_url: string | null;
-  github_url: string | null;
-  linkedin_url: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ProfileSaveValues = {
-  display_name: string;
-  username?: string | null;
-  avatar_url?: string | null;
-  bio?: string | null;
-  website_url?: string | null;
-  github_url?: string | null;
-  linkedin_url?: string | null;
-};
+import type { Profile, ProfileSaveValues } from '@/types';
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
