@@ -12,9 +12,8 @@ import type { User } from '@supabase/supabase-js';
 import {
   getProfile,
   saveProfile,
-  type Profile,
-  type ProfileSaveValues,
 } from '@/services/profileService';
+import type { Profile, ProfileSaveValues } from '@/types';
 
 type AuthContextValue = {
   user: User | null;

@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { useToast } from '@/contexts/ToastContext';
+import { getMyPublications } from '@/services/publicationService';
+import type { Publication } from '@/types';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -24,7 +26,7 @@ type SaveState = 'idle' | 'saving' | 'saved';
 export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
   const { toast } = useToast();
@@ -37,6 +39,8 @@ export function ArticleEditorPage() {
     status: 'draft' as ArticleStatus,
     publishedAt: ''
   });
+  const [publications, setPublications] = useState<Publication[]>([]);
+  const [publicationId, setPublicationId] = useState<string>('');
   const [loading, setLoading] = useState(!isNew);
   const [preview, setPreview] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -59,6 +63,23 @@ export function ArticleEditorPage() {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+
+    getMyPublications(user.id)
+      .then((pubs) => {
+        setPublications(pubs);
+
+        setPublicationId((current) => {
+          if (current) return current;
+
+          const fallback = pubs.find((p) => p.isDefault) ?? pubs[0];
+          return fallback?.id ?? '';
+        });
+      })
+      .catch(console.error);
+  }, [user]);
+
+  useEffect(() => {
     if (!isNew && id) {
       getArticleById(id).then((a) => {
         if (a) {
@@ -72,6 +93,7 @@ export function ArticleEditorPage() {
             status: a.status,
             publishedAt: a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 16) : ''
           });
+          setPublicationId(a.publicationId)
         }
         setLoading(false);
       });
@@ -87,8 +109,9 @@ export function ArticleEditorPage() {
     ...formData,
     slug: formData.slug || generateSlug(formData.title || 'untitled'),
     readingTime,
+    publicationId: publicationId || undefined,
     publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
-  }), [formData, readingTime]);
+  }), [formData, readingTime, publicationId]);
 
   const saveArticle = useCallback(async () => {
     const data = buildArticleData();
@@ -102,6 +125,7 @@ export function ArticleEditorPage() {
       if (isNew && !articleRef.current?.id) {
         const created = await createArticle(data);
         articleRef.current = created;
+        if (!publicationId) { setPublicationId(created.publicationId); }
         navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } else {
         const articleId = articleRef.current?.id ?? id;
@@ -360,6 +384,28 @@ export function ArticleEditorPage() {
                   value={formData.coverImage}
                   onChange={(e) => handleChange('coverImage', e.target.value)}
                 />
+              </div>
+              <div>
+                <label htmlFor="publication" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Publication
+                </label>
+                <select
+                  id="publication"
+                  value={publicationId}
+                  onChange={(e) => setPublicationId(e.target.value)}
+                  className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
+                >
+                  {publications.length === 0 && (
+                    <option value="">Loading publications...</option>
+                  )}
+
+                  {publications.map((pub) => (
+                    <option key={pub.id} value={pub.id}>
+                      {pub.name}
+                      {pub.isDefault ? ' (default)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label htmlFor="category" className="block text-sm font-medium text-text-secondary mb-1.5">Category</label>

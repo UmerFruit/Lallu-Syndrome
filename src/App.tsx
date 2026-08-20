@@ -24,7 +24,8 @@ import { WriterProfilePage } from '@/pages/WriterProfilePage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminPage } from '@/pages/AdminPage';
-
+import { PublicationPage } from '@/pages/PublicationPage';
+import { PublicationsPage } from '@/pages/PublicationsPage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -84,7 +85,7 @@ function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (!profile?.is_admin) { 
+  if (!profile?.is_admin) {
     return <Navigate to="/" replace />;
   }
 
@@ -103,6 +104,7 @@ function AppRoutes() {
         <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
         <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
         <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
+        <Route path="/p/:slug" element={<AppLayout> <PublicationPage /> </AppLayout>} />
 
         {/* Auth routes */}
         <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
@@ -114,6 +116,8 @@ function AppRoutes() {
         <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
         <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
         <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route path="/dashboard/publications" element={<ProtectedRoute>  <AppLayout> <PublicationsPage />  </AppLayout></ProtectedRoute>}
+        />
         <Route
           path="/settings"
           element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}

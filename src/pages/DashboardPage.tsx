@@ -128,13 +128,22 @@ export function DashboardPage() {
             {user ? `Signed in as ${user.user_metadata.name}` : 'Manage your writing.'}
           </p>
         </div>
-        <Link
-          to="/dashboard/articles/new"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors duration-200"
-        >
-          <Plus size={16} />
-          New Article
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/dashboard/publications"
+            className="inline-flex items-center gap-1.5 rounded border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary"
+          >
+            Publications
+          </Link>
+
+          <Link
+            to="/dashboard/articles/new"
+            className="inline-flex items-center gap-1.5 rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          >
+            <Plus size={16} />
+            New Article
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}

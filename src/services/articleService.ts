@@ -5,22 +5,28 @@ import { getCategoryBySlug } from '@/services/categoryService';
 import { deleteArticleMedia } from './storageService';
 import type { QueryData } from '@supabase/supabase-js';
 import { slugify } from '@/utils/slugify';
+import { getDefaultPublication } from '@/services/publicationService';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
 const ARTICLE_SELECT = `
-*,
-categories (slug),
-profiles!articles_author_id_fkey (
-display_name,
-username,
-avatar_url,
-bio
-),
-article_likes (
-count
-)
+  *,
+  categories (slug),
+  publications!articles_publication_id_fkey (
+    id,
+    slug,
+    name
+  ),
+  profiles!articles_author_id_fkey (
+    display_name,
+    username,
+    avatar_url,
+    bio
+  ),
+  article_likes (
+    count
+  )
 `;
 
 const articleQuery = supabase
@@ -30,14 +36,25 @@ const articleQuery = supabase
 type ArticleWithRelations = QueryData<typeof articleQuery>[number];
 
 function mapSupabaseArticle(article: ArticleWithRelations): Article {
-  if (!article.categories) {
+  const rawCategory = article.categories as any;
+  const rawProfile = article.profiles as any;
+  const rawPublication = (article as any).publications;
+
+  const publication = Array.isArray(rawPublication)
+    ? rawPublication[0]
+    : rawPublication;
+
+  if (!rawCategory) {
     throw new Error(`Category not found for article ${article.id}`);
   }
 
-  if (!article.profiles) {
+  if (!rawProfile) {
     throw new Error(`Profile not found for article ${article.id}`);
   }
 
+  if (!publication) {
+    throw new Error(`Publication not found for article ${article.id}`);
+  }
 
   const likes = article.article_likes?.[0]?.count ?? 0;
 
@@ -46,13 +63,19 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     slug: article.slug,
     title: article.title,
     content: article.content,
-    category: article.categories.slug,
+    category: rawCategory.slug,
     coverImage: article.cover_image ?? '',
+    publicationId: article.publication_id,
+    publication: {
+      id: publication.id,
+      slug: publication.slug,
+      name: publication.name,
+    },
     author: {
-      name: article.profiles.display_name,
-      username: article.profiles.username ?? undefined,
-      avatar: article.profiles.avatar_url ?? undefined,
-      bio: article.profiles.bio ?? undefined,
+      name: rawProfile.display_name,
+      username: rawProfile.username ?? undefined,
+      avatar: rawProfile.avatar_url ?? undefined,
+      bio: rawProfile.bio ?? undefined,
     },
     publishedAt: article.published_at ?? undefined,
     createdAt: article.created_at,
@@ -273,12 +296,20 @@ export async function createArticle(data: Partial<ArticleInput>): Promise<Articl
     throw new Error(`Category "${categorySlug}" not found.`);
   }
 
+  let publicationId = data.publicationId;
+
+  if (!publicationId) {
+    const defaultPublication = await getDefaultPublication(user.id);
+    publicationId = defaultPublication.id;
+  }
+
   const title = data.title ?? 'Untitled';
   const content = data.content ?? '';
 
   const { data: article, error } = await supabase
     .from('articles')
     .insert({
+      publication_id: publicationId,
       author_id: user.id,
       category_id: category.id,
       title,
@@ -344,6 +375,9 @@ export async function updateArticle(id: string, data: Partial<ArticleInput>): Pr
     }
 
     updateData.category_id = category.id;
+  }
+  if (data.publicationId !== undefined) {
+    updateData.publication_id = data.publicationId;
   }
 
   const { data: article, error } = await supabase
@@ -585,6 +619,28 @@ export async function deleteComment(commentId: string): Promise<void> {
     .from('comments')
     .delete()
     .eq('id', commentId);
-  
+
   if (error) throw error;
+}
+export async function getArticlesByPublication(publicationSlug: string): Promise<Article[]> {
+  const { data: publication, error: publicationError } = await supabase
+    .from('publications')
+    .select('id')
+    .eq('slug', publicationSlug)
+    .maybeSingle();
+
+  if (publicationError) throw publicationError;
+
+  if (!publication) return [];
+
+  const { data, error } = await supabase
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .eq('status', 'published')
+    .eq('publication_id', publication.id)
+    .order('published_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map(mapSupabaseArticle);
 }

@@ -32,7 +32,7 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env, **/ParticleText.tsx, **/Strands.tsx
+- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env, src/components/interactions/CommentSection.tsx, src/pages/settings/ProfileSettingsPage.tsx, src/components/editor/TiptapEditor.tsx
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -41,7 +41,9 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
-[src]/
+public/
+  favicon.svg
+src/
   components/
     articles/
       ArticleCard.tsx
@@ -59,9 +61,7 @@ The content is organized as follows:
       processPastedHtml.ts
       SlashCommand.tsx
       SlashCommandMenu.tsx
-      TiptapEditor.tsx
     interactions/
-      CommentSection.tsx
       LikeButton.tsx
       ShareButton.tsx
     layout/
@@ -70,6 +70,8 @@ The content is organized as follows:
       Navbar.tsx
       SettingsLayout.tsx
       UserMenu.tsx
+    templates/
+      SettingsForm.tsx
     ui/
       Badge.tsx
       Button.tsx
@@ -94,7 +96,6 @@ The content is organized as follows:
       SignupPage.tsx
     settings/
       PasswordSettingsPage.tsx
-      ProfileSettingsPage.tsx
     AboutPage.tsx
     AdminPage.tsx
     ArticleEditorPage.tsx
@@ -124,20 +125,595 @@ The content is organized as follows:
   index.css
   main.tsx
   vite-env.d.ts
-
-[supabase/migrations]/
-  20260819121429_schema.sql
-  20260819121432_functions_triggers.sql
-  20260819121436_rls_grants.sql
-  20260819121440_storage.sql
-  20260819121445_seed.sql
-  20260820033358_fixes.sql
-  20260820072952_reverse_roles.sql
-  20260820083616_reverse_setup_and_new.sql
+supabase/
+  migrations/
+    20260819121429_schema.sql
+    20260819121432_functions_triggers.sql
+    20260819121436_rls_grants.sql
+    20260819121440_storage.sql
+    20260819121445_seed.sql
+    20260820033358_fixes.sql
+    20260820072952_reverse_roles.sql
+    20260820083616_reverse_setup_and_new.sql
+.gitignore
+eslint.config.js
+index.html
+package.json
+postcss.config.js
+repomix.config.json
+tailwind.config.js
+tsconfig.app.json
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/components/templates/SettingsForm.tsx">
+
+</file>
+
+<file path="public/favicon.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#090909"/>
+  <text x="16" y="22" font-family="Georgia, serif" font-size="16" font-weight="600" fill="#F4F4F4" text-anchor="middle">LS</text>
+</svg>
+</file>
+
+<file path="src/components/articles/ArticleProgress.tsx">
+import { useEffect, useState } from 'react';
+
+export function ArticleProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const article = document.getElementById('article-content');
+      if (!article) return;
+
+      const rect = article.getBoundingClientRect();
+      const articleTop = rect.top + window.scrollY;
+      const articleHeight = rect.height;
+      const scrollPos = window.scrollY - articleTop;
+      const progressVal = Math.max(0, Math.min(100, (scrollPos / articleHeight) * 100));
+      setProgress(progressVal);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[60] h-0.5 bg-transparent pointer-events-none">
+      <div
+        className="h-full bg-accent transition-[width] duration-75 ease-out"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/articles/RelatedArticles.tsx">
+import type { Article } from '@/types';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+
+type RelatedArticlesProps = {
+  articles: Article[];
+};
+
+export function RelatedArticles({ articles }: Readonly<RelatedArticlesProps>) {
+  if (articles.length === 0) return null;
+
+  return (
+    <section className="mt-16 pt-10 border-t border-border-subtle">
+      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
+        Related Articles
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {articles.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/auth/Turnstile.tsx">
+import { useEffect, useRef } from 'react';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          callback: (token: string) => void;
+          theme?: 'dark' | 'light' | 'auto';
+        }
+      ) => string;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
+type TurnstileProps = {
+  siteKey: string;
+  onVerify: (token: string) => void;
+};
+
+export function Turnstile({ siteKey, onVerify }: Readonly<TurnstileProps>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const renderWidget = () => {
+      if (containerRef.current && window.turnstile) {
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          callback: onVerify,
+          theme: 'dark',
+        });
+      }
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const interval = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+      }
+    };
+  }, [siteKey, onVerify]);
+
+  return <div ref={containerRef} />;
+}
+</file>
+
+<file path="src/components/editor/CodeBlock.tsx">
+import { CodeBlock as TiptapCodeBlock } from '@tiptap/extension-code-block';
+import { ReactNodeViewRenderer } from '@tiptap/react';
+
+import CodeBlockComponent from './CodeBlockComponent';
+
+export const CodeBlock = TiptapCodeBlock.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(CodeBlockComponent);
+  },
+});
+</file>
+
+<file path="src/components/editor/SlashCommandMenu.tsx">
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import type { SlashCommandItem } from './SlashCommand';
+
+export type SlashCommandMenuRef = {
+  onKeyDown: (props: { event: KeyboardEvent }) => boolean;
+};
+
+type SlashCommandMenuProps = {
+  items: SlashCommandItem[];
+  command: (item: SlashCommandItem) => void;
+};
+
+export const SlashCommandMenu = forwardRef<
+  SlashCommandMenuRef,
+  SlashCommandMenuProps
+>(({ items, command }, ref) => {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [items]);
+
+  const selectItem = (index: number) => {
+    const item = items[index];
+
+    if (item) {
+      command(item);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    onKeyDown: ({ event }) => {
+      if (event.key === 'ArrowUp') {
+        setSelectedIndex((current) =>
+          current <= 0 ? items.length - 1 : current - 1
+        );
+
+        return true;
+      }
+
+      if (event.key === 'ArrowDown') {
+        setSelectedIndex((current) =>
+          current >= items.length - 1 ? 0 : current + 1
+        );
+
+        return true;
+      }
+
+      if (event.key === 'Enter') {
+        selectItem(selectedIndex);
+
+        return true;
+      }
+
+      return false;
+    },
+  }));
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="w-72 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-xl">
+      {items.map((item, index) => (
+        <button
+          key={item.title}
+          type="button"
+          onClick={() => selectItem(index)}
+          className={`flex w-full flex-col rounded-md px-3 py-2 text-left transition-colors ${
+            index === selectedIndex
+              ? 'bg-elevated text-text-primary'
+              : 'text-text-secondary hover:bg-elevated'
+          }`}
+        >
+          <span className="text-sm font-medium">
+            {item.title}
+          </span>
+
+          <span className="text-xs text-text-muted">
+            {item.description}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+});
+
+SlashCommandMenu.displayName = 'SlashCommandMenu';
+</file>
+
+<file path="src/components/interactions/ShareButton.tsx">
+import { useState } from 'react';
+import { Share2, Check} from 'lucide-react';
+
+type ShareButtonProps = {
+  url: string;
+  title: string;
+};
+
+export function ShareButton({ url, title }: Readonly<ShareButtonProps>) {
+  const [shared, setShared] = useState(false);
+
+  const handleShare = async () => {
+    const shareData = { title, url };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // user cancelled, ignore
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      className="group inline-flex items-center gap-2.5 px-4 py-2.5 rounded border border-border bg-surface hover:border-text-muted transition-colors duration-200"
+      aria-label="Share article"
+    >
+      {shared ? (
+        <>
+          <Check size={18} className="text-accent" />
+          <span className="text-sm font-medium text-accent">Link copied</span>
+        </>
+      ) : (
+        <>
+          <Share2 size={18} className="text-text-muted group-hover:text-text-secondary transition-colors" />
+          <span className="text-sm font-medium text-text-secondary">Share</span>
+        </>
+      )}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/layout/SettingsLayout.tsx">
+import { NavLink, Outlet } from 'react-router-dom';
+import { PageContainer } from '@/components/layout/Navbar';
+
+export function SettingsLayout() {
+    const tabClass = ({ isActive }: { isActive: boolean }) =>
+        `border-b-2 px-3 py-2 text-sm font-medium transition-colors duration-200 ${isActive
+            ? 'border-accent text-text-primary'
+            : 'border-transparent text-text-secondary hover:text-text-primary'
+        }`;
+
+    return (
+        <PageContainer className="py-10">
+            <div>
+                <h1 className="font-serif text-2xl font-semibold text-text-primary">
+                    Settings
+                </h1>
+                <p className="mt-1 text-sm text-text-secondary">
+                    Manage your public profile and account details.
+                </p>
+            </div>
+
+            <div className="mt-6 border-b border-border-subtle">
+                <nav className="-mb-px flex items-center gap-2">
+                    <NavLink to="profile" className={tabClass}>
+                        Profile
+                    </NavLink>
+
+                    <NavLink to="password" className={tabClass}>
+                        Password
+                    </NavLink>
+                </nav>
+            </div>
+
+            <div className="mt-8">
+                <Outlet />
+            </div>
+        </PageContainer>
+    );
+}
+</file>
+
+<file path="src/components/ui/Badge.tsx">
+type BadgeProps = {
+  children: React.ReactNode;
+  variant?: 'default' | 'accent' | 'muted';
+  className?: string;
+};
+
+const variantClasses = {
+  default: 'text-text-secondary border-border',
+  accent: 'text-accent border-accent/30',
+  muted: 'text-text-muted border-border-subtle',
+};
+
+export function Badge({ children, variant = 'default', className }: Readonly<BadgeProps>) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded border ${variantClasses[variant]} ${className ?? ''}`}
+    >
+      {children}
+    </span>
+  );
+}
+</file>
+
+<file path="src/components/ui/Button.tsx">
+import { type ButtonHTMLAttributes, forwardRef } from 'react';
+
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Size = 'sm' | 'md' | 'lg';
+
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+};
+
+const variantClasses: Record<Variant, string> = {
+  primary: 'bg-accent text-white hover:bg-accent-hover',
+  secondary: 'bg-elevated text-text-primary border border-border hover:border-text-muted',
+  ghost: 'text-text-secondary hover:text-text-primary hover:bg-elevated',
+  danger: 'text-accent hover:bg-accent hover:text-white',
+};
+
+const sizeClasses: Record<Size, string> = {
+  sm: 'px-3 py-1.5 text-sm',
+  md: 'px-4 py-2 text-sm',
+  lg: 'px-6 py-2.5 text-base',
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'primary', size = 'md', loading, className, children, disabled, ...props }, ref) => {
+    return (
+      <button
+        type="button"
+        ref={ref}
+        disabled={disabled || loading}
+        className={`inline-flex items-center justify-center gap-2 rounded font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
+        {...props}
+      >
+        {loading && (
+          <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        )}
+        {children}
+      </button>
+    );
+  }
+);
+
+Button.displayName = 'Button';
+</file>
+
+<file path="src/components/ErrorBoundary.tsx">
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+
+type Props = { children: ReactNode };
+type State = { hasError: boolean };
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // In the future, send this to Sentry/LogRocket
+    console.error('Uncaught app error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+          <div className="max-w-md text-center space-y-4">
+            <h1 className="font-serif text-3xl font-semibold text-text-primary">Something went wrong.</h1>
+            <p className="text-text-secondary">
+              The application encountered an unexpected error. Please try refreshing the page.
+            </p>
+            <Link
+              to="/"
+              onClick={() => this.setState({ hasError: false })}
+              className="inline-block px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors"
+            >
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+</file>
+
+<file path="src/config/site.ts">
+export const siteConfig = {
+  name: 'Lallu Syndrome',
+  description: 'Notes, experiments, and deep dives into technology.',
+  creator: {
+    name: 'Umer Farooq',
+    avatarUrl:
+      'https://sakhudjwzeyhtixjqrsn.supabase.co/storage/v1/object/public/avatars/mine.png',
+    links: [
+      { label: 'Portfolio', href: 'https://umerfruit.dev' },
+      { label: 'GitHub', href: 'https://github.com/UmerFruit' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/in/umer-farooq-242130277/' },
+    ],
+  },
+} as const;
+
+export type SiteConfig = typeof siteConfig;
+</file>
+
+<file path="src/pages/auth/LoginPage.tsx">
+import { useState, type FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { login } from '@/services/authService';
+
+export function LoginPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = (): boolean => {
+    const e: typeof errors = {};
+    if (!email) e.email = 'Email is required.';
+    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
+    if (!password) e.password = 'Password is required.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Sign in"
+      subtitle="Welcome back. Sign in to access your dashboard."
+      footer={
+        <>
+          Don't have an account? <AuthLink to="/signup">Create one</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errors.form && (
+          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
+            {errors.form}
+          </div>
+        )}
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          autoComplete="email"
+          required
+        />
+        <Input
+          label="Password"
+          isPassword
+          name="password"
+          placeholder="Your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          autoComplete="current-password"
+          required
+        />
+        <div className="flex justify-end">
+          <Link to="/forgot-password" className="text-xs text-text-muted hover:text-text-secondary transition-colors">
+            Forgot password?
+          </Link>
+        </div>
+        <Button type="submit" className="w-full" loading={loading}>
+          Sign in
+        </Button>
+      </form>
+    </AuthLayout>
+  );
+}
+</file>
 
 <file path="src/pages/AdminPage.tsx">
 import { useEffect, useState } from 'react';
@@ -530,6 +1106,33 @@ function LoadingSkeleton({ rows }: Readonly<{ rows: number }>) {
 }
 </file>
 
+<file path="src/pages/NotFoundPage.tsx">
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
+
+export function NotFoundPage() {
+  return (
+    <PageContainer className="py-24 text-center">
+      <p className="font-mono text-sm uppercase tracking-[0.25em] text-text-muted mb-4">404</p>
+      <h1 className="font-serif text-4xl md:text-5xl font-medium text-text-primary mb-4 tracking-tight">
+        Page not found<span className="text-accent">.</span>
+      </h1>
+      <p className="text-text-secondary mb-8 max-w-md mx-auto">
+        The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+      </p>
+      <Link
+        to="/"
+        className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+      >
+        <ArrowLeft size={16} />
+        Back to home
+      </Link>
+    </PageContainer>
+  );
+}
+</file>
+
 <file path="src/services/adminService.ts">
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
@@ -672,838 +1275,6 @@ export async function adminDeleteArticle(articleId: string): Promise<void> {
     .eq('id', articleId);
 
   if (error) throw error;
-}
-</file>
-
-<file path="supabase/migrations/20260820083616_reverse_setup_and_new.sql">
--- Drop new policies
-drop policy if exists "Published articles are publicly readable" on public.articles;
-drop policy if exists "Authors can read their own articles" on public.articles;
-drop policy if exists "Admins can read all articles" on public.articles;
-drop policy if exists "Writers can create articles" on public.articles;
-drop policy if exists "Writers can update their own articles" on public.articles;
-drop policy if exists "Writers can delete their own articles" on public.articles;
-drop policy if exists "Admins can delete any article" on public.articles;
-drop policy if exists "Users can delete their own comments" on public.comments;
-drop policy if exists "Admins can delete any comment" on public.comments;
-drop policy if exists "Users can update their own profile" on public.profiles;
-drop policy if exists "Admins can update any profile" on public.profiles;
-
--- Restore original policies
-create policy "Published articles are publicly readable"
-on public.articles for select to anon, authenticated
-using (status = 'published');
-
-create policy "Authors can read their own articles"
-on public.articles for select to authenticated
-using (auth.uid() = author_id);
-
-create policy "Authors can create their own articles"
-on public.articles for insert to authenticated
-with check (auth.uid() = author_id);
-
-create policy "Authors can update their own articles"
-on public.articles for update to authenticated
-using (auth.uid() = author_id)
-with check (auth.uid() = author_id);
-
-create policy "Authors can delete their own articles"
-on public.articles for delete to authenticated
-using (auth.uid() = author_id);
-
-create policy "Users can delete their own comments"
-on public.comments for delete to authenticated
-using (auth.uid() = author_id);
-
-create policy "Users can update their own profile"
-on public.profiles for update to authenticated
-using (auth.uid() = id)
-with check (auth.uid() = id);
-
--- Drop functions, column, enum
-drop function if exists public.is_admin(uuid);
-drop function if exists public.is_writer(uuid);
-alter table public.profiles drop column if exists role;
-drop type if exists public.user_role;
-
-
--- 1. Add is_admin flag
-alter table public.profiles
-add column is_admin boolean not null default false;
-
--- 2. Helper function
-create or replace function public.is_admin(user_id uuid)
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.profiles
-    where id = user_id and is_admin = true
-  );
-$$;
-
--- 3. Admin can read ALL articles (for admin panel)
-create policy "Admins can read all articles"
-on public.articles for select to authenticated
-using (public.is_admin(auth.uid()));
-
--- 4. Admin can delete ANY article
-create policy "Admins can delete any article"
-on public.articles for delete to authenticated
-using (public.is_admin(auth.uid()));
-
--- 5. Admin can delete ANY comment
-create policy "Admins can delete any comment"
-on public.comments for delete to authenticated
-using (public.is_admin(auth.uid()));
-
--- 6. Prevent users from setting themselves as admin
-drop policy if exists "Users can update their own profile" on public.profiles;
-
-create policy "Users can update their own profile"
-on public.profiles for update to authenticated
-using (auth.uid() = id)
-with check (
-  auth.uid() = id
-  AND is_admin = (select p.is_admin from public.profiles p where p.id = auth.uid())
-);
-
--- 7. Admins can update any profile (to grant/revoke admin)
-create policy "Admins can update any profile"
-on public.profiles for update to authenticated
-using (public.is_admin(auth.uid()))
-with check (public.is_admin(auth.uid()));
-
-
-update public.profiles set is_admin = true where id = '1d571977-83a0-4cf0-a573-7fe1e92fea8b';
-</file>
-
-<file path="src/components/articles/ArticleProgress.tsx">
-import { useEffect, useState } from 'react';
-
-export function ArticleProgress() {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const article = document.getElementById('article-content');
-      if (!article) return;
-
-      const rect = article.getBoundingClientRect();
-      const articleTop = rect.top + window.scrollY;
-      const articleHeight = rect.height;
-      const scrollPos = window.scrollY - articleTop;
-      const progressVal = Math.max(0, Math.min(100, (scrollPos / articleHeight) * 100));
-      setProgress(progressVal);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-[60] h-0.5 bg-transparent pointer-events-none">
-      <div
-        className="h-full bg-accent transition-[width] duration-75 ease-out"
-        style={{ width: `${progress}%` }}
-      />
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/articles/RelatedArticles.tsx">
-import type { Article } from '@/types';
-import { ArticleCard } from '@/components/articles/ArticleCard';
-
-type RelatedArticlesProps = {
-  articles: Article[];
-};
-
-export function RelatedArticles({ articles }: Readonly<RelatedArticlesProps>) {
-  if (articles.length === 0) return null;
-
-  return (
-    <section className="mt-16 pt-10 border-t border-border-subtle">
-      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
-        Related Articles
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {articles.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/auth/Turnstile.tsx">
-import { useEffect, useRef } from 'react';
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: HTMLElement,
-        options: {
-          sitekey: string;
-          callback: (token: string) => void;
-          theme?: 'dark' | 'light' | 'auto';
-        }
-      ) => string;
-      remove: (widgetId: string) => void;
-    };
-  }
-}
-
-type TurnstileProps = {
-  siteKey: string;
-  onVerify: (token: string) => void;
-};
-
-export function Turnstile({ siteKey, onVerify }: Readonly<TurnstileProps>) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const renderWidget = () => {
-      if (containerRef.current && window.turnstile) {
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          callback: onVerify,
-          theme: 'dark',
-        });
-      }
-    };
-
-    if (window.turnstile) {
-      renderWidget();
-    } else {
-      const interval = setInterval(() => {
-        if (window.turnstile) {
-          clearInterval(interval);
-          renderWidget();
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
-
-    return () => {
-      if (widgetIdRef.current && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
-      }
-    };
-  }, [siteKey, onVerify]);
-
-  return <div ref={containerRef} />;
-}
-</file>
-
-<file path="src/components/editor/CodeBlock.tsx">
-import { CodeBlock as TiptapCodeBlock } from '@tiptap/extension-code-block';
-import { ReactNodeViewRenderer } from '@tiptap/react';
-
-import CodeBlockComponent from './CodeBlockComponent';
-
-export const CodeBlock = TiptapCodeBlock.extend({
-  addNodeView() {
-    return ReactNodeViewRenderer(CodeBlockComponent);
-  },
-});
-</file>
-
-<file path="src/components/editor/SlashCommandMenu.tsx">
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
-import type { SlashCommandItem } from './SlashCommand';
-
-export type SlashCommandMenuRef = {
-  onKeyDown: (props: { event: KeyboardEvent }) => boolean;
-};
-
-type SlashCommandMenuProps = {
-  items: SlashCommandItem[];
-  command: (item: SlashCommandItem) => void;
-};
-
-export const SlashCommandMenu = forwardRef<
-  SlashCommandMenuRef,
-  SlashCommandMenuProps
->(({ items, command }, ref) => {
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [items]);
-
-  const selectItem = (index: number) => {
-    const item = items[index];
-
-    if (item) {
-      command(item);
-    }
-  };
-
-  useImperativeHandle(ref, () => ({
-    onKeyDown: ({ event }) => {
-      if (event.key === 'ArrowUp') {
-        setSelectedIndex((current) =>
-          current <= 0 ? items.length - 1 : current - 1
-        );
-
-        return true;
-      }
-
-      if (event.key === 'ArrowDown') {
-        setSelectedIndex((current) =>
-          current >= items.length - 1 ? 0 : current + 1
-        );
-
-        return true;
-      }
-
-      if (event.key === 'Enter') {
-        selectItem(selectedIndex);
-
-        return true;
-      }
-
-      return false;
-    },
-  }));
-
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="w-72 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-xl">
-      {items.map((item, index) => (
-        <button
-          key={item.title}
-          type="button"
-          onClick={() => selectItem(index)}
-          className={`flex w-full flex-col rounded-md px-3 py-2 text-left transition-colors ${
-            index === selectedIndex
-              ? 'bg-elevated text-text-primary'
-              : 'text-text-secondary hover:bg-elevated'
-          }`}
-        >
-          <span className="text-sm font-medium">
-            {item.title}
-          </span>
-
-          <span className="text-xs text-text-muted">
-            {item.description}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-});
-
-SlashCommandMenu.displayName = 'SlashCommandMenu';
-</file>
-
-<file path="src/components/interactions/ShareButton.tsx">
-import { useState } from 'react';
-import { Share2, Check} from 'lucide-react';
-
-type ShareButtonProps = {
-  url: string;
-  title: string;
-};
-
-export function ShareButton({ url, title }: Readonly<ShareButtonProps>) {
-  const [shared, setShared] = useState(false);
-
-  const handleShare = async () => {
-    const shareData = { title, url };
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        // user cancelled, ignore
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setShared(true);
-      setTimeout(() => setShared(false), 2000);
-    } catch {
-      // ignore
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleShare}
-      className="group inline-flex items-center gap-2.5 px-4 py-2.5 rounded border border-border bg-surface hover:border-text-muted transition-colors duration-200"
-      aria-label="Share article"
-    >
-      {shared ? (
-        <>
-          <Check size={18} className="text-accent" />
-          <span className="text-sm font-medium text-accent">Link copied</span>
-        </>
-      ) : (
-        <>
-          <Share2 size={18} className="text-text-muted group-hover:text-text-secondary transition-colors" />
-          <span className="text-sm font-medium text-text-secondary">Share</span>
-        </>
-      )}
-    </button>
-  );
-}
-</file>
-
-<file path="src/components/layout/SettingsLayout.tsx">
-import { NavLink, Outlet } from 'react-router-dom';
-import { PageContainer } from '@/components/layout/Navbar';
-
-export function SettingsLayout() {
-    const tabClass = ({ isActive }: { isActive: boolean }) =>
-        `border-b-2 px-3 py-2 text-sm font-medium transition-colors duration-200 ${isActive
-            ? 'border-accent text-text-primary'
-            : 'border-transparent text-text-secondary hover:text-text-primary'
-        }`;
-
-    return (
-        <PageContainer className="py-10">
-            <div>
-                <h1 className="font-serif text-2xl font-semibold text-text-primary">
-                    Settings
-                </h1>
-                <p className="mt-1 text-sm text-text-secondary">
-                    Manage your public profile and account details.
-                </p>
-            </div>
-
-            <div className="mt-6 border-b border-border-subtle">
-                <nav className="-mb-px flex items-center gap-2">
-                    <NavLink to="profile" className={tabClass}>
-                        Profile
-                    </NavLink>
-
-                    <NavLink to="password" className={tabClass}>
-                        Password
-                    </NavLink>
-                </nav>
-            </div>
-
-            <div className="mt-8">
-                <Outlet />
-            </div>
-        </PageContainer>
-    );
-}
-</file>
-
-<file path="src/components/layout/UserMenu.tsx">
-import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-
-type UserMenuProps = {
-  onNavigate?: () => void;
-};
-
-export function UserMenu({ onNavigate }: Readonly<UserMenuProps>) {
-  const { user, profile, logout } = useAuth();
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: Event) => {
-      const target = event.target as Node;
-      if (menuRef.current && !menuRef.current.contains(target)) {
-        setOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open]);
-
-  if (!user) return null;
-
-  const displayName =
-    profile?.display_name ||
-    user.email ||
-    'Account';
-
-  const initial = displayName.charAt(0).toUpperCase();
-
-  const closeAndNavigate = () => {
-    setOpen(false);
-    onNavigate?.();
-  };
-
-  const handleLogout = async () => {
-    setOpen(false);
-    onNavigate?.();
-    await logout();
-  };
-
-  return (
-    <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 rounded-full border border-border-subtle bg-elevated/40 p-1 pr-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        {profile?.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt={displayName}
-            className="h-7 w-7 rounded-full object-cover"
-          />
-        ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
-            {initial}
-          </span>
-        )}
-
-        <span className="hidden sm:inline">{displayName}</span>
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-border-subtle bg-bg shadow-lg"
-        >
-          <div className="border-b border-border-subtle px-4 py-3">
-            <p className="truncate text-sm font-medium text-text-primary">
-              {displayName}
-            </p>
-            {user.email && (
-              <p className="truncate text-xs text-text-secondary">{user.email}</p>
-            )}
-          </div>
-
-          <div className="p-1">
-            <Link
-              to="/dashboard"
-              onClick={closeAndNavigate}
-              role="menuitem"
-              className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
-            >
-              <LayoutDashboard size={16} />
-              Dashboard
-            </Link>
-            {profile?.is_admin && (
-              <Link
-                to="/admin"
-                onClick={closeAndNavigate}
-                role="menuitem"
-                className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
-              >
-                <Shield size={16} />
-                Admin Panel
-              </Link>
-            )}
-
-            <Link
-              to="/settings/profile"
-              onClick={closeAndNavigate}
-              role="menuitem"
-              className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
-            >
-              <Settings size={16} />
-              Settings
-            </Link>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              role="menuitem"
-              className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/ui/Badge.tsx">
-type BadgeProps = {
-  children: React.ReactNode;
-  variant?: 'default' | 'accent' | 'muted';
-  className?: string;
-};
-
-const variantClasses = {
-  default: 'text-text-secondary border-border',
-  accent: 'text-accent border-accent/30',
-  muted: 'text-text-muted border-border-subtle',
-};
-
-export function Badge({ children, variant = 'default', className }: Readonly<BadgeProps>) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded border ${variantClasses[variant]} ${className ?? ''}`}
-    >
-      {children}
-    </span>
-  );
-}
-</file>
-
-<file path="src/components/ui/Button.tsx">
-import { type ButtonHTMLAttributes, forwardRef } from 'react';
-
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size = 'sm' | 'md' | 'lg';
-
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: Variant;
-  size?: Size;
-  loading?: boolean;
-};
-
-const variantClasses: Record<Variant, string> = {
-  primary: 'bg-accent text-white hover:bg-accent-hover',
-  secondary: 'bg-elevated text-text-primary border border-border hover:border-text-muted',
-  ghost: 'text-text-secondary hover:text-text-primary hover:bg-elevated',
-  danger: 'text-accent hover:bg-accent hover:text-white',
-};
-
-const sizeClasses: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-6 py-2.5 text-base',
-};
-
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading, className, children, disabled, ...props }, ref) => {
-    return (
-      <button
-        type="button"
-        ref={ref}
-        disabled={disabled || loading}
-        className={`inline-flex items-center justify-center gap-2 rounded font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
-        {...props}
-      >
-        {loading && (
-          <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-        )}
-        {children}
-      </button>
-    );
-  }
-);
-
-Button.displayName = 'Button';
-</file>
-
-<file path="src/components/ErrorBoundary.tsx">
-import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-
-type Props = { children: ReactNode };
-type State = { hasError: boolean };
-
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // In the future, send this to Sentry/LogRocket
-    console.error('Uncaught app error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-bg p-4">
-          <div className="max-w-md text-center space-y-4">
-            <h1 className="font-serif text-3xl font-semibold text-text-primary">Something went wrong.</h1>
-            <p className="text-text-secondary">
-              The application encountered an unexpected error. Please try refreshing the page.
-            </p>
-            <Link
-              to="/"
-              onClick={() => this.setState({ hasError: false })}
-              className="inline-block px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors"
-            >
-              Back to Home
-            </Link>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-</file>
-
-<file path="src/config/site.ts">
-export const siteConfig = {
-  name: 'Lallu Syndrome',
-  description: 'Notes, experiments, and deep dives into technology.',
-  creator: {
-    name: 'Umer Farooq',
-    avatarUrl:
-      'https://sakhudjwzeyhtixjqrsn.supabase.co/storage/v1/object/public/avatars/mine.png',
-    links: [
-      { label: 'Portfolio', href: 'https://umerfruit.dev' },
-      { label: 'GitHub', href: 'https://github.com/UmerFruit' },
-      { label: 'LinkedIn', href: 'https://www.linkedin.com/in/umer-farooq-242130277/' },
-    ],
-  },
-} as const;
-
-export type SiteConfig = typeof siteConfig;
-</file>
-
-<file path="src/pages/auth/LoginPage.tsx">
-import { useState, type FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { login } from '@/services/authService';
-
-export function LoginPage() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
-  const [loading, setLoading] = useState(false);
-
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      await login(email, password);
-      navigate('/dashboard');
-    } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <AuthLayout
-      title="Sign in"
-      subtitle="Welcome back. Sign in to access your dashboard."
-      footer={
-        <>
-          Don't have an account? <AuthLink to="/signup">Create one</AuthLink>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
-          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
-          </div>
-        )}
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="Your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="current-password"
-          required
-        />
-        <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-xs text-text-muted hover:text-text-secondary transition-colors">
-            Forgot password?
-          </Link>
-        </div>
-        <Button type="submit" className="w-full" loading={loading}>
-          Sign in
-        </Button>
-      </form>
-    </AuthLayout>
-  );
-}
-</file>
-
-<file path="src/pages/NotFoundPage.tsx">
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { PageContainer } from '@/components/layout/Navbar';
-
-export function NotFoundPage() {
-  return (
-    <PageContainer className="py-24 text-center">
-      <p className="font-mono text-sm uppercase tracking-[0.25em] text-text-muted mb-4">404</p>
-      <h1 className="font-serif text-4xl md:text-5xl font-medium text-text-primary mb-4 tracking-tight">
-        Page not found<span className="text-accent">.</span>
-      </h1>
-      <p className="text-text-secondary mb-8 max-w-md mx-auto">
-        The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
-      </p>
-      <Link
-        to="/"
-        className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
-      >
-        <ArrowLeft size={16} />
-        Back to home
-      </Link>
-    </PageContainer>
-  );
 }
 </file>
 
@@ -1847,6 +1618,301 @@ alter table public.profiles drop column if exists role;
 drop type if exists public.user_role;
 </file>
 
+<file path="supabase/migrations/20260820083616_reverse_setup_and_new.sql">
+-- Drop new policies
+drop policy if exists "Published articles are publicly readable" on public.articles;
+drop policy if exists "Authors can read their own articles" on public.articles;
+drop policy if exists "Admins can read all articles" on public.articles;
+drop policy if exists "Writers can create articles" on public.articles;
+drop policy if exists "Writers can update their own articles" on public.articles;
+drop policy if exists "Writers can delete their own articles" on public.articles;
+drop policy if exists "Admins can delete any article" on public.articles;
+drop policy if exists "Users can delete their own comments" on public.comments;
+drop policy if exists "Admins can delete any comment" on public.comments;
+drop policy if exists "Users can update their own profile" on public.profiles;
+drop policy if exists "Admins can update any profile" on public.profiles;
+
+-- Restore original policies
+create policy "Published articles are publicly readable"
+on public.articles for select to anon, authenticated
+using (status = 'published');
+
+create policy "Authors can read their own articles"
+on public.articles for select to authenticated
+using (auth.uid() = author_id);
+
+create policy "Authors can create their own articles"
+on public.articles for insert to authenticated
+with check (auth.uid() = author_id);
+
+create policy "Authors can update their own articles"
+on public.articles for update to authenticated
+using (auth.uid() = author_id)
+with check (auth.uid() = author_id);
+
+create policy "Authors can delete their own articles"
+on public.articles for delete to authenticated
+using (auth.uid() = author_id);
+
+create policy "Users can delete their own comments"
+on public.comments for delete to authenticated
+using (auth.uid() = author_id);
+
+create policy "Users can update their own profile"
+on public.profiles for update to authenticated
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+-- Drop functions, column, enum
+drop function if exists public.is_admin(uuid);
+drop function if exists public.is_writer(uuid);
+alter table public.profiles drop column if exists role;
+drop type if exists public.user_role;
+
+
+-- 1. Add is_admin flag
+alter table public.profiles
+add column is_admin boolean not null default false;
+
+-- 2. Helper function
+create or replace function public.is_admin(user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = user_id and is_admin = true
+  );
+$$;
+
+-- 3. Admin can read ALL articles (for admin panel)
+create policy "Admins can read all articles"
+on public.articles for select to authenticated
+using (public.is_admin(auth.uid()));
+
+-- 4. Admin can delete ANY article
+create policy "Admins can delete any article"
+on public.articles for delete to authenticated
+using (public.is_admin(auth.uid()));
+
+-- 5. Admin can delete ANY comment
+create policy "Admins can delete any comment"
+on public.comments for delete to authenticated
+using (public.is_admin(auth.uid()));
+
+-- 6. Prevent users from setting themselves as admin
+drop policy if exists "Users can update their own profile" on public.profiles;
+
+create policy "Users can update their own profile"
+on public.profiles for update to authenticated
+using (auth.uid() = id)
+with check (
+  auth.uid() = id
+  AND is_admin = (select p.is_admin from public.profiles p where p.id = auth.uid())
+);
+
+-- 7. Admins can update any profile (to grant/revoke admin)
+create policy "Admins can update any profile"
+on public.profiles for update to authenticated
+using (public.is_admin(auth.uid()))
+with check (public.is_admin(auth.uid()));
+
+
+update public.profiles set is_admin = true where id = '1d571977-83a0-4cf0-a573-7fe1e92fea8b';
+</file>
+
+<file path=".gitignore">
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+</file>
+
+<file path="eslint.config.js">
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['dist'] },
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
+  }
+);
+</file>
+
+<file path="postcss.config.js">
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "customPatterns": [
+      "supabase/.temp/**",
+      "src/components/ui/Strands.tsx",
+      "src/components/ui/ParticleText.tsx",
+      ".bolt/**",
+      ".env",
+      "src/components/interactions/CommentSection.tsx",
+      "src/pages/settings/ProfileSettingsPage.tsx",
+      "src/components/editor/TiptapEditor.tsx"
+    ]
+  }
+}
+</file>
+
+<file path="tailwind.config.js">
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        bg: 'var(--color-bg)',
+        surface: 'var(--color-surface)',
+        elevated: 'var(--color-elevated)',
+        border: {
+          DEFAULT: 'var(--color-border)',
+          subtle: 'var(--color-border-subtle)',
+        },
+        text: {
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          muted: 'var(--color-text-muted)',
+        },
+        accent: {
+          DEFAULT: 'var(--color-accent)',
+          hover: 'var(--color-accent-hover)',
+        },
+      },
+      fontFamily: {
+        serif: ['"Newsreader"', 'Georgia', 'serif'],
+        sans: ['"Inter"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
+      },
+      borderRadius: {
+        DEFAULT: '6px',
+        card: '8px',
+      },
+      transitionDuration: {
+        DEFAULT: '200ms',
+      },
+      maxWidth: {
+        article: '680px',
+        wide: '1200px',
+        content: '1080px',
+      },
+      animation: {
+        'fade-in': 'fadeIn 200ms ease-out',
+        'slide-up': 'slideUp 200ms ease-out',
+        'pulse-once': 'pulseOnce 300ms ease-out',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        pulseOnce: {
+          '0%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.25)' },
+          '100%': { transform: 'scale(1)' },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
+</file>
+
+<file path="tsconfig.json">
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+</file>
+
+<file path="tsconfig.node.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["vite.config.ts"]
+}
+</file>
+
 <file path="src/components/editor/CodeBlockComponent.tsx">
 import { useState } from 'react';
 import {
@@ -2000,6 +2066,153 @@ export function AuthLink({ to, children }: Readonly<{ to: string; children: Reac
     <Link to={to} className="text-accent hover:text-accent-hover transition-colors font-medium">
       {children}
     </Link>
+  );
+}
+</file>
+
+<file path="src/components/layout/UserMenu.tsx">
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+type UserMenuProps = {
+  onNavigate?: () => void;
+};
+
+export function UserMenu({ onNavigate }: Readonly<UserMenuProps>) {
+  const { user, profile, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: Event) => {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  if (!user) return null;
+
+  const displayName =
+    profile?.display_name ||
+    user.email ||
+    'Account';
+
+  const initial = displayName.charAt(0).toUpperCase();
+
+  const closeAndNavigate = () => {
+    setOpen(false);
+    onNavigate?.();
+  };
+
+  const handleLogout = async () => {
+    setOpen(false);
+    onNavigate?.();
+    await logout();
+  };
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex items-center gap-2 rounded-full border border-border-subtle bg-elevated/40 p-1 pr-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        {profile?.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt={displayName}
+            className="h-7 w-7 rounded-full object-cover"
+          />
+        ) : (
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
+            {initial}
+          </span>
+        )}
+
+        <span className="hidden sm:inline">{displayName}</span>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-border-subtle bg-bg shadow-lg"
+        >
+          <div className="border-b border-border-subtle px-4 py-3">
+            <p className="truncate text-sm font-medium text-text-primary">
+              {displayName}
+            </p>
+            {user.email && (
+              <p className="truncate text-xs text-text-secondary">{user.email}</p>
+            )}
+          </div>
+
+          <div className="p-1">
+            <Link
+              to="/dashboard"
+              onClick={closeAndNavigate}
+              role="menuitem"
+              className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
+            >
+              <LayoutDashboard size={16} />
+              Dashboard
+            </Link>
+            {profile?.is_admin && (
+              <Link
+                to="/admin"
+                onClick={closeAndNavigate}
+                role="menuitem"
+                className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
+              >
+                <Shield size={16} />
+                Admin Panel
+              </Link>
+            )}
+
+            <Link
+              to="/settings/profile"
+              onClick={closeAndNavigate}
+              role="menuitem"
+              className="flex items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
+            >
+              <Settings size={16} />
+              Settings
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              role="menuitem"
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-text-secondary hover:bg-elevated hover:text-text-primary transition-colors"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 </file>
@@ -2668,505 +2881,6 @@ export function PasswordSettingsPage() {
 }
 </file>
 
-<file path="src/pages/settings/ProfileSettingsPage.tsx">
-import { useEffect, useState, type FormEvent } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { uploadAvatar } from '@/services/profileService';
-type FormState = {
-    display_name: string;
-    username: string;
-    avatar_url: string;
-    bio: string;
-    website_url: string;
-    github_url: string;
-    linkedin_url: string;
-};
-
-const initialForm: FormState = {
-    display_name: '',
-    username: '',
-    avatar_url: '',
-    bio: '',
-    website_url: '',
-    github_url: '',
-    linkedin_url: '',
-};
-
-const inputClass =
-    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
-
-const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
-
-function normalizeUrl(value: string): string {
-    const trimmed = value.trim();
-
-    if (!trimmed) return '';
-
-    // Allow relative paths, useful later for Supabase Storage paths.
-    if (trimmed.startsWith('/')) return trimmed;
-
-    if (/^https?:\/\//i.test(trimmed)) {
-        return trimmed;
-    }
-
-    return `https://${trimmed}`;
-}
-
-function isValidUrl(value: string): boolean {
-    if (!value) return true;
-
-    if (value.startsWith('/')) return true;
-
-    try {
-        new URL(value);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-function getErrorMessage(error: unknown): string {
-    if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code?: string }).code === '23505'
-    ) {
-        return 'That username is already taken.';
-    }
-
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return 'Could not save your profile. Please try again.';
-}
-
-export function ProfileSettingsPage() {
-    const { user, profile, isLoading, isProfileLoading, updateProfile } = useAuth();
-    const [uploading, setUploading] = useState(false);
-    const [form, setForm] = useState<FormState>(initialForm);
-    const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-    const [errorMessage, setErrorMessage] = useState('');
-    const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-
-    useEffect(() => {
-        if (profile) {
-            setForm({
-                display_name: profile.display_name ?? '',
-                username: profile.username ?? '',
-                avatar_url: profile.avatar_url ?? '',
-                bio: profile.bio ?? '',
-                website_url: profile.website_url ?? '',
-                github_url: profile.github_url ?? '',
-                linkedin_url: profile.linkedin_url ?? '',
-            });
-
-            return;
-        }
-
-        if (user) {
-            const metadata = user.user_metadata as Record<string, unknown> | undefined;
-
-            const fallbackDisplayName =
-                typeof metadata?.display_name === 'string'
-                    ? metadata.display_name
-                    : user.email?.split('@')[0] ?? '';
-
-            setForm((current) => ({
-                ...current,
-                display_name: current.display_name || fallbackDisplayName,
-            }));
-        }
-    }, [profile, user]);
-
-    if (isLoading || isProfileLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-[40vh]">
-                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !user) return;
-
-        if (!file.type.startsWith('image/')) {
-            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Please select an image file.' }));
-            return;
-        }
-        if (file.size > 2 * 1024 * 1024) {
-            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Image must be smaller than 2MB.' }));
-            return;
-        }
-
-        setUploading(true);
-        try {
-            const publicUrl = await uploadAvatar(user.id, file);
-            setForm((prev) => ({ ...prev, avatar_url: publicUrl }));
-            setFieldErrors((prev) => ({ ...prev, avatar_url: undefined }));
-        } catch (err) {
-            console.error('Avatar upload error:', err);
-            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Failed to upload image.' }));
-        } finally {
-            setUploading(false);
-            e.target.value = ''; // Reset input so the same file can be selected again if needed
-        }
-    };
-    const setField = (name: keyof FormState, value: string) => {
-        setForm((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-
-        if (status !== 'idle') {
-            setStatus('idle');
-            setErrorMessage('');
-        }
-
-        setFieldErrors((prev) => ({
-            ...prev,
-            [name]: undefined,
-        }));
-    };
-
-    const validate = (): boolean => {
-        const errors: Partial<Record<keyof FormState, string>> = {};
-
-        const displayName = form.display_name.trim();
-
-        if (!displayName) {
-            errors.display_name = 'Display name is required.';
-        } else if (displayName.length > 100) {
-            errors.display_name = 'Display name must be 100 characters or less.';
-        }
-
-        const username = form.username.trim().toLowerCase();
-
-        if (username && !/^[a-z0-9_-]{3,30}$/.test(username)) {
-            errors.username =
-                'Username must be 3-30 characters and can include lowercase letters, numbers, hyphens, and underscores.';
-        }
-
-        if (form.bio.length > 500) {
-            errors.bio = 'Bio must be 500 characters or less.';
-        }
-
-        const urlFields = ['avatar_url', 'website_url', 'github_url', 'linkedin_url'] as const;
-
-        for (const field of urlFields) {
-            const rawValue = form[field].trim();
-
-            if (!rawValue) continue;
-
-            const normalized = normalizeUrl(rawValue);
-
-            if (!isValidUrl(normalized)) {
-                errors[field] = 'Enter a valid URL.';
-            }
-        }
-
-        setFieldErrors(errors);
-
-        return Object.keys(errors).length === 0;
-    };
-
-    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (!user) return;
-
-        if (!validate()) {
-            setStatus('error');
-            setErrorMessage('Please fix the highlighted fields.');
-            return;
-        }
-
-        setStatus('saving');
-        setErrorMessage('');
-
-        try {
-            await updateProfile({
-                display_name: form.display_name.trim(),
-                username: form.username.trim() ? form.username.trim().toLowerCase() : null,
-                avatar_url: normalizeUrl(form.avatar_url) || null,
-                bio: form.bio.trim() || null,
-                website_url: normalizeUrl(form.website_url) || null,
-                github_url: normalizeUrl(form.github_url) || null,
-                linkedin_url: normalizeUrl(form.linkedin_url) || null,
-            });
-
-            setStatus('success');
-        } catch (error) {
-            setStatus('error');
-            setErrorMessage(getErrorMessage(error));
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-8">
-            <section className="rounded-lg border border-border-subtle bg-bg p-6">
-                <div>
-                    <h2 className="font-serif text-lg font-semibold text-text-primary">
-                        Public profile
-                    </h2>
-                    <p className="mt-1 text-sm text-text-secondary">
-                        This information may be displayed alongside your articles and public profile.
-                    </p>
-                </div>
-
-                <div className="mt-6 grid gap-6 md:grid-cols-2">
-                    <div>
-                        <label htmlFor="display_name" className={labelClass}>
-                            Display name
-                        </label>
-
-                        <input
-                            id="display_name"
-                            type="text"
-                            value={form.display_name}
-                            onChange={(event) => setField('display_name', event.target.value)}
-                            placeholder="Your name"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.display_name && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.display_name}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label htmlFor="username" className={labelClass}>
-                            Username
-                        </label>
-
-                        <input
-                            id="username"
-                            type="text"
-                            value={form.username}
-                            onChange={(event) => setField('username', event.target.value)}
-                            placeholder="yourusername"
-                            className={inputClass}
-                        />
-
-                        <p className="mt-1.5 text-xs text-text-secondary">
-                            Lowercase letters, numbers, hyphens, and underscores only.
-                        </p>
-
-                        {fieldErrors.username && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.username}</p>
-                        )}
-                    </div>
-                </div>
-
-                <div className="mt-6">
-                    <label htmlFor="avatar_url" className={labelClass}>
-                        Avatar
-                    </label>
-
-                    <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
-                        {/* Avatar preview */}
-                        {form.avatar_url.trim() ? (
-                            <img
-                                src={normalizeUrl(form.avatar_url)}
-                                alt="Avatar preview"
-                                className="h-28 w-28 sm:h-36 sm:w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-28 w-28 sm:h-36 sm:w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
-                                No image
-                            </div>
-                        )}
-
-                        {/* Controls */}
-                        <div className="flex min-w-0 flex-1 flex-col gap-4">
-                            {/* Avatar URL */}
-                            <div className="max-w-lg">
-                                <input
-                                    id="avatar_url"
-                                    type="text"
-                                    value={form.avatar_url}
-                                    onChange={(event) =>
-                                        setField('avatar_url', event.target.value)
-                                    }
-                                    placeholder="https://example.com/avatar.jpg"
-                                    className={inputClass}
-                                />
-
-                                {fieldErrors.avatar_url && (
-                                    <p className="mt-1.5 text-sm text-accent">
-                                        {fieldErrors.avatar_url}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Upload */}
-                            <div className="max-w-lg rounded-lg border border-border-subtle bg-surface px-4 py-3">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-text-primary">
-                                            Upload an image
-                                        </p>
-                                        <p className="mt-0.5 text-xs text-text-muted">
-                                            JPG, PNG, WebP, or GIF · Max 2MB
-                                        </p>
-                                    </div>
-
-                                    <label
-                                        htmlFor="avatar-upload"
-                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
-                                                ? 'pointer-events-none opacity-50'
-                                                : ''
-                                            }`}
-                                    >
-                                        {uploading ? 'Uploading...' : 'Choose image'}
-                                    </label>
-
-                                    <input
-                                        id="avatar-upload"
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleAvatarUpload}
-                                        disabled={uploading}
-                                        className="sr-only"
-                                    />
-                                </div>
-
-                                {uploading && (
-                                    <div className="mt-2">
-                                        <div className="h-1 w-full overflow-hidden rounded-full bg-elevated">
-                                            <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
-                                        </div>
-                                        <p className="mt-1 text-xs text-text-muted">
-                                            Uploading...
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-6">
-                    <label htmlFor="bio" className={labelClass}>
-                        Bio
-                    </label>
-
-                    <textarea
-                        id="bio"
-                        value={form.bio}
-                        onChange={(event) => setField('bio', event.target.value)}
-                        placeholder="Write a short bio..."
-                        rows={5}
-                        className={`${inputClass} resize-y`}
-                    />
-
-                    <div className="mt-1.5 flex items-center justify-between">
-                        {fieldErrors.bio ? (
-                            <p className="text-sm text-red-500">{fieldErrors.bio}</p>
-                        ) : (
-                            <p className="text-xs text-text-secondary">
-                                A short description shown on your profile and articles.
-                            </p>
-                        )}
-
-                        <p className="text-xs text-text-secondary">{form.bio.length}/500</p>
-                    </div>
-                </div>
-            </section>
-
-            <section className="rounded-lg border border-border-subtle bg-bg p-6">
-                <div>
-                    <h2 className="font-serif text-lg font-semibold text-text-primary">Links</h2>
-                    <p className="mt-1 text-sm text-text-secondary">
-                        Optional external links for your profile.
-                    </p>
-                </div>
-
-                <div className="mt-6 grid gap-6 md:grid-cols-3">
-                    <div>
-                        <label htmlFor="website_url" className={labelClass}>
-                            Website
-                        </label>
-
-                        <input
-                            id="website_url"
-                            type="text"
-                            value={form.website_url}
-                            onChange={(event) => setField('website_url', event.target.value)}
-                            placeholder="yoursite.com"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.website_url && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.website_url}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label htmlFor="github_url" className={labelClass}>
-                            GitHub
-                        </label>
-
-                        <input
-                            id="github_url"
-                            type="text"
-                            value={form.github_url}
-                            onChange={(event) => setField('github_url', event.target.value)}
-                            placeholder="github.com/username"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.github_url && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.github_url}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label htmlFor="linkedin_url" className={labelClass}>
-                            LinkedIn
-                        </label>
-
-                        <input
-                            id="linkedin_url"
-                            type="text"
-                            value={form.linkedin_url}
-                            onChange={(event) => setField('linkedin_url', event.target.value)}
-                            placeholder="linkedin.com/in/username"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.linkedin_url && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.linkedin_url}</p>
-                        )}
-                    </div>
-                </div>
-            </section>
-
-            <div className="flex items-center gap-3">
-                <button
-                    type="submit"
-                    disabled={status === 'saving'}
-                    className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    {status === 'saving' ? 'Saving...' : 'Save changes'}
-                </button>
-
-                {status === 'success' && (
-                    <span className="text-sm font-medium text-emerald-500">
-                        Profile saved.
-                    </span>
-                )}
-            </div>
-
-            {status === 'error' && errorMessage && (
-                <p className="text-sm text-red-500">{errorMessage}</p>
-            )}
-        </form>
-    );
-}
-</file>
-
 <file path="src/pages/CreatorPage.tsx">
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -3513,442 +3227,6 @@ function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
     </div>
   );
 }
-</file>
-
-<file path="src/services/profileService.ts">
-import { supabase } from '@/lib/supabase';
-import type { Profile, ProfileSaveValues } from '@/types';
-
-export async function getProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  return data as Profile | null;
-}
-
-export async function saveProfile(
-  userId: string,
-  values: ProfileSaveValues
-): Promise<Profile> {
-  const payload = {
-    id: userId,
-    display_name: values.display_name,
-    username: values.username ?? null,
-    avatar_url: values.avatar_url ?? null,
-    bio: values.bio ?? null,
-    website_url: values.website_url ?? null,
-    github_url: values.github_url ?? null,
-    linkedin_url: values.linkedin_url ?? null,
-  };
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert(payload, {
-      onConflict: 'id',
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return data as Profile;
-}
-
-export async function uploadAvatar(userId: string, file: File): Promise<string> {
-  const fileExt = file.name.split('.').pop() || 'png';
-  // Save as {userId}/avatar.{ext} so it automatically overwrites the old one
-  const filePath = `${userId}/avatar.${fileExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(filePath, file, { upsert: true, cacheControl: '3600' });
-
-  if (uploadError) throw uploadError;
-
-  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-  
-  // Append timestamp to bypass browser cache when the image updates
-  return `${data.publicUrl}?t=${Date.now()}`;
-}
-
-export async function getProfileByUsername(username: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', username)
-    .maybeSingle();
-  if (error) throw error;
-  return data as Profile | null;
-}
-</file>
-
-<file path="src/types/database.ts">
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
-
-export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.15"
-  }
-  public: {
-    Tables: {
-      article_likes: {
-        Row: {
-          article_id: string
-          created_at: string
-          user_id: string
-        }
-        Insert: {
-          article_id: string
-          created_at?: string
-          user_id: string
-        }
-        Update: {
-          article_id?: string
-          created_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_likes_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_likes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      articles: {
-        Row: {
-          author_id: string
-          category_id: number
-          content: string
-          cover_image: string | null
-          created_at: string
-          id: string
-          published_at: string | null
-          reading_time: number | null
-          slug: string
-          status: Database["public"]["Enums"]["article_status"]
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          author_id: string
-          category_id: number
-          content: string
-          cover_image?: string | null
-          created_at?: string
-          id?: string
-          published_at?: string | null
-          reading_time?: number | null
-          slug: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string
-          category_id?: number
-          content?: string
-          cover_image?: string | null
-          created_at?: string
-          id?: string
-          published_at?: string | null
-          reading_time?: number | null
-          slug?: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "articles_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "articles_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          created_at: string
-          id: number
-          name: string
-          slug: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          name: string
-          slug: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          name?: string
-          slug?: string
-        }
-        Relationships: []
-      }
-      comments: {
-        Row: {
-          article_id: string
-          author_id: string
-          content: string
-          created_at: string
-          id: string
-          parent_id: string | null
-        }
-        Insert: {
-          article_id: string
-          author_id: string
-          content: string
-          created_at?: string
-          id?: string
-          parent_id?: string | null
-        }
-        Update: {
-          article_id?: string
-          author_id?: string
-          content?: string
-          created_at?: string
-          id?: string
-          parent_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comments_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          bio: string | null
-          created_at: string
-          display_name: string
-          github_url: string | null
-          id: string
-          is_admin: boolean
-          linkedin_url: string | null
-          updated_at: string
-          username: string | null
-          website_url: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          display_name: string
-          github_url?: string | null
-          id: string
-          is_admin?: boolean
-          linkedin_url?: string | null
-          updated_at?: string
-          username?: string | null
-          website_url?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          display_name?: string
-          github_url?: string | null
-          id?: string
-          is_admin?: boolean
-          linkedin_url?: string | null
-          updated_at?: string
-          username?: string | null
-          website_url?: string | null
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      is_admin: { Args: { user_id: string }; Returns: boolean }
-    }
-    Enums: {
-      article_status: "draft" | "published"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      article_status: ["draft", "published"],
-    },
-  },
-} as const
 </file>
 
 <file path="src/utils/slugify.ts">
@@ -4721,147 +3999,6 @@ export function Footer() {
 }
 </file>
 
-<file path="src/pages/auth/SignupPage.tsx">
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { signup } from '@/services/authService';
-// import { Turnstile } from '@/components/auth/Turnstile';
-
-// Replace with your actual Cloudflare Turnstile Site Key
-// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
-export function SignupPage() {
-  const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    captcha?: string;
-    form?: string;
-  }>({});
-  const [loading, setLoading] = useState(false);
-
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!name) e.name = 'Name is required.';
-    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
-    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      await signup(name, email, password, captchaToken ?? undefined);
-      navigate('/dashboard');
-    } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <AuthLayout
-      title="Create account"
-      subtitle="Start writing and publishing on Lallu Syndrome."
-      footer={
-        <>
-          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
-          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
-          </div>
-        )}
-        <Input
-          label="Name"
-          type="text"
-          name="name"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={errors.name}
-          autoComplete="name"
-          required
-        />
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-          required
-        />
-        <Input
-          label="Confirm password"
-          isPassword
-          name="confirmPassword"
-          placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          error={errors.confirmPassword}
-          autoComplete="new-password"
-          required
-        />
-
-        {/* Turnstile Captcha */}
-        {/* <div>
-          <Turnstile
-            siteKey={TURNSTILE_SITE_KEY}
-            onVerify={(token) => {
-              setCaptchaToken(token);
-              setErrors((prev) => ({ ...prev, captcha: undefined }));
-            }}
-          />
-          {errors.captcha && (
-            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
-          )}
-        </div> */}
-
-        <Button type="submit" className="w-full" loading={loading}>
-          Create account
-        </Button>
-      </form>
-    </AuthLayout>
-  );
-}
-</file>
-
 <file path="src/services/categoryService.ts">
 import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types";
@@ -4878,6 +4015,442 @@ export async function getCategoryBySlug(slug: string): Promise<Category> {
 
     return results;
 }
+</file>
+
+<file path="src/services/profileService.ts">
+import { supabase } from '@/lib/supabase';
+import type { Profile, ProfileSaveValues } from '@/types';
+
+export async function getProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data as Profile | null;
+}
+
+export async function saveProfile(
+  userId: string,
+  values: ProfileSaveValues
+): Promise<Profile> {
+  const payload = {
+    id: userId,
+    display_name: values.display_name,
+    username: values.username ?? null,
+    avatar_url: values.avatar_url ?? null,
+    bio: values.bio ?? null,
+    website_url: values.website_url ?? null,
+    github_url: values.github_url ?? null,
+    linkedin_url: values.linkedin_url ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(payload, {
+      onConflict: 'id',
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data as Profile;
+}
+
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  const fileExt = file.name.split('.').pop() || 'png';
+  // Save as {userId}/avatar.{ext} so it automatically overwrites the old one
+  const filePath = `${userId}/avatar.${fileExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file, { upsert: true, cacheControl: '3600' });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  
+  // Append timestamp to bypass browser cache when the image updates
+  return `${data.publicUrl}?t=${Date.now()}`;
+}
+
+export async function getProfileByUsername(username: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Profile | null;
+}
+</file>
+
+<file path="src/types/database.ts">
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
+  public: {
+    Tables: {
+      article_likes: {
+        Row: {
+          article_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_likes_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      articles: {
+        Row: {
+          author_id: string
+          category_id: number
+          content: string
+          cover_image: string | null
+          created_at: string
+          id: string
+          published_at: string | null
+          reading_time: number | null
+          slug: string
+          status: Database["public"]["Enums"]["article_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          category_id: number
+          content: string
+          cover_image?: string | null
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          reading_time?: number | null
+          slug: string
+          status?: Database["public"]["Enums"]["article_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          category_id?: number
+          content?: string
+          cover_image?: string | null
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          reading_time?: number | null
+          slug?: string
+          status?: Database["public"]["Enums"]["article_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          article_id: string
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          parent_id: string | null
+        }
+        Insert: {
+          article_id: string
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+        }
+        Update: {
+          article_id?: string
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string
+          github_url: string | null
+          id: string
+          is_admin: boolean
+          linkedin_url: string | null
+          updated_at: string
+          username: string | null
+          website_url: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name: string
+          github_url?: string | null
+          id: string
+          is_admin?: boolean
+          linkedin_url?: string | null
+          updated_at?: string
+          username?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          github_url?: string | null
+          id?: string
+          is_admin?: boolean
+          linkedin_url?: string | null
+          updated_at?: string
+          username?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      is_admin: { Args: { user_id: string }; Returns: boolean }
+    }
+    Enums: {
+      article_status: "draft" | "published"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      article_status: ["draft", "published"],
+    },
+  },
+} as const
 </file>
 
 <file path="src/utils/date.ts">
@@ -4913,6 +4486,43 @@ export function relativeTime(date: string): string {
   if (diffDay < 7) return `${diffDay}d ago`;
   return formatDate(date);
 }
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#090909" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Lallu Syndrome" />
+  <title>Lallu Syndrome</title>
+  <meta name="description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
+  <meta property="og:title" content="Lallu Syndrome" />
+  <meta property="og:description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</body>
+
+</html>
 </file>
 
 <file path="src/components/articles/ArticleCard.tsx">
@@ -5073,6 +4683,147 @@ export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
 }
 </file>
 
+<file path="src/pages/auth/SignupPage.tsx">
+import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { signup } from '@/services/authService';
+// import { Turnstile } from '@/components/auth/Turnstile';
+
+// Replace with your actual Cloudflare Turnstile Site Key
+// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    captcha?: string;
+    form?: string;
+  }>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = (): boolean => {
+    const e: typeof errors = {};
+    if (!name) e.name = 'Name is required.';
+    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
+    if (!email) e.email = 'Email is required.';
+    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
+    if (!password) e.password = 'Password is required.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
+    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
+    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      await signup(name, email, password, captchaToken ?? undefined);
+      navigate('/dashboard');
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Create account"
+      subtitle="Start writing and publishing on Lallu Syndrome."
+      footer={
+        <>
+          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errors.form && (
+          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
+            {errors.form}
+          </div>
+        )}
+        <Input
+          label="Name"
+          type="text"
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+          autoComplete="name"
+          required
+        />
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          autoComplete="email"
+          required
+        />
+        <Input
+          label="Password"
+          isPassword
+          name="password"
+          placeholder="At least 6 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          autoComplete="new-password"
+          required
+        />
+        <Input
+          label="Confirm password"
+          isPassword
+          name="confirmPassword"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          error={errors.confirmPassword}
+          autoComplete="new-password"
+          required
+        />
+
+        {/* Turnstile Captcha */}
+        {/* <div>
+          <Turnstile
+            siteKey={TURNSTILE_SITE_KEY}
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              setErrors((prev) => ({ ...prev, captcha: undefined }));
+            }}
+          />
+          {errors.captcha && (
+            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
+          )}
+        </div> */}
+
+        <Button type="submit" className="w-full" loading={loading}>
+          Create account
+        </Button>
+      </form>
+    </AuthLayout>
+  );
+}
+</file>
+
 <file path="src/pages/CategoryPage.tsx">
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -5146,6 +4897,38 @@ export function CategoryPage() {
       {renderArticles()}
     </PageContainer>
   );
+}
+</file>
+
+<file path="tsconfig.app.json">
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Path alias depth-invariant imports for src (@/foo === src/foo from any file) */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
 }
 </file>
 
@@ -5283,6 +5066,32 @@ export async function logout(): Promise<void> {
 
   if (error) { throw new Error(error.message); }
 }
+</file>
+
+<file path="vite.config.ts">
+/// <reference types="node" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  server: {
+    host: true,
+    allowedHosts: [
+      'quakier-ascensive-melodie.ngrok-free.dev',
+    ],
+  },
+  optimizeDeps: {
+    include: ['lucide-react'],
+  },
+});
 </file>
 
 <file path="src/components/layout/Navbar.tsx">
@@ -5701,342 +5510,6 @@ export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
 }
 </file>
 
-<file path="src/components/interactions/CommentSection.tsx">
-// src/components/interactions/CommentSection.tsx
-import { useEffect, useState, type FormEvent } from 'react';
-import { Send, Trash2 } from 'lucide-react';
-import type { Comment } from '@/types';
-import { getComments, addComment, deleteComment } from '@/services/articleService';
-import { useAuth } from '@/contexts/AuthContext';
-import { relativeTime } from '@/utils/date';
-import type { User } from '@supabase/supabase-js';
-
-type CommentSectionProps = {
-  articleId: string;
-};
-
-export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { user, profile } = useAuth();
-
-  useEffect(() => {
-    let mounted = true;
-    const loadComments = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await getComments(articleId);
-        if (mounted) setComments(result);
-      } catch {
-        if (mounted) setError('Unable to load comments.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    loadComments();
-    return () => { mounted = false; };
-  }, [articleId]);
-
-  // Helper to add a new comment/reply to the local state
-  const handleAddComment = (newComment: Comment) => {
-    setComments((prev) => [...prev, newComment]);
-  };
-
-  // Helper to remove a deleted comment (and its nested replies) from local state
-  const handleDeleteComment = (commentId: string) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
-  };
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmedContent = content.trim();
-    if (!trimmedContent || !user || submitting) return;
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      const newComment = await addComment(articleId, trimmedContent);
-      handleAddComment(newComment);
-      setContent('');
-    } catch {
-      setError('Unable to post your comment. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const topLevel = comments.filter((comment) => comment.parentId === null);
-  const getReplies = (parentId: string) =>
-    comments.filter((comment) => comment.parentId === parentId);
-
-  let commentsContent: JSX.Element;
-  if (loading) {
-    commentsContent = (
-      <div className="space-y-6">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="animate-pulse">
-            <div className="flex gap-3">
-              <div className="w-9 h-9 rounded-full bg-elevated" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-24 bg-elevated rounded" />
-                <div className="h-4 w-full bg-elevated rounded" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  } else if (error && comments.length === 0) {
-    commentsContent = <p className="text-sm text-text-muted">{error}</p>;
-  } else if (topLevel.length === 0) {
-    commentsContent = (
-      <p className="text-sm text-text-muted">
-        No comments yet. Be the first to say something.
-      </p>
-    );
-  } else {
-    commentsContent = (
-      <div className="space-y-6">
-        {topLevel.map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            replies={getReplies(comment.id)}
-            articleId={articleId}
-            user={user}
-            onReplyAdded={handleAddComment}
-            onDelete={handleDeleteComment} // <-- ADD THIS
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <section className="mt-16 pt-10 border-t border-border-subtle">
-      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
-        Comments
-      </h3>
-
-      {/* Top-level comment form */}
-      {user ? (
-        <form onSubmit={handleSubmit} className="mb-8">
-          <div className="flex gap-3">
-            {profile?.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name ?? 'User'}
-                className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-                {(profile?.display_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                placeholder="Write a comment..."
-                rows={3}
-                maxLength={1000}
-                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
-                disabled={submitting}
-              />
-              <div className="flex justify-end mt-2">
-                <button
-                  type="submit"
-                  disabled={!content.trim() || submitting}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  <Send size={14} />
-                  {submitting ? 'Posting...' : 'Comment'}
-                </button>
-              </div>
-            </div>
-          </div>
-          {error && <p className="mt-3 text-sm text-accent">{error}</p>}
-        </form>
-      ) : (
-        <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
-          <a href="/login" className="text-accent hover:underline">Sign in</a> to leave a comment.
-        </div>
-      )}
-
-      {commentsContent}
-    </section>
-  );
-}
-
-// Recursive Comment Item component
-function CommentItem({
-  comment,
-  replies,
-  articleId,
-  user,
-  onReplyAdded,
-  onDelete,
-}: Readonly<{
-  comment: Comment;
-  replies: Comment[];
-  articleId: string;
-  user: User | null;
-  onReplyAdded: (newComment: Comment) => void;
-  onDelete: (commentId: string) => void;
-}>) {
-  const [isReplying, setIsReplying] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // --- MODERATION LOGIC ---
-  // Replace with your actual UUID from Supabase Auth dashboard
-  // const ADMIN_UUID = 'YOUR-AUTH-UUID-HERE'; 
-  // const isAdmin = user?.id === ADMIN_UUID;
-  const isOwner = user?.id === comment.authorId;
-  const canDelete = isOwner // || isAdmin;
-
-  const handleDelete = async () => {
-    if (!confirm('Delete this comment?')) return;
-    setIsDeleting(true);
-    try {
-      await deleteComment(comment.id);
-      onDelete(comment.id);
-    } catch (error) {
-      console.error('Failed to delete comment:', error);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmed = replyContent.trim();
-    if (!trimmed || !user || submitting) return;
-    try {
-      setSubmitting(true);
-      const newComment = await addComment(articleId, trimmed, comment.id);
-      onReplyAdded(newComment);
-      setReplyContent('');
-      setIsReplying(false);
-    } catch (error) {
-      console.error('Failed to post reply:', error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-3">
-        {comment.avatar ? (
-          <img
-            src={comment.avatar}
-            alt={comment.author}
-            className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-            {comment.author.charAt(0).toUpperCase()}
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          {/* Header with Reply & Delete buttons */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-sm font-medium text-text-primary">
-              {comment.author}
-            </span>
-            <span className="font-mono text-xs text-text-muted">
-              {relativeTime(comment.createdAt)}
-            </span>
-            {user && (
-              <button
-                type="button"
-                onClick={() => setIsReplying(!isReplying)}
-                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
-                {isReplying ? 'Cancel' : 'Reply'}
-              </button>
-            )}
-            {/* DELETE BUTTON */}
-            {canDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
-                aria-label="Delete comment"
-              >
-                {isDeleting ? '...' : <Trash2 size={14} />}
-              </button>
-            )}
-          </div>
-          
-          {/* Comment Content */}
-          <p className="text-sm text-text-secondary leading-relaxed">
-            {comment.content}
-          </p>
-
-          {/* Inline Reply Form */}
-          {isReplying && (
-            <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
-              <textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                placeholder="Write a reply..."
-                rows={2}
-                maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" 
-                disabled={submitting}
-                autoFocus
-              />
-              <button
-                type="submit"
-                disabled={!replyContent.trim() || submitting}
-                className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send size={14} />
-              </button>
-            </form>
-          )}
-
-          {/* Nested Replies */}
-          {replies.length > 0 && (
-            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
-              {replies.map((reply) => (
-                <CommentItem
-                  key={reply.id}
-                  comment={reply}
-                  replies={[]} 
-                  articleId={articleId}
-                  user={user}
-                  onReplyAdded={onReplyAdded}
-                  onDelete={onDelete}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/services/storageService.ts">
 import { supabase } from '@/lib/supabase';
 
@@ -6201,162 +5674,6 @@ export function extractStorageImagePaths(content: string): string[] {
 
   return [...new Set(paths)];
 }
-</file>
-
-<file path="src/App.tsx">
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { type ReactNode, useEffect } from 'react';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { HomePage } from '@/pages/HomePage';
-import { ArticlesPage } from '@/pages/ArticlesPage';
-import { ArticlePage } from '@/pages/ArticlePage';
-import { CategoryPage } from '@/pages/CategoryPage';
-import { AboutPage } from '@/pages/AboutPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { SignupPage } from '@/pages/auth/SignupPage';
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
-import { SettingsLayout } from '@/components/layout/SettingsLayout';
-import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
-import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
-import { ToastProvider } from '@/contexts/ToastContext';
-import { CreatorPage } from '@/pages/CreatorPage';
-import { WriterProfilePage } from '@/pages/WriterProfilePage';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { NotFoundPage } from './pages/NotFoundPage';
-import { AdminPage } from '@/pages/AdminPage';
-
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  return null;
-}
-
-function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
-  );
-}
-
-function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen bg-bg">{children}</div>
-  );
-}
-
-function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-    </div>
-  );
-}
-function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, profile, isLoading, isProfileLoading } = useAuth();
-
-  if (isLoading || isProfileLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-
-  if (!profile?.is_admin) { 
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-}
-function AppRoutes() {
-  return (
-    <>
-      <ScrollToTop />
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
-        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
-        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
-        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
-        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
-        <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
-        <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
-
-        {/* Auth routes */}
-        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
-        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
-        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
-        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
-
-        {/* Dashboard routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route
-          path="/settings"
-          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
-        >
-          <Route index element={<Navigate to="profile" replace />} />
-          <Route path="profile" element={<ProfileSettingsPage />} />
-          <Route path="password" element={<PasswordSettingsPage />} />
-
-        </Route>
-
-        {/* Admin routes */}
-        <Route path="/admin" element={<AdminRoute><AppLayout><AdminPage /></AppLayout></AdminRoute>} />
-
-        {/* Fallback */}
-        <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
-      </Routes>
-    </>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <ErrorBoundary>
-              <AppRoutes />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
-  );
-}
-
-export default App;
 </file>
 
 <file path="src/pages/AboutPage.tsx">
@@ -6546,6 +5863,162 @@ export function AboutPage() {
     </div>
   );
 }
+</file>
+
+<file path="src/App.tsx">
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { type ReactNode, useEffect } from 'react';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { HomePage } from '@/pages/HomePage';
+import { ArticlesPage } from '@/pages/ArticlesPage';
+import { ArticlePage } from '@/pages/ArticlePage';
+import { CategoryPage } from '@/pages/CategoryPage';
+import { AboutPage } from '@/pages/AboutPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
+import { LoginPage } from '@/pages/auth/LoginPage';
+import { SignupPage } from '@/pages/auth/SignupPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { SettingsLayout } from '@/components/layout/SettingsLayout';
+import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
+import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
+import { ToastProvider } from '@/contexts/ToastContext';
+import { CreatorPage } from '@/pages/CreatorPage';
+import { WriterProfilePage } from '@/pages/WriterProfilePage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { AdminPage } from '@/pages/AdminPage';
+
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
+function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
+function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen bg-bg">{children}</div>
+  );
+}
+
+function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
+function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, profile, isLoading, isProfileLoading } = useAuth();
+
+  if (isLoading || isProfileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (!profile?.is_admin) { 
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+function AppRoutes() {
+  return (
+    <>
+      <ScrollToTop />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
+        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
+        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
+        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
+        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
+        <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
+        <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
+
+        {/* Auth routes */}
+        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
+        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
+        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
+        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
+
+        {/* Dashboard routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
+        >
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="password" element={<PasswordSettingsPage />} />
+
+        </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin" element={<AdminRoute><AppLayout><AdminPage /></AppLayout></AdminRoute>} />
+
+        {/* Fallback */}
+        <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
+      </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
 </file>
 
 <file path="src/index.css">
@@ -7146,6 +6619,61 @@ function TabButton({ label, count, active, onClick }: Readonly<{ label: string; 
 }
 </file>
 
+<file path="package.json">
+{
+  "name": "vite-react-typescript-starter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "@tiptap/extension-image": "^3.30.1",
+    "@tiptap/extension-link": "^3.30.1",
+    "@tiptap/extension-placeholder": "^3.30.1",
+    "@tiptap/extension-text-align": "^3.30.1",
+    "@tiptap/extension-underline": "^3.30.1",
+    "@tiptap/pm": "^3.30.1",
+    "@tiptap/react": "^3.30.1",
+    "@tiptap/starter-kit": "^3.30.1",
+    "@tiptap/suggestion": "^3.30.1",
+    "dompurify": "^3.4.13",
+    "lucide-react": "^0.446.0",
+    "ogl": "^1.0.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.2",
+    "tippy.js": "^6.3.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@types/node": "^26.2.0",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "eslint": "^9.9.1",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "globals": "^15.9.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.3.0",
+    "vite": "^5.4.2"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
+</file>
+
 <file path="src/pages/HomePage.tsx">
 import { useEffect, useState, Suspense, lazy } from 'react';
 import type { Article, Category } from '@/types';
@@ -7410,594 +6938,6 @@ export type ProfileSaveValues = {
   github_url?: string | null;
   linkedin_url?: string | null;
 };
-</file>
-
-<file path="src/components/editor/TiptapEditor.tsx">
-import { useEditor, EditorContent } from '@tiptap/react';
-import { useRef } from 'react';
-import type { Editor } from '@tiptap/core';
-import { BubbleMenu } from '@tiptap/react/menus';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import Link from '@tiptap/extension-link';
-import { CodeBlock } from './CodeBlock';
-import { AlignedImage } from './AlignedImage';
-import { SlashCommand } from './SlashCommand';
-import TextAlign from '@tiptap/extension-text-align';
-import { processPastedHtml } from './processPastedHtml';
-import { useToast } from '@/contexts/ToastContext';
-
-import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Link as LinkIcon,
-  Quote,
-  Code,
-  Eraser,
-  Heading1,
-  Heading2,
-  Heading3,
-  AlignJustify,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-} from 'lucide-react';
-
-
-type TiptapEditorProps = {
-  value: string;
-  onChange: (html: string) => void;
-  onImageUpload: (file: File) => Promise<string>;
-};
-function isDirectImageUrl(value: string): boolean {
-  try {
-    const url = new URL(value.trim());
-
-    return /\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(url.pathname + url.search);
-  } catch {
-    return false;
-  }
-}
-export function TiptapEditor({
-  value,
-  onChange,
-  onImageUpload
-}: Readonly<TiptapEditorProps>) {
-
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const openImagePicker = (targetEditor: Editor) => {
-    fileInputRef.current?.click();
-
-    const handleFileChange = async () => {
-      const file = fileInputRef.current?.files?.[0];
-
-      if (!file) return;
-
-      try {
-        const url = await onImageUpload(file);
-
-        targetEditor
-          .chain()
-          .focus()
-          .setImage({
-            src: url,
-            alt: file.name,
-          })
-          .run();
-      } catch (error) {
-        console.error('Failed to upload image:', error);
-        toast.error('Failed to upload image. Please try again.');
-      } finally {
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-
-        fileInputRef.current?.removeEventListener(
-          'change',
-          handleFileChange
-        );
-      }
-    };
-
-    fileInputRef.current?.addEventListener(
-      'change',
-      handleFileChange,
-      { once: true }
-    );
-  };
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false,
-        link: false,
-      }),
-      Placeholder.configure({
-        placeholder: "Type '/' for commands...",
-      }),
-      Link.configure({
-        openOnClick: false,
-      }),
-      TextAlign.extend({
-        addKeyboardShortcuts() {
-          return {}; // disable all TextAlign shortcuts
-        },
-      }).configure({
-        types: ['paragraph', 'heading'],
-        defaultAlignment: 'justify',
-      }),
-      SlashCommand.configure({
-        onImageUpload: openImagePicker,
-      }),
-      AlignedImage,
-      CodeBlock,
-    ],
-
-
-    content: value,
-
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
-    },
-    editorProps: {
-      attributes: {
-        class: 'article-prose focus:outline-none min-h-[300px]',
-      },
-
-      handlePaste: (_view, event) => {
-        const clipboardData = event.clipboardData;
-
-        if (!clipboardData) {
-          return false;
-        }
-
-        // 1. Pasted image file from clipboard
-        const items = Array.from(clipboardData.items);
-
-        const imageItem = items.find((item) =>
-          item.type.startsWith('image/')
-        );
-
-        if (imageItem) {
-          const file = imageItem.getAsFile();
-
-          if (!file) {
-            return false;
-          }
-
-          const position = editor?.state.selection.from;
-
-          void (async () => {
-            try {
-              const url = await onImageUpload(file);
-
-              if (!editor || position === undefined) {
-                return;
-              }
-
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(position, {
-                  type: 'image',
-                  attrs: {
-                    src: url,
-                    alt: file.name,
-                  },
-                })
-                .run();
-            } catch (error) {
-              console.error('Failed to upload pasted image:', error);
-              toast.error('Failed to upload image. Please try again.');
-            }
-          })();
-
-          return true;
-        }
-
-        // 2. Direct image URL pasted as text
-        const pastedText = clipboardData.getData('text/plain').trim();
-
-        if (pastedText && isDirectImageUrl(pastedText)) {
-          if (!editor) return true;
-          editor.chain().focus().setImage({ src: pastedText, alt: '' }).run();
-
-          void (async () => {
-            try {
-              const response = await fetch(pastedText);
-              if (!response.ok) return;
-              const blob = await response.blob();
-              if (!blob.type.startsWith('image/')) return;
-
-              const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
-              const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
-              const url = await onImageUpload(file);
-
-              // Find the image node by its original src and update it
-              editor.chain().command(({ tr }) => {
-                let updated = false;
-                tr.doc.descendants((node, pos) => {
-                  if (node.type.name === 'image' && node.attrs.src === pastedText) {
-                    tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
-                    updated = true;
-                    return false;
-                  }
-                });
-                return updated;
-              }).run();
-            }
-            catch (error) {
-              console.error('Failed to upload image from URL:', error);
-              toast.error('Failed to upload image from URL. Please try again.');
-            }
-          })();
-
-          return true;
-        }
-
-        // 3. Pasted HTML content
-        const pastedHtml = clipboardData.getData('text/html');
-
-        if (pastedHtml) {
-          if (!editor) return true;
-
-          // Process HTML synchronously to get the content and the list of images
-          const { html: processedHtml, images } = processPastedHtml(pastedHtml);
-
-          // FIX: Let Tiptap parse the HTML string directly. 
-          // This safely handles the schema and replaces active text selections.
-          editor.chain().focus().insertContent(processedHtml).run();
-
-          void (async () => {
-            for (const img of images) {
-              try {
-                const response = await fetch(img.originalSrc);
-                if (!response.ok) continue;
-                const blob = await response.blob();
-                if (!blob.type.startsWith('image/')) continue;
-
-                const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
-                const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
-                const url = await onImageUpload(file);
-
-                // Find the image node by its original src and update it
-                editor.chain().command(({ tr }) => {
-                  let updated = false;
-                  tr.doc.descendants((node, pos) => {
-                    if (node.type.name === 'image' && node.attrs.src === img.originalSrc) {
-                      tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
-                      updated = true;
-                      return false;
-                    }
-                  });
-                  return updated;
-                }).run();
-              } catch (error) {
-                console.error(`Failed to process pasted image:`, error);
-                toast.error('Failed to process pasted image. Please try again.');
-              }
-            }
-          })();
-
-          return true;
-        }
-      },
-
-      handleDrop: (_view, event, _slice, moved) => {
-        if (moved) {
-          return false;
-        }
-
-        const files = Array.from(event.dataTransfer?.files ?? []);
-
-        const imageFile = files.find((file) =>
-          file.type.startsWith('image/')
-        );
-
-        if (!imageFile) {
-          return false;
-        }
-
-        void (async () => {
-          try {
-            const url = await onImageUpload(imageFile);
-
-            editor?.chain()
-              .focus()
-              .setImage({
-                src: url,
-                alt: imageFile.name,
-              })
-              .run();
-          } catch (error) {
-            console.error('Failed to upload dropped image:', error);
-            toast.error('Failed to upload image. Please try again.');
-          }
-        })();
-
-        return true;
-      },
-    },
-  });
-
-
-  const setLink = () => {
-    if (!editor) return;
-
-    const previousUrl = editor.getAttributes('link').href;
-
-    const url = window.prompt('Enter URL', previousUrl);
-
-    if (url === null) return;
-
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  };
-
-  if (!editor) {
-    return null;
-  }
-  // Predicates for bubble menus
-  const textMenuShouldShow = ({ editor }: { editor: Editor }) => {
-    // Show only when there is a selection and the active node is NOT an image
-    return !editor.isActive('image') && !editor.state.selection.empty;
-  };
-
-  const imageMenuShouldShow = ({ editor }: { editor: Editor }) => {
-    return editor.isActive('image');
-  };
-  return (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-      />
-      {/* ====== TEXT BUBBLE MENU ====== */}
-      <BubbleMenu
-        editor={editor}
-        shouldShow={textMenuShouldShow}
-        className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
-      >
-        {/* Bold */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('bold')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Bold"
-        >
-          <Bold size={16} />
-        </button>
-
-        {/* Italic */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('italic')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Italic"
-        >
-          <Italic size={16} />
-        </button>
-
-        {/* Strike */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('strike')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Strikethrough"
-        >
-          <Strikethrough size={16} />
-        </button>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* Heading 1 */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Heading 1"
-        >
-          <Heading1 size={16} />
-        </button>
-
-        {/* Heading 2 */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Heading 2"
-        >
-          <Heading2 size={16} />
-        </button>
-
-        {/* Heading 3 */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Heading 3"
-        >
-          <Heading3 size={16} />
-        </button>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* Justify text */}
-        <button
-          type="button"
-          onClick={() => {
-            if (editor.isActive({ textAlign: 'justify' })) {
-              editor.chain().focus().setTextAlign('left').run();
-            } else {
-              editor.chain().focus().setTextAlign('justify').run();
-            }
-          }}
-          className={`p-2.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Justify text"
-        >
-          <AlignJustify size={16} />
-        </button>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* Quote */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('blockquote')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Quote"
-        >
-          <Quote size={16} />
-        </button>
-
-        {/* Inline Code */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('code')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Inline code"
-        >
-          <Code size={16} />
-        </button>
-
-        {/* Clear formatting */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
-          className="p-2.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
-          title="Clear formatting"
-        >
-          <Eraser size={16} />
-        </button>
-
-        {/* Link */}
-        <button
-          type="button"
-          onClick={setLink}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('link')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Add link"
-        >
-          <LinkIcon size={16} />
-        </button>
-      </BubbleMenu>
-      {/* ====== IMAGE BUBBLE MENU ====== */}
-      <BubbleMenu
-        editor={editor}
-        shouldShow={imageMenuShouldShow}
-        className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
-      >
-        {/* Alignment */}
-        <button
-          type="button"
-          onClick={() =>
-            editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
-          }
-          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Align image left"
-        >
-          <AlignLeft size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
-          }
-          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Center image"
-        >
-          <AlignCenter size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
-          }
-          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Align image right"
-        >
-          <AlignRight size={16} />
-        </button>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* Width presets */}
-        {[
-          { label: 'S', width: '25%', title: 'Small image' },
-          { label: 'M', width: '50%', title: 'Medium image' },
-          { label: 'L', width: '75%', title: 'Large image' },
-          { label: 'F', width: '100%', title: 'Full width image' },
-        ].map(({ label, width, title }) => (
-          <button
-            key={width}
-            type="button"
-            onClick={() =>
-              editor.chain().focus().updateAttributes('image', { width }).run()
-            }
-            className={`p-2.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title={title}
-          >
-            {label}
-          </button>
-        ))}
-      </BubbleMenu>
-
-      <EditorContent editor={editor} />
-    </>
-  );
-}
 </file>
 
 <file path="src/pages/ArticlePage.tsx">

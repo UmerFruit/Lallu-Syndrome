@@ -12,7 +12,9 @@ export type Author = {
 export type ArticleInput = Pick<
   Article,
   'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
->;
+> & {
+  publicationId?: string;
+};
 
 export type Comment = {
   id: string;
@@ -30,7 +32,17 @@ export type Category = {
   slug: string;
   name: string;
 };
-
+export type Publication = {
+  id: string;
+  ownerId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 export type Article = {
   id: string;
   slug: string;
@@ -39,6 +51,12 @@ export type Article = {
   category: string;
   coverImage: string;
   author: Author;
+  publicationId: string;
+  publication: {
+    id: string;
+    slug: string;
+    name: string;
+  };
   publishedAt?: string;
   createdAt: string;
   updatedAt?: string;
@@ -61,7 +79,7 @@ export type Profile = {
   website_url: string | null;
   github_url: string | null;
   linkedin_url: string | null;
-  is_admin: boolean; 
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 };

@@ -46,7 +46,7 @@ export function ArticlePage() {
   const [error, setError] = useState(false);
   const [liked, setLiked] = useState(false);
   const { user } = useAuth();
-  
+
   const authorCardRef = useRef<HTMLDivElement>(null);
   const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
   const [coverImgError, setCoverImgError] = useState(false);
@@ -104,14 +104,14 @@ export function ArticlePage() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); 
+    handleScroll();
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isAuthorCardVisible]);
 
   // 3. Memoized Headings (MUST be before conditional returns)
   const headings = useMemo(
-    () => extractHeadings(article?.content ?? ''), 
+    () => extractHeadings(article?.content ?? ''),
     [article?.content]
   );
 
@@ -156,6 +156,16 @@ export function ArticlePage() {
       <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
+          {article.publication && (
+            <div className="mb-3 flex justify-center">
+              <Link
+                to={`/p/${article.publication.slug}`}
+                className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
+              >
+                {article.publication.name}
+              </Link>
+            </div>
+          )}
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>

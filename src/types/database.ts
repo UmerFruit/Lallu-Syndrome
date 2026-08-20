@@ -55,6 +55,7 @@ export type Database = {
           cover_image: string | null
           created_at: string
           id: string
+          publication_id: string
           published_at: string | null
           reading_time: number | null
           slug: string
@@ -69,6 +70,7 @@ export type Database = {
           cover_image?: string | null
           created_at?: string
           id?: string
+          publication_id: string
           published_at?: string | null
           reading_time?: number | null
           slug: string
@@ -83,6 +85,7 @@ export type Database = {
           cover_image?: string | null
           created_at?: string
           id?: string
+          publication_id?: string
           published_at?: string | null
           reading_time?: number | null
           slug?: string
@@ -103,6 +106,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_publication_id_fkey"
+            columns: ["publication_id"]
+            isOneToOne: false
+            referencedRelation: "publications"
             referencedColumns: ["id"]
           },
         ]
@@ -219,11 +229,63 @@ export type Database = {
         }
         Relationships: []
       }
+      publications: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          logo_url: string | null
+          name: string
+          owner_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          owner_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publications_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      create_default_publication: {
+        Args: { p_owner_id: string }
+        Returns: undefined
+      }
+      generate_publication_slug: {
+        Args: { p_owner_id: string }
+        Returns: string
+      }
       is_admin: { Args: { user_id: string }; Returns: boolean }
     }
     Enums: {

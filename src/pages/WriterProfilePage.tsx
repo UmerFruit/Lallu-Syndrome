@@ -1,47 +1,64 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
-import type { Article } from '@/types';
+import type { Article, Publication } from '@/types';
 import type { Profile } from '@/services/profileService';
 import { getProfileByUsername } from '@/services/profileService';
 import { getPublishedArticlesByAuthor } from '@/services/articleService';
+import { getPublicationsByOwner } from '@/services/publicationService';
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
 
 export function WriterProfilePage() {
   const { username } = useParams<{ username: string }>();
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [publications, setPublications] = useState<Publication[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [status, setStatus] = useState<'loading' | 'found' | 'not-found'>('loading');
 
   useEffect(() => {
     if (!username) return;
+
     let mounted = true;
 
     setStatus('loading');
     setProfile(null);
     setArticles([]);
+    setPublications([]);
     setLoadingArticles(true);
 
     (async () => {
       try {
         const found = await getProfileByUsername(username.toLowerCase());
+
         if (!mounted) return;
+
         if (!found) {
           setStatus('not-found');
           setLoadingArticles(false);
           return;
         }
+
         setProfile(found);
         setStatus('found');
-        const writerArticles = await getPublishedArticlesByAuthor(found.id);
+
+        const [writerArticles, writerPublications] = await Promise.all([
+          getPublishedArticlesByAuthor(found.id),
+          getPublicationsByOwner(found.id).catch(() => [] as Publication[]),
+        ]);
+
         if (!mounted) return;
+
         setArticles(writerArticles);
+        setPublications(writerPublications);
       } catch (error) {
         console.error('Failed to load writer profile:', error);
+
         if (!mounted) return;
+
         setStatus('not-found');
       } finally {
         if (mounted) setLoadingArticles(false);
@@ -55,6 +72,7 @@ export function WriterProfilePage() {
 
   const externalLinks = useMemo(() => {
     if (!profile) return [];
+
     return [
       { label: 'Website', href: profile.website_url },
       { label: 'GitHub', href: profile.github_url },
@@ -67,9 +85,15 @@ export function WriterProfilePage() {
     [articles]
   );
 
+  const latestArticles = articles.slice(0, 3);
+
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]" role="status" aria-label="Loading writer profile">
+      <div
+        className="flex items-center justify-center min-h-[60vh]"
+        role="status"
+        aria-label="Loading writer profile"
+      >
         <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -79,12 +103,15 @@ export function WriterProfilePage() {
     return (
       <PageContainer className="py-24 text-center">
         <UserX size={32} className="mx-auto text-text-muted mb-4" />
+
         <h1 className="font-serif text-2xl font-semibold text-text-primary mb-2">
           Writer not found
         </h1>
+
         <p className="text-text-muted mb-6">
           This profile doesn't exist, or the username has changed.
         </p>
+
         <Link
           to="/articles"
           className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
@@ -168,30 +195,73 @@ export function WriterProfilePage() {
             className="anim-fade-up mt-10 flex items-center justify-center gap-8"
             style={{ animationDelay: '0.9s' }}
           >
-            <Stat value={articles.length} label={articles.length === 1 ? 'Article' : 'Articles'} />
+            <Stat
+              value={articles.length}
+              label={articles.length === 1 ? 'Article' : 'Articles'}
+            />
+
             <span className="h-8 w-px bg-border-subtle" aria-hidden="true" />
+
             <Stat value={totalLikes} label={totalLikes === 1 ? 'Like' : 'Likes'} />
           </div>
         </header>
 
-        {/* Published articles */}
+        {/* Publications */}
+        {publications.length > 0 && (
+          <section className="mx-auto mt-12 md:mt-16 max-w-content">
+            <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
+              Publications
+            </h2>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {publications.map((publication) => (
+                <Link
+                  key={publication.id}
+                  to={`/p/${publication.slug}`}
+                  className="group rounded border border-border-subtle bg-surface p-4 transition-colors hover:border-border"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-medium text-text-primary transition-colors group-hover:text-accent">
+                      {publication.name}
+                    </p>
+
+                    {publication.isDefault && (
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                        default
+                      </span>
+                    )}
+                  </div>
+
+                  {publication.description && (
+                    <p className="mt-2 line-clamp-2 text-xs text-text-secondary">
+                      {publication.description}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Latest articles */}
         <section className="mx-auto mt-12 md:mt-16 max-w-content">
           <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
-            Published writing
+            Latest writing
           </h2>
+
           {loadingArticles ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <ArticleCardSkeleton key={i} />
               ))}
             </div>
-          ) : articles.length === 0 ? (
+          ) : latestArticles.length === 0 ? (
             <p className="py-12 text-center text-text-muted">
               No published articles yet.
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {articles.map((article) => (
+              {latestArticles.map((article) => (
                 <ArticleCard key={article.id} article={article} />
               ))}
             </div>
@@ -205,7 +275,10 @@ export function WriterProfilePage() {
 function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
   return (
     <div className="text-center">
-      <p className="font-serif text-2xl font-medium text-text-primary md:text-3xl">{value}</p>
+      <p className="font-serif text-2xl font-medium text-text-primary md:text-3xl">
+        {value}
+      </p>
+
       <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
         {label}
       </p>
