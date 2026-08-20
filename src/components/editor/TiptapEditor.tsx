@@ -11,7 +11,7 @@ import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
 import { useToast } from '@/contexts/ToastContext';
-
+// import '@tiptap/react/menus/styles.css';
 import {
   Bold,
   Italic,
@@ -349,233 +349,243 @@ export function TiptapEditor({
       <BubbleMenu
         editor={editor}
         shouldShow={textMenuShouldShow}
-        className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+        options={{ placement: 'top', offset: 8 }}
       >
-        {/* Bold */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('bold')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Bold"
+        <div
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}
         >
-          <Bold size={16} />
-        </button>
+          {/* Bold */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('bold')
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Bold"
+          >
+            <Bold size={16} />
+          </button>
 
-        {/* Italic */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('italic')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Italic"
-        >
-          <Italic size={16} />
-        </button>
+          {/* Italic */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('italic')
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Italic"
+          >
+            <Italic size={16} />
+          </button>
 
-        {/* Strike */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('strike')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Strikethrough"
-        >
-          <Strikethrough size={16} />
-        </button>
+          {/* Strike */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('strike')
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Strikethrough"
+          >
+            <Strikethrough size={16} />
+          </button>
 
-        <div className="w-px h-5 bg-border" />
+          <div className="w-px h-5 bg-border" />
 
-        {/* Heading 1 */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Heading 1"
-        >
-          <Heading1 size={16} />
-        </button>
+          {/* Heading 1 */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Heading 1"
+          >
+            <Heading1 size={16} />
+          </button>
 
-        {/* Heading 2 */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Heading 2"
-        >
-          <Heading2 size={16} />
-        </button>
+          {/* Heading 2 */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Heading 2"
+          >
+            <Heading2 size={16} />
+          </button>
 
-        {/* Heading 3 */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Heading 3"
-        >
-          <Heading3 size={16} />
-        </button>
+          {/* Heading 3 */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Heading 3"
+          >
+            <Heading3 size={16} />
+          </button>
 
-        <div className="w-px h-5 bg-border" />
+          <div className="w-px h-5 bg-border" />
 
-        {/* Justify text */}
-        <button
-          type="button"
-          onClick={() => {
-            if (editor.isActive({ textAlign: 'justify' })) {
-              editor.chain().focus().setTextAlign('left').run();
-            } else {
-              editor.chain().focus().setTextAlign('justify').run();
-            }
-          }}
-          className={`p-2.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Justify text"
-        >
-          <AlignJustify size={16} />
-        </button>
+          {/* Justify text */}
+          <button
+            type="button"
+            onClick={() => {
+              if (editor.isActive({ textAlign: 'justify' })) {
+                editor.chain().focus().setTextAlign('left').run();
+              } else {
+                editor.chain().focus().setTextAlign('justify').run();
+              }
+            }}
+            className={`p-2.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Justify text"
+          >
+            <AlignJustify size={16} />
+          </button>
 
-        <div className="w-px h-5 bg-border" />
+          <div className="w-px h-5 bg-border" />
 
-        {/* Quote */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('blockquote')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Quote"
-        >
-          <Quote size={16} />
-        </button>
+          {/* Quote */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('blockquote')
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Quote"
+          >
+            <Quote size={16} />
+          </button>
 
-        {/* Inline Code */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('code')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Inline code"
-        >
-          <Code size={16} />
-        </button>
+          {/* Inline Code */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleCode().run()}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('code')
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Inline code"
+          >
+            <Code size={16} />
+          </button>
 
-        {/* Clear formatting */}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
-          className="p-2.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
-          title="Clear formatting"
-        >
-          <Eraser size={16} />
-        </button>
+          {/* Clear formatting */}
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
+            className="p-2.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+            title="Clear formatting"
+          >
+            <Eraser size={16} />
+          </button>
 
-        {/* Link */}
-        <button
-          type="button"
-          onClick={setLink}
-          className={`p-2.5 rounded transition-colors ${editor.isActive('link')
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Add link"
-        >
-          <LinkIcon size={16} />
-        </button>
+          {/* Link */}
+          <button
+            type="button"
+            onClick={setLink}
+            className={`p-2.5 rounded transition-colors ${editor.isActive('link')
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Add link"
+          >
+            <LinkIcon size={16} />
+          </button>
+        </div>
       </BubbleMenu>
       {/* ====== IMAGE BUBBLE MENU ====== */}
       <BubbleMenu
         editor={editor}
         shouldShow={imageMenuShouldShow}
-        className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+        options={{ placement: 'top', offset: 8 }}
       >
-        {/* Alignment */}
-        <button
-          type="button"
-          onClick={() =>
-            editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
-          }
-          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Align image left"
+        <div
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}
         >
-          <AlignLeft size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
-          }
-          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Center image"
-        >
-          <AlignCenter size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
-          }
-          className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
-            ? 'text-accent bg-surface'
-            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-            }`}
-          title="Align image right"
-        >
-          <AlignRight size={16} />
-        </button>
-
-        <div className="w-px h-5 bg-border" />
-
-        {/* Width presets */}
-        {[
-          { label: 'S', width: '25%', title: 'Small image' },
-          { label: 'M', width: '50%', title: 'Medium image' },
-          { label: 'L', width: '75%', title: 'Large image' },
-          { label: 'F', width: '100%', title: 'Full width image' },
-        ].map(({ label, width, title }) => (
+          {/* Alignment */}
           <button
-            key={width}
             type="button"
             onClick={() =>
-              editor.chain().focus().updateAttributes('image', { width }).run()
+              editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
             }
-            className={`p-2.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
+            className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
               ? 'text-accent bg-surface'
               : 'text-text-secondary hover:text-text-primary hover:bg-surface'
               }`}
-            title={title}
+            title="Align image left"
           >
-            {label}
+            <AlignLeft size={16} />
           </button>
-        ))}
+
+          <button
+            type="button"
+            onClick={() =>
+              editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
+            }
+            className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Center image"
+          >
+            <AlignCenter size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
+            }
+            className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Align image right"
+          >
+            <AlignRight size={16} />
+          </button>
+
+          <div className="w-px h-5 bg-border" />
+
+          {/* Width presets */}
+          {[
+            { label: 'S', width: '25%', title: 'Small image' },
+            { label: 'M', width: '50%', title: 'Medium image' },
+            { label: 'L', width: '75%', title: 'Large image' },
+            { label: 'F', width: '100%', title: 'Full width image' },
+          ].map(({ label, width, title }) => (
+            <button
+              key={width}
+              type="button"
+              onClick={() =>
+                editor.chain().focus().updateAttributes('image', { width }).run()
+              }
+              className={`p-2.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
+                ? 'text-accent bg-surface'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+              title={title}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </BubbleMenu>
 
       <EditorContent editor={editor} />
