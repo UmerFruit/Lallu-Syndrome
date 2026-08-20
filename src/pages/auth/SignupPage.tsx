@@ -65,7 +65,7 @@ export function SignupPage() {
       subtitle="Start writing and publishing on Lallu Syndrome."
       footer={
         <>
-          Already have an account NOOOOOOOOOOOOOOOOOOOOOO? <AuthLink to="/login">Sign in</AuthLink>
+          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
         </>
       }
     >
