@@ -42,15 +42,20 @@ export function SignupPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    console.log("I got called 1")
     if (!validate()) return;
     setLoading(true);
+    console.log("I got called 2")
     try {
       await signup(name, email, password, captchaToken ?? undefined);
       navigate('/dashboard');
+      console.log("I got called 3")
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+      console.log("I got called 4")
     } finally {
       setLoading(false);
+      console.log("I got called 5")
     }
   };
 

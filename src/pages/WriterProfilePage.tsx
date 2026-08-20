@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
-import type { Article, Publication } from '@/types';
-import type { Profile } from '@/services/profileService';
+import type { Article, Publication,Profile } from '@/types';
 import { getProfileByUsername } from '@/services/profileService';
 import { getPublishedArticlesByAuthor } from '@/services/articleService';
 import { getPublicationsByOwner } from '@/services/publicationService';
