@@ -19,6 +19,7 @@ export interface ParticleTextProps {
   glow?: boolean;
   className?: string;
   style?: CSSProperties;
+  widthScale?: number;
 }
 
 type Rgb = { r: number; g: number; b: number };
@@ -108,6 +109,7 @@ const ParticleText = ({
   fontFamily = 'inherit',
   glow = true,
   className = '',
+  widthScale = 1,
   style
 }: ParticleTextProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -294,7 +296,7 @@ const ParticleText = ({
       const ascent = Math.ceil(metrics.actualBoundingBoxAscent || resolvedSize * 0.78);
       const descent = Math.ceil(metrics.actualBoundingBoxDescent || resolvedSize * 0.22);
       const padding = Math.max(12, Math.ceil(resolvedSize * 0.08));
-      const textWidth = Math.max(1, left + right);
+      const textWidth = Math.max(1, Math.ceil((left + right) * widthScale));
       const textHeight = Math.max(1, ascent + descent);
 
       offscreen.width = textWidth + padding * 2;

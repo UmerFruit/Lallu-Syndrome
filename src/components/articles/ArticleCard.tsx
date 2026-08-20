@@ -1,13 +1,21 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
+import { getFallbackImage } from '@/utils/image';
 
 type ArticleCardProps = {
   article: Article;
 };
 
 export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
+  const [imgError, setImgError] = useState(false);
+  const fallback = getFallbackImage(article.id);
+  
+  // Use fallback if coverImage is empty OR if the image failed to load
+  const imageSrc = imgError || !article.coverImage ? fallback : article.coverImage;
+
   return (
     <Link
       to={`/articles/${article.slug}`}
@@ -16,26 +24,45 @@ export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
       <div className="overflow-hidden rounded-card border border-border-subtle">
         <div className="aspect-[16/9] overflow-hidden bg-elevated">
           <img
-            src={article.coverImage}
+            src={imageSrc}
             alt={article.title}
             loading="lazy"
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
           />
         </div>
       </div>
-
+      
       <div className="flex items-center gap-2">
         <Badge variant="accent">{article.category}</Badge>
         <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
       </div>
-
+      
       <h3 className="font-serif text-lg font-medium text-text-primary leading-snug tracking-tight group-hover:text-accent transition-colors duration-200">
         {article.title}
       </h3>
-
-      <time className="block font-mono text-xs text-text-muted">
-        {article.publishedAt && formatDate(article.publishedAt)}
-      </time>
+      
+      {/* Author & Date Row */}
+      <div className="flex items-center gap-2.5 pt-1">
+        {article.author.avatar ? (
+          <img 
+            src={article.author.avatar} 
+            alt="" 
+            className="w-6 h-6 rounded-full object-cover border border-border-subtle bg-elevated shrink-0" 
+          />
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-elevated border border-border-subtle flex items-center justify-center text-[10px] font-semibold text-text-secondary shrink-0">
+            {article.author.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono min-w-0">
+          <span className="text-text-secondary font-medium truncate">{article.author.name}</span>
+          <span>•</span>
+          <time className="whitespace-nowrap">
+            {article.publishedAt ? formatDate(article.publishedAt) : 'Draft'}
+          </time>
+        </div>
+      </div>
     </Link>
   );
 }

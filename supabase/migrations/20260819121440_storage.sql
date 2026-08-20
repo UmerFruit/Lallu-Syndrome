@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- ── Buckets ─────────────────────────────────────────────────
+-- Note: The 'media' bucket is public, so images are downloadable by anyone with the URL.
+-- This SELECT policy only restricts users from using the API to LIST the contents of folders they don't own.
 insert into storage.buckets (id, name, public)
 values ('media', 'media', true)
 on conflict (id) do nothing;

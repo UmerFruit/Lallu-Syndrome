@@ -47,36 +47,6 @@ export type Database = {
           },
         ]
       }
-      article_tags: {
-        Row: {
-          article_id: string
-          tag_id: number
-        }
-        Insert: {
-          article_id: string
-          tag_id: number
-        }
-        Update: {
-          article_id?: string
-          tag_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_tags_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_tags_tag_id_fkey"
-            columns: ["tag_id"]
-            isOneToOne: false
-            referencedRelation: "tags"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       articles: {
         Row: {
           author_id: string
@@ -243,27 +213,6 @@ export type Database = {
           updated_at?: string
           username?: string | null
           website_url?: string | null
-        }
-        Relationships: []
-      }
-      tags: {
-        Row: {
-          created_at: string
-          id: number
-          name: string
-          slug: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          name: string
-          slug: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          name?: string
-          slug?: string
         }
         Relationships: []
       }

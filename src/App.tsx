@@ -21,6 +21,8 @@ import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { CreatorPage } from '@/pages/CreatorPage';
 import { WriterProfilePage } from '@/pages/WriterProfilePage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -102,7 +104,7 @@ function AppRoutes() {
 
         </Route>
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
       </Routes>
     </>
   );
@@ -114,7 +116,9 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>
       </ToastProvider>

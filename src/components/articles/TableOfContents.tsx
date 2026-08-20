@@ -8,10 +8,10 @@ type Heading = {
 };
 
 export function extractHeadings(html: string): Heading[] {
-  const document = new DOMParser().parseFromString(html, 'text/html');
+  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
 
   const headings = Array.from(
-    document.querySelectorAll('h1, h2, h3')
+    parsedDoc.querySelectorAll('h1, h2, h3')
   );
 
   return headings.map((heading) => {

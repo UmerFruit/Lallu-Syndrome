@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
@@ -13,6 +13,8 @@ import { CommentSection } from '@/components/interactions/CommentSection';
 import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getFallbackImage } from '@/utils/image';
 
 function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
   return (
@@ -43,11 +45,13 @@ export function ArticlePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [liked, setLiked] = useState(false);
-
-  // Scroll-triggered animation state for the author card
+  const { user } = useAuth();
+  
   const authorCardRef = useRef<HTMLDivElement>(null);
   const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
+  const [coverImgError, setCoverImgError] = useState(false);
 
+  // 1. Data Fetching Effect
   useEffect(() => {
     async function loadArticle() {
       if (!slug) return;
@@ -57,6 +61,7 @@ export function ArticlePage() {
         setArticle(null);
         setRelated([]);
         setLiked(false);
+        setCoverImgError(false); // Reset image error when navigating to a new article
 
         const articleData = await getArticleBySlug(slug);
 
@@ -69,7 +74,7 @@ export function ArticlePage() {
 
         const [relatedData, likedData] = await Promise.all([
           getRelatedArticles(articleData, 3),
-          isLiked(articleData.id),
+          isLiked(articleData.id, user?.id),
         ]);
 
         setRelated(relatedData);
@@ -82,9 +87,9 @@ export function ArticlePage() {
     }
 
     loadArticle();
-  }, [slug]);
+  }, [slug, user?.id]); // Added user?.id to deps so likes update if auth resolves late
 
-
+  // 2. Scroll Effect
   useEffect(() => {
     const handleScroll = () => {
       const card = authorCardRef.current;
@@ -99,10 +104,18 @@ export function ArticlePage() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check on mount
+    handleScroll(); 
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isAuthorCardVisible]);
+
+  // 3. Memoized Headings (MUST be before conditional returns)
+  const headings = useMemo(
+    () => extractHeadings(article?.content ?? ''), 
+    [article?.content]
+  );
+
+  // --- Conditional Returns (Early Exits) ---
   if (loading) {
     return (
       <>
@@ -131,7 +144,9 @@ export function ArticlePage() {
     );
   }
 
-  const headings = extractHeadings(article.content);
+  // --- Safe to use `article` here, it is guaranteed to be non-null ---
+  const coverFallback = getFallbackImage(article.id);
+  const coverSrc = coverImgError || !article.coverImage ? coverFallback : article.coverImage;
   const articleUrl = window.location.href;
 
   return (
@@ -159,8 +174,9 @@ export function ArticlePage() {
         {/* Cover Image */}
         <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
           <img
-            src={article.coverImage}
+            src={coverSrc}
             alt=""
+            onError={() => setCoverImgError(true)}
             className="absolute inset-0 h-full w-full object-cover"
           />
         </div>

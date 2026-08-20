@@ -21,8 +21,8 @@ export type PastedImage = {
 
 export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
   const normalizedHtml = normalizeHtml(html);
-  const document = new DOMParser().parseFromString(normalizedHtml, 'text/html');
-  const images = Array.from(document.querySelectorAll('img'));
+  const parsedDoc = new DOMParser().parseFromString(normalizedHtml, 'text/html');
+  const images = Array.from(parsedDoc.querySelectorAll('img'));
   const imagesToUpload: PastedImage[] = [];
 
   images.forEach((image) => {
@@ -37,5 +37,5 @@ export function processPastedHtml(html: string): { html: string; images: PastedI
     image.removeAttribute('sizes');
 
   })
-  return { html: document.body.innerHTML, images: imagesToUpload };
+  return { html: parsedDoc.body.innerHTML, images: imagesToUpload };
 }

@@ -92,8 +92,8 @@ function mapSupabaseComment(
 export function calculateReadingTime(content: string): number {
   const wordsPerMinute = 220;
 
-  const doc = new DOMParser().parseFromString(content, "text/html");
-  const plaintext = (doc.body.textContent || '').trim();
+  const parsedDoc = new DOMParser().parseFromString(content, "text/html");
+  const plaintext = (parsedDoc.body.textContent || '').trim();
 
   if (!plaintext) return 1;
 
@@ -555,20 +555,14 @@ export async function toggleLike(
   };
 }
 
-export async function isLiked(articleId: string): Promise<boolean> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-
-  if (authError || !user) return false;
+export async function isLiked(articleId: string,userId?: string | null): Promise<boolean> {
+  if (!userId) return false;
 
   const { data, error } = await supabase
     .from('article_likes')
     .select('article_id')
     .eq('article_id', articleId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (error) throw error;

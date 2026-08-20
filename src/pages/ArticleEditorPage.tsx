@@ -43,7 +43,8 @@ export function ArticleEditorPage() {
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
 
-  const handleChange = (field: string, value: string) => {
+  type FormField = keyof typeof formData;
+  const handleChange = (field: FormField, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -132,10 +133,6 @@ export function ArticleEditorPage() {
   }, [formData, saveArticle, loading]);
 
   const handlePublish = async () => {
-    if (!formData.coverImage) {
-      toast.error('Cover image is required for published articles.');
-      return;
-    }
     if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
       toast.error('Publication date cannot be in the future.');
       return;
@@ -226,11 +223,23 @@ export function ArticleEditorPage() {
 
   const uploadContentImage = async (file: File): Promise<string> => {
     const articleId = articleRef.current?.id ?? id;
+
     if (!articleId || articleId === 'new') {
-      throw new Error('Save the article before inserting an image.');
+      const errorMsg = 'Please type something to auto-save the article before inserting an image.';
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
     }
-    const result = await upload(articleId, file, 'content');
-    return result.publicUrl;
+
+    try {
+      // The service handles the size/type checks and the actual upload
+      const result = await upload(articleId, file, 'content');
+      return result.publicUrl;
+    } catch (error: any) {
+      console.error('Content image upload failed:', error);
+      // If your service throws "Image must be under 5 MB.", it will be printed right here!
+      toast.error(error.message || 'Failed to upload image. Please try again.');
+      throw error;
+    }
   };
 
   // Inline local datetime for the max attribute
@@ -455,7 +464,7 @@ export function ArticleEditorPage() {
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-border-subtle px-3 py-2 text-sm text-text-muted transition-colors hover:border-text-muted hover:text-text-secondary">
-            <ImagePlus size={15} />
+              <ImagePlus size={15} />
               Cover
               <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
             </label>

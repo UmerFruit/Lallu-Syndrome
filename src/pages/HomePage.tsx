@@ -120,6 +120,7 @@ export function HomePage() {
               }
               fontWeight={400}
               fontFamily="inherit"
+              widthScale={1.05}
               glow={isMobile}
             />
           </Suspense>
