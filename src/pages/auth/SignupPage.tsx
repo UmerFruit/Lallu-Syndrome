@@ -35,7 +35,7 @@ export function SignupPage() {
     else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
     if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
     else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
+    // if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -65,7 +65,7 @@ export function SignupPage() {
       subtitle="Start writing and publishing on Lallu Syndrome."
       footer={
         <>
-          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
+          Already have an account NOOOOOOOOOOOOOOOOOOOOOO? <AuthLink to="/login">Sign in</AuthLink>
         </>
       }
     >
