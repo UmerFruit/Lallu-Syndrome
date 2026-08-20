@@ -46,6 +46,8 @@ export function ArticleEditorPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
+  const [publishing, setPublishing] = useState(false);
+  const publishingRef = useRef(false);
 
   type FormField = keyof typeof formData;
   const handleChange = (field: FormField, value: string) => {
@@ -157,33 +159,68 @@ export function ArticleEditorPage() {
   }, [formData, saveArticle, loading]);
 
   const handlePublish = async () => {
+    if (publishingRef.current) return;
+
     if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
       toast.error('Publication date cannot be in the future.');
       return;
     }
+
+    publishingRef.current = true;
+    setPublishing(true);
+
+    // Stop autosave from fighting the publish request
+    exitRequestedRef.current = true;
+
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+
     const data = {
       ...buildArticleData(),
       status: 'published' as ArticleStatus,
-      publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
+      publishedAt: formData.publishedAt
+        ? new Date(formData.publishedAt).toISOString()
+        : undefined,
     };
-    if (isNew && !articleRef.current?.id) {
-      const created = await createArticle(data);
-      articleRef.current = created;
-      navigate('/dashboard');
-      return;
-    }
-    const articleId = articleRef.current?.id ?? id;
-    if (articleId) {
+
+    try {
+      if (isNew && !articleRef.current?.id) {
+        const created = await createArticle(data);
+        articleRef.current = created;
+        navigate('/dashboard');
+        return;
+      }
+
+      const articleId = articleRef.current?.id ?? id;
+
+      if (!articleId) {
+        toast.error('Could not find article to publish.');
+        exitRequestedRef.current = false;
+        return;
+      }
+
       const updated = await updateArticle(articleId, data);
+
       if (updated) {
         articleRef.current = updated;
+
         try {
           await cleanupArticleContentMedia(articleId, data.content ?? '');
         } catch (error) {
           console.error('Failed to clean up article media:', error);
         }
       }
+
       navigate('/dashboard');
+    } catch (error) {
+      console.error('Failed to publish article:', error);
+      toast.error('Failed to publish article. Please try again.');
+      exitRequestedRef.current = false;
+    } finally {
+      publishingRef.current = false;
+      setPublishing(false);
     }
   };
 
@@ -358,7 +395,7 @@ export function ArticleEditorPage() {
               <SettingsIcon size={15} />
               <span className="hidden sm:inline" aria-label="Post settings">Settings</span>
             </button>
-            <Button type="button" size="sm" onClick={handlePublish}>
+            <Button type="button" size="sm" onClick={handlePublish} loading={publishing}>
               Publish
             </Button>
           </div>

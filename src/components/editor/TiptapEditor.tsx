@@ -112,7 +112,6 @@ export function TiptapEditor({
         },
       }).configure({
         types: ['paragraph', 'heading'],
-        defaultAlignment: 'justify',
       }),
       SlashCommand.configure({
         onImageUpload: openImagePicker,
