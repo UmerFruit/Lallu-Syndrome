@@ -17,6 +17,7 @@ export type ArticleInput = Pick<
 export type Comment = {
   id: string;
   articleId: string;
+  authorId: string;
   author: string;
   avatar?: string;
   content: string;

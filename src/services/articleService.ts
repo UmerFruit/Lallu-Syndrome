@@ -81,6 +81,7 @@ function mapSupabaseComment(
   return {
     id: comment.id,
     articleId: comment.article_id,
+    authorId: comment.author_id,
     author: profile.display_name,
     avatar: profile.avatar_url ?? undefined,
     content: comment.content,
@@ -555,7 +556,7 @@ export async function toggleLike(
   };
 }
 
-export async function isLiked(articleId: string,userId?: string | null): Promise<boolean> {
+export async function isLiked(articleId: string, userId?: string | null): Promise<boolean> {
   if (!userId) return false;
 
   const { data, error } = await supabase
@@ -578,4 +579,12 @@ export async function getMyArticles(userId: string): Promise<Article[]> {
 
   if (error) throw error;
   return data.map(mapSupabaseArticle);
+}
+export async function deleteComment(commentId: string): Promise<void> {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId);
+  
+  if (error) throw error;
 }

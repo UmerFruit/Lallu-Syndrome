@@ -1,8 +1,8 @@
 // src/components/interactions/CommentSection.tsx
 import { useEffect, useState, type FormEvent } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Trash2 } from 'lucide-react';
 import type { Comment } from '@/types';
-import { getComments, addComment } from '@/services/articleService';
+import { getComments, addComment, deleteComment } from '@/services/articleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { relativeTime } from '@/utils/date';
 import type { User } from '@supabase/supabase-js';
@@ -42,6 +42,10 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
     setComments((prev) => [...prev, newComment]);
   };
 
+  // Helper to remove a deleted comment (and its nested replies) from local state
+  const handleDeleteComment = (commentId: string) => {
+    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
+  };
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmedContent = content.trim();
@@ -100,6 +104,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
             articleId={articleId}
             user={user}
             onReplyAdded={handleAddComment}
+            onDelete={handleDeleteComment} // <-- ADD THIS
           />
         ))}
       </div>
@@ -175,25 +180,46 @@ function CommentItem({
   articleId,
   user,
   onReplyAdded,
+  onDelete,
 }: Readonly<{
   comment: Comment;
   replies: Comment[];
   articleId: string;
   user: User | null;
   onReplyAdded: (newComment: Comment) => void;
+  onDelete: (commentId: string) => void;
 }>) {
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- MODERATION LOGIC ---
+  // Replace with your actual UUID from Supabase Auth dashboard
+  // const ADMIN_UUID = 'YOUR-AUTH-UUID-HERE'; 
+  // const isAdmin = user?.id === ADMIN_UUID;
+  const isOwner = user?.id === comment.authorId;
+  const canDelete = isOwner // || isAdmin;
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this comment?')) return;
+    setIsDeleting(true);
+    try {
+      await deleteComment(comment.id);
+      onDelete(comment.id);
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmed = replyContent.trim();
     if (!trimmed || !user || submitting) return;
-
     try {
       setSubmitting(true);
-      // Pass the parent comment's ID to create a threaded reply
       const newComment = await addComment(articleId, trimmed, comment.id);
       onReplyAdded(newComment);
       setReplyContent('');
@@ -219,9 +245,8 @@ function CommentItem({
             {comment.author.charAt(0).toUpperCase()}
           </div>
         )}
-
         <div className="flex-1 min-w-0">
-          {/* Header with Reply button */}
+          {/* Header with Reply & Delete buttons */}
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-sm font-medium text-text-primary">
               {comment.author}
@@ -237,8 +262,20 @@ function CommentItem({
                 {isReplying ? 'Cancel' : 'Reply'}
               </button>
             )}
+            {/* DELETE BUTTON */}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                aria-label="Delete comment"
+              >
+                {isDeleting ? '...' : <Trash2 size={14} />}
+              </button>
+            )}
           </div>
-
+          
           {/* Comment Content */}
           <p className="text-sm text-text-secondary leading-relaxed">
             {comment.content}
@@ -259,7 +296,8 @@ function CommentItem({
                 placeholder="Write a reply..."
                 rows={2}
                 maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" disabled={submitting}
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" 
+                disabled={submitting}
                 autoFocus
               />
               <button
@@ -279,16 +317,17 @@ function CommentItem({
                 <CommentItem
                   key={reply.id}
                   comment={reply}
-                  replies={[]} // Keeps UI clean at 1 level of visual nesting
+                  replies={[]} 
                   articleId={articleId}
                   user={user}
                   onReplyAdded={onReplyAdded}
+                  onDelete={onDelete}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
-    </div >
+    </div>
   );
 }
