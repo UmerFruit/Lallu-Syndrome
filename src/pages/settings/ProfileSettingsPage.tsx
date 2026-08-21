@@ -1,55 +1,54 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadAvatar } from '@/services/profileService';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
-type FormState = {
-    display_name: string;
-    username: string;
-    avatar_url: string;
-    bio: string;
-    website_url: string;
-    github_url: string;
-    linkedin_url: string;
-};
+const optionalUrl = z.string().refine(
+    (value) => {
+        const trimmed = value.trim();
+        if (!trimmed || trimmed.startsWith('/')) return true;
+        const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+        try {
+            new URL(normalized);
+            return true;
+        } catch {
+            return false;
+        }
+    },
+    { message: 'Enter a valid URL.' }
+);
 
-const initialForm: FormState = {
-    display_name: '',
-    username: '',
-    avatar_url: '',
-    bio: '',
-    website_url: '',
-    github_url: '',
-    linkedin_url: '',
-};
+const profileSchema = z.object({
+    display_name: z
+        .string()
+        .min(1, 'Display name is required.')
+        .max(100, 'Display name must be 100 characters or less.'),
+    username: z.string().refine((val) => !val || /^[a-z0-9_-]{3,30}$/.test(val), {
+        message:
+            'Username must be 3-30 characters and can include lowercase letters, numbers, hyphens, and underscores.',
+    }),
+    bio: z.string().max(500, 'Bio must be 500 characters or less.'),
+    avatar_url: optionalUrl,
+    website_url: optionalUrl,
+    github_url: optionalUrl,
+    linkedin_url: optionalUrl,
+});
+
+type ProfileForm = z.infer<typeof profileSchema>;
 
 function normalizeUrl(value: string): string {
     const trimmed = value.trim();
-
     if (!trimmed) return '';
-
-    // Allow relative paths, useful later for Supabase Storage paths.
     if (trimmed.startsWith('/')) return trimmed;
-
     if (/^https?:\/\//i.test(trimmed)) {
         return trimmed;
     }
-
     return `https://${trimmed}`;
-}
-
-function isValidUrl(value: string): boolean {
-    if (!value) return true;
-
-    if (value.startsWith('/')) return true;
-
-    try {
-        new URL(value);
-        return true;
-    } catch {
-        return false;
-    }
 }
 
 function getErrorMessage(error: unknown): string {
@@ -72,14 +71,31 @@ function getErrorMessage(error: unknown): string {
 export function ProfileSettingsPage() {
     const { user, profile, isLoading, isProfileLoading, updateProfile } = useAuth();
     const [uploading, setUploading] = useState(false);
-    const [form, setForm] = useState<FormState>(initialForm);
-    const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-    const [errorMessage, setErrorMessage] = useState('');
-    const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+
+    const {
+        register,
+        handleSubmit,
+        setValue,
+        watch,
+        reset,
+        setError,
+        formState: { errors, isSubmitting },
+    } = useForm<ProfileForm>({
+        resolver: zodResolver(profileSchema),
+        defaultValues: {
+            display_name: '',
+            username: '',
+            bio: '',
+            avatar_url: '',
+            website_url: '',
+            github_url: '',
+            linkedin_url: '',
+        },
+    });
 
     useEffect(() => {
         if (profile) {
-            setForm({
+            reset({
                 display_name: profile.display_name ?? '',
                 username: profile.username ?? '',
                 avatar_url: profile.avatar_url ?? '',
@@ -88,29 +104,31 @@ export function ProfileSettingsPage() {
                 github_url: profile.github_url ?? '',
                 linkedin_url: profile.linkedin_url ?? '',
             });
-
-            return;
-        }
-
-        if (user) {
+        } else if (user) {
             const metadata = user.user_metadata as Record<string, unknown> | undefined;
-
-            const fallbackDisplayName =
+            const fallback =
                 typeof metadata?.display_name === 'string'
                     ? metadata.display_name
                     : user.email?.split('@')[0] ?? '';
-
-            setForm((current) => ({
-                ...current,
-                display_name: current.display_name || fallbackDisplayName,
-            }));
+            reset({
+                display_name: fallback,
+                username: '',
+                avatar_url: '',
+                bio: '',
+                website_url: '',
+                github_url: '',
+                linkedin_url: '',
+            });
         }
-    }, [profile, user]);
+    }, [profile, user, reset]);
+
+    const bioText = watch('bio') ?? '';
+    const avatarUrl = watch('avatar_url') ?? '';
 
     if (isLoading || isProfileLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[40vh]">
-                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            <div className="flex min-h-[40vh] items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
             </div>
         );
     }
@@ -120,120 +138,47 @@ export function ProfileSettingsPage() {
         if (!file || !user) return;
 
         if (!file.type.startsWith('image/')) {
-            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Please select an image file.' }));
+            setError('avatar_url', { message: 'Please select an image file.' });
             return;
         }
+
         if (file.size > 2 * 1024 * 1024) {
-            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Image must be smaller than 2MB.' }));
+            setError('avatar_url', { message: 'Image must be smaller than 2MB.' });
             return;
         }
 
         setUploading(true);
         try {
             const publicUrl = await uploadAvatar(user.id, file);
-            setForm((prev) => ({ ...prev, avatar_url: publicUrl }));
-            setFieldErrors((prev) => ({ ...prev, avatar_url: undefined }));
-        } catch (err) {
-            console.error('Avatar upload error:', err);
-            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Failed to upload image.' }));
+            setValue('avatar_url', publicUrl, { shouldValidate: true });
+        } catch {
+            setError('avatar_url', { message: 'Failed to upload image.' });
         } finally {
             setUploading(false);
-            e.target.value = ''; // Reset input so the same file can be selected again if needed
+            e.target.value = '';
         }
     };
 
-    const setField = (name: keyof FormState, value: string) => {
-        setForm((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-
-        if (status !== 'idle') {
-            setStatus('idle');
-            setErrorMessage('');
-        }
-
-        setFieldErrors((prev) => ({
-            ...prev,
-            [name]: undefined,
-        }));
-    };
-
-    const validate = (): boolean => {
-        const errors: Partial<Record<keyof FormState, string>> = {};
-
-        const displayName = form.display_name.trim();
-
-        if (!displayName) {
-            errors.display_name = 'Display name is required.';
-        } else if (displayName.length > 100) {
-            errors.display_name = 'Display name must be 100 characters or less.';
-        }
-
-        const username = form.username.trim().toLowerCase();
-
-        if (username && !/^[a-z0-9_-]{3,30}$/.test(username)) {
-            errors.username =
-                'Username must be 3-30 characters and can include lowercase letters, numbers, hyphens, and underscores.';
-        }
-
-        if (form.bio.length > 500) {
-            errors.bio = 'Bio must be 500 characters or less.';
-        }
-
-        const urlFields = ['avatar_url', 'website_url', 'github_url', 'linkedin_url'] as const;
-
-        for (const field of urlFields) {
-            const rawValue = form[field].trim();
-
-            if (!rawValue) continue;
-
-            const normalized = normalizeUrl(rawValue);
-
-            if (!isValidUrl(normalized)) {
-                errors[field] = 'Enter a valid URL.';
-            }
-        }
-
-        setFieldErrors(errors);
-
-        return Object.keys(errors).length === 0;
-    };
-
-    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
+    const onSubmit = async (data: ProfileForm) => {
         if (!user) return;
-
-        if (!validate()) {
-            setStatus('error');
-            setErrorMessage('Please fix the highlighted fields.');
-            return;
-        }
-
-        setStatus('saving');
-        setErrorMessage('');
-
         try {
             await updateProfile({
-                display_name: form.display_name.trim(),
-                username: form.username.trim() ? form.username.trim().toLowerCase() : null,
-                avatar_url: normalizeUrl(form.avatar_url) || null,
-                bio: form.bio.trim() || null,
-                website_url: normalizeUrl(form.website_url) || null,
-                github_url: normalizeUrl(form.github_url) || null,
-                linkedin_url: normalizeUrl(form.linkedin_url) || null,
+                display_name: data.display_name.trim(),
+                username: data.username.trim() ? data.username.trim().toLowerCase() : null,
+                avatar_url: normalizeUrl(data.avatar_url) || null,
+                bio: data.bio.trim() || null,
+                website_url: normalizeUrl(data.website_url) || null,
+                github_url: normalizeUrl(data.github_url) || null,
+                linkedin_url: normalizeUrl(data.linkedin_url) || null,
             });
-
-            setStatus('success');
+            toast.success('Profile saved.');
         } catch (error) {
-            setStatus('error');
-            setErrorMessage(getErrorMessage(error));
+            setError('root', { message: getErrorMessage(error) });
         }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             <section className="rounded-lg border border-border-subtle bg-bg p-6">
                 <div>
                     <h2 className="font-serif text-lg font-semibold text-text-primary">
@@ -249,10 +194,9 @@ export function ProfileSettingsPage() {
                         id="display_name"
                         label="Display name"
                         type="text"
-                        value={form.display_name}
-                        onChange={(event) => setField('display_name', event.target.value)}
+                        {...register('display_name')}
                         placeholder="Your name"
-                        error={fieldErrors.display_name}
+                        error={errors.display_name?.message}
                     />
 
                     <div>
@@ -260,10 +204,9 @@ export function ProfileSettingsPage() {
                             id="username"
                             label="Username"
                             type="text"
-                            value={form.username}
-                            onChange={(event) => setField('username', event.target.value)}
+                            {...register('username')}
                             placeholder="yourusername"
-                            error={fieldErrors.username}
+                            error={errors.username?.message}
                         />
                         <p className="mt-1.5 text-xs text-text-secondary">
                             Lowercase letters, numbers, hyphens, and underscores only.
@@ -272,18 +215,18 @@ export function ProfileSettingsPage() {
                 </div>
 
                 <div className="mt-6">
-                    <p className="block text-sm font-medium text-text-primary mb-1.5">Avatar</p>
+                    <p className="mb-1.5 block text-sm font-medium text-text-primary">Avatar</p>
 
                     <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
                         {/* Avatar preview */}
-                        {form.avatar_url.trim() ? (
+                        {avatarUrl.trim() ? (
                             <img
-                                src={normalizeUrl(form.avatar_url)}
+                                src={normalizeUrl(avatarUrl)}
                                 alt="Avatar preview"
-                                className="h-28 w-28 sm:h-36 sm:w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
+                                className="h-28 w-28 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover sm:h-36 sm:w-36"
                             />
                         ) : (
-                            <div className="flex h-28 w-28 sm:h-36 sm:w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
+                            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted sm:h-36 sm:w-36">
                                 No image
                             </div>
                         )}
@@ -295,12 +238,9 @@ export function ProfileSettingsPage() {
                                 <Input
                                     id="avatar_url"
                                     type="text"
-                                    value={form.avatar_url}
-                                    onChange={(event) =>
-                                        setField('avatar_url', event.target.value)
-                                    }
+                                    {...register('avatar_url')}
                                     placeholder="https://example.com/avatar.jpg"
-                                    error={fieldErrors.avatar_url}
+                                    error={errors.avatar_url?.message}
                                 />
                             </div>
 
@@ -351,29 +291,31 @@ export function ProfileSettingsPage() {
                 </div>
 
                 <div className="mt-6">
-                    <label htmlFor="bio" className="block text-sm font-medium text-text-primary mb-1.5">
+                    <label
+                        htmlFor="bio"
+                        className="mb-1.5 block text-sm font-medium text-text-primary"
+                    >
                         Bio
                     </label>
 
                     <textarea
                         id="bio"
-                        value={form.bio}
-                        onChange={(event) => setField('bio', event.target.value)}
+                        {...register('bio')}
                         placeholder="Write a short bio..."
                         rows={5}
-                        className="w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none resize-y"
+                        className="w-full resize-y rounded border border-border-subtle bg-bg px-3 py-2 text-base text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none sm:text-sm"
                     />
 
                     <div className="mt-1.5 flex items-center justify-between">
-                        {fieldErrors.bio ? (
-                            <p className="text-sm text-red-500">{fieldErrors.bio}</p>
+                        {errors.bio?.message ? (
+                            <p className="text-sm text-red-500">{errors.bio.message}</p>
                         ) : (
                             <p className="text-xs text-text-secondary">
                                 A short description shown on your profile and articles.
                             </p>
                         )}
 
-                        <p className="text-xs text-text-secondary">{form.bio.length}/500</p>
+                        <p className="text-xs text-text-secondary">{bioText.length}/500</p>
                     </div>
                 </div>
             </section>
@@ -391,48 +333,39 @@ export function ProfileSettingsPage() {
                         id="website_url"
                         label="Website"
                         type="text"
-                        value={form.website_url}
-                        onChange={(event) => setField('website_url', event.target.value)}
+                        {...register('website_url')}
                         placeholder="yoursite.com"
-                        error={fieldErrors.website_url}
+                        error={errors.website_url?.message}
                     />
 
                     <Input
                         id="github_url"
                         label="GitHub"
                         type="text"
-                        value={form.github_url}
-                        onChange={(event) => setField('github_url', event.target.value)}
+                        {...register('github_url')}
                         placeholder="github.com/username"
-                        error={fieldErrors.github_url}
+                        error={errors.github_url?.message}
                     />
 
                     <Input
                         id="linkedin_url"
                         label="LinkedIn"
                         type="text"
-                        value={form.linkedin_url}
-                        onChange={(event) => setField('linkedin_url', event.target.value)}
+                        {...register('linkedin_url')}
                         placeholder="linkedin.com/in/username"
-                        error={fieldErrors.linkedin_url}
+                        error={errors.linkedin_url?.message}
                     />
                 </div>
             </section>
 
             <div className="flex items-center gap-3">
-                <Button type="submit" loading={status === 'saving'}>
-                    {status === 'saving' ? 'Saving...' : 'Save changes'}
+                <Button type="submit" loading={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save changes'}
                 </Button>
-
-                {status === 'success' && (
-                    <span className="text-sm font-medium text-emerald-500">
-                        Profile saved.
-                    </span>
-                )}
             </div>
 
-            {status === 'error' && errorMessage && (
-                <p className="text-sm text-red-500">{errorMessage}</p>
+            {errors.root?.message && (
+                <p className="text-sm text-red-500">{errors.root.message}</p>
             )}
         </form>
     );

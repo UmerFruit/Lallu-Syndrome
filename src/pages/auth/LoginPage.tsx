@@ -1,38 +1,31 @@
-import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { login } from '@/services/authService';
 
+const loginSchema = z.object({
+  email: z.string().trim().min(1, 'Email is required.').pipe(z.email({ message: 'Please enter a valid email address.' })),
+  password: z.string().min(1, 'Password is required.').min(6, 'Password must be at least 6 characters.'),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
+
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
-  const [loading, setLoading] = useState(false);
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
 
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
+  const onSubmit = async (data: LoginForm) => {
     try {
-      await login(email, password);
+      await login(data.email, data.password);
       navigate('/dashboard');
     } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-    } finally {
-      setLoading(false);
+      setError('root', { message: err instanceof Error ? err.message : 'Something went wrong.' });
     }
   };
 
@@ -40,48 +33,22 @@ export function LoginPage() {
     <AuthLayout
       title="Sign in"
       subtitle="Welcome back. Sign in to access your dashboard."
-      footer={
-        <>
-          Don't have an account? <AuthLink to="/signup">Create one</AuthLink>
-        </>
-      }
+      footer={<>Don't have an account? <AuthLink to="/signup">Create one</AuthLink></>}
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {errors.root && (
           <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
+            {errors.root.message}
           </div>
         )}
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="Your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="current-password"
-          required
-        />
+        <Input label="Email" type="email" placeholder="you@example.com" autoComplete="email" {...register('email')} error={errors.email?.message} />
+        <Input label="Password" isPassword placeholder="Your password" autoComplete="current-password" {...register('password')} error={errors.password?.message} />
         <div className="flex justify-end">
           <Link to="/forgot-password" className="text-xs text-text-muted hover:text-text-secondary transition-colors">
             Forgot password?
           </Link>
         </div>
-        <Button type="submit" className="w-full" loading={loading}>
-          Sign in
-        </Button>
+        <Button type="submit" className="w-full" loading={isSubmitting}>Sign in</Button>
       </form>
     </AuthLayout>
   );

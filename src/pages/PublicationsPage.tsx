@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,13 +15,35 @@ import {
     getMyPublications,
 } from '@/services/publicationService';
 import type { Publication } from '@/types';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+
+const publicationSchema = z.object({
+    name: z.string().min(1, 'Publication name is required.'),
+    description: z.string().optional(),
+});
+
+type PublicationForm = z.infer<typeof publicationSchema>;
+
 
 export function PublicationsPage() {
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
+    const { register, handleSubmit, reset, formState: { errors: formErrors } } = useForm<PublicationForm>({
+        resolver: zodResolver(publicationSchema),
+    });
+
+    const onFormSubmit = (data: PublicationForm) => {
+        if (!user) return;
+        createMutation.mutate(
+            { name: data.name.trim(), description: data.description?.trim() || undefined },
+            { onSuccess: () => reset() }
+        );
+    };
+
     const [publicationToDelete, setPublicationToDelete] = useState<Publication | null>(null);
 
     const { data: publications = [], isLoading: loading } = useQuery({
@@ -35,8 +57,6 @@ export function PublicationsPage() {
             createPublication(user!.id, input),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['my-publications', user?.id] });
-            setName('');
-            setDescription('');
             toast.success('Publication created.');
         },
         onError: (error) => {
@@ -58,22 +78,6 @@ export function PublicationsPage() {
             setPublicationToDelete(null);
         },
     });
-
-    const handleCreate = (event: FormEvent) => {
-        event.preventDefault();
-        if (!user) return;
-        
-        const trimmedName = name.trim();
-        if (!trimmedName) {
-            toast.error('Publication name is required.');
-            return;
-        }
-
-        createMutation.mutate({ 
-            name: trimmedName, 
-            description: description.trim() || undefined 
-        });
-    };
 
     const handleDeleteClick = (publication: Publication) => {
         if (publication.isDefault) return;
@@ -160,33 +164,13 @@ export function PublicationsPage() {
                     New publication
                 </h2>
 
-                <form onSubmit={handleCreate} className="space-y-4">
-                    <Input
-                        label="Name"
-                        placeholder="My Tech Blog"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                    />
-
+                <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+                    <Input label="Name" placeholder="My Tech Blog" {...register('name')} error={formErrors.name?.message} />
                     <div>
-                        <label
-                            htmlFor="publication-description"
-                            className="mb-1.5 block text-sm font-medium text-text-secondary"
-                        >
-                            Description
-                        </label>
-
-                        <textarea
-                            id="publication-description"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Optional description"
-                            rows={3}
-                            className="w-full resize-y rounded border border-border bg-surface px-3.5 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none sm:text-sm"
-                        />
+                        <label htmlFor="publication-description" className="mb-1.5 block text-sm font-medium text-text-secondary">Description</label>
+                        <textarea id="publication-description" placeholder="Optional description" rows={3} {...register('description')}
+                            className="w-full resize-y rounded border border-border bg-surface px-3.5 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none sm:text-sm" />
                     </div>
-
                     <Button type="submit" loading={createMutation.isPending}>
                         <Plus size={16} />
                         Create publication

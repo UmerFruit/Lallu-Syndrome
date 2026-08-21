@@ -1,38 +1,34 @@
-import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { resetPassword } from '@/services/authService';
 
+const resetSchema = z.object({
+  password: z.string().min(1, 'Password is required.').min(6, 'Password must be at least 6 characters.'),
+  confirmPassword: z.string().min(1, 'Please confirm your password.'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match.',
+  path: ['confirmPassword'],
+});
+
+type ResetForm = z.infer<typeof resetSchema>;
+
 export function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string; form?: string }>({});
-  const [loading, setLoading] = useState(false);
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<ResetForm>({
+    resolver: zodResolver(resetSchema),
+  });
 
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
-    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
+  const onSubmit = async (data: ResetForm) => {
     try {
-      await resetPassword(password);
+      await resetPassword(data.password);
       navigate('/login');
     } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-    } finally {
-      setLoading(false);
+      setError('root', { message: err instanceof Error ? err.message : 'Something went wrong.' });
     }
   };
 
@@ -40,43 +36,17 @@ export function ResetPasswordPage() {
     <AuthLayout
       title="Reset password"
       subtitle="Enter your new password below."
-      footer={
-        <Link to="/login" className="text-accent hover:text-accent-hover transition-colors font-medium">
-          Back to sign in
-        </Link>
-      }
+      footer={<Link to="/login" className="text-accent hover:text-accent-hover transition-colors font-medium">Back to sign in</Link>}
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {errors.root && (
           <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
+            {errors.root.message}
           </div>
         )}
-        <Input
-          label="New password"
-          isPassword
-          name="password"
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-          required
-        />
-        <Input
-          label="Confirm new password"
-          isPassword
-          name="confirmPassword"
-          placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          error={errors.confirmPassword}
-          autoComplete="new-password"
-          required
-        />
-        <Button type="submit" className="w-full" loading={loading}>
-          Reset password
-        </Button>
+        <Input label="New password" isPassword placeholder="At least 6 characters" autoComplete="new-password" {...register('password')} error={errors.password?.message} />
+        <Input label="Confirm new password" isPassword placeholder="Re-enter your password" autoComplete="new-password" {...register('confirmPassword')} error={errors.confirmPassword?.message} />
+        <Button type="submit" className="w-full" loading={isSubmitting}>Reset password</Button>
       </form>
     </AuthLayout>
   );
