@@ -8,18 +8,18 @@ import type { Category } from '@/types';
 const principles = [
   {
     id: '01',
-    title: 'Depth over noise',
-    body: 'Articles are written to be useful in six months, not six hours. Nothing padded, nothing rushed.',
+    title: 'Refuse the comfort of half-measures',
+    body: 'Half-hearted effort is just an apology written in advance for a failure you chose not to prevent.',
   },
   {
     id: '02',
-    title: 'Show the work',
-    body: 'Code, configs, and failure notes included. Reproduce it, improve it, or disagree with it.',
+    title: 'Premature confidence is the root of all evil',
+    body: 'The moment you think you have it all figured out is the moment you will start sliding backwards.',
   },
   {
     id: '03',
     title: 'Stay independent',
-    body: 'No sponsors, no affiliates, no engagement bait. The opinions here belong to the authors alone.',
+    body: "Their progress doesn't add to you. Their failure doesn't excuse you. In the end, it's just you."
   },
 ];
 
@@ -36,7 +36,7 @@ export function AboutPage() {
 
   return (
     <div className="grain">
-      <PageContainer className="py-12 md:py-24">
+      <PageContainer className="py-12 md:py-16">
         <div className="relative mx-auto max-w-2xl">
           {/* Eyebrow */}
           <p
@@ -59,9 +59,7 @@ export function AboutPage() {
             className="anim-fade-up mx-auto mt-8 max-w-md text-center text-base leading-relaxed text-text-secondary md:text-lg"
             style={{ animationDelay: '0.65s' }}
           >
-            An independent technology publication. Notes, experiments, and
-            deep dives into the systems we use every day written slowly,
-            published carefully.
+            Everything here is a lesson, even when I'm the only one who learns it.
           </p>
 
           {/* Quick links */}
@@ -99,13 +97,14 @@ export function AboutPage() {
 
           <div className="anim-fade-up space-y-5" style={{ animationDelay: '1.2s' }}>
             <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
-              Write to understand. Publish to remember<span className="text-accent">.</span>
+              Never settle for anything less than your very best.
             </p>
-            <p className="text-sm leading-relaxed text-text-secondary">
-              Most of the web is marketing. This is the opposite. Slow, careful
-              writing about how things actually work. Operating systems, compilers,
-              networks, security, and the occasional piece of hardware: taken
-              apart, explained, and put back together.
+            <p className="text-sm leading-relaxed text-text-secondary text-justify">
+              Lallu: someone aimless, directionless, content with just getting by.
+              <br />
+              Lallu Syndrome is when settling stops feeling like settling and your standards quietly erode. Your 90% becomes 70%, then 60%. You stop caring enough to notice. I felt that way and by the time I realized, it was too late. This blog is me giving it my all, not because I want to recover what I had, but to become what I hadn't yet imagined.
+              <br />
+              <b>Because comfort kills more potential than failure ever could.</b>
             </p>
           </div>
 

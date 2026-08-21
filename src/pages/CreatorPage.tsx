@@ -16,11 +16,10 @@ export function CreatorPage() {
   }, []);
 
   const { creator } = siteConfig;
-  const marqueeItems = [...categories, ...categories];
 
   return (
     <div className="grain">
-      <PageContainer className="py-12 md:py-24">
+      <PageContainer className="py-12 md:py-20">
         <div className="relative mx-auto max-w-2xl">
           {/* Top label */}
           <p
