@@ -1,9 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
-
-const inputClass =
-  'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
-const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
+import { Input } from '@/components/ui/Input';
 
 export function PasswordSettingsPage() {
   const [newPassword, setNewPassword] = useState('');
@@ -55,35 +52,25 @@ export function PasswordSettingsPage() {
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <div>
-            <label htmlFor="new_password" className={labelClass}>
-              New Password
-            </label>
-            <input
-              id="new_password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="••••••••"
-              className={inputClass}
-              required
-            />
-          </div>
+          <Input
+            id="new_password"
+            label="New Password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+          />
 
-          <div>
-            <label htmlFor="confirm_password" className={labelClass}>
-              Confirm New Password
-            </label>
-            <input
-              id="confirm_password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              className={inputClass}
-              required
-            />
-          </div>
+          <Input
+            id="confirm_password"
+            label="Confirm New Password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+          />
         </div>
       </section>
 

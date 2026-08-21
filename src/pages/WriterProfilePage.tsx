@@ -4,10 +4,10 @@ import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
 import type { Article, Publication,Profile } from '@/types';
 import { getProfileByUsername } from '@/services/profileService';
 import { getPublishedArticlesByAuthor } from '@/services/articleService';
-import { getPublicationsByOwner } from '@/services/publicationService';
+import { getMyPublications } from '@/services/publicationService';
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+import { ArticleCardSkeleton, PageSpinner } from '@/components/ui/Skeleton';
 
 export function WriterProfilePage() {
   const { username } = useParams<{ username: string }>();
@@ -46,7 +46,7 @@ export function WriterProfilePage() {
 
         const [writerArticles, writerPublications] = await Promise.all([
           getPublishedArticlesByAuthor(found.id),
-          getPublicationsByOwner(found.id).catch(() => [] as Publication[]),
+          getMyPublications(found.id).catch(() => [] as Publication[]),
         ]);
 
         if (!mounted) return;
@@ -87,15 +87,7 @@ export function WriterProfilePage() {
   const latestArticles = articles.slice(0, 3);
 
   if (status === 'loading') {
-    return (
-      <div
-        className="flex items-center justify-center min-h-[60vh]"
-        role="status"
-        aria-label="Loading writer profile"
-      >
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (status === 'not-found' || !profile) {

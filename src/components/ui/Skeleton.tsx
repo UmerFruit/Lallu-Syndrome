@@ -21,6 +21,12 @@ export function ArticleCardSkeleton() {
   );
 }
 
+export function PageSpinner() {
+  return (<div className="flex items-center justify-center min-h-[60vh]">
+    <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+  </div>);
+}
+
 export function FeaturedArticleSkeleton() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">

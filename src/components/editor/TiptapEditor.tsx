@@ -27,7 +27,27 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  type LucideIcon,
 } from 'lucide-react';
+type ToolbarButton = {
+  key: string;
+  icon: LucideIcon;
+  title: string;
+  isActive: (editor: Editor) => boolean;
+  run: (editor: Editor) => void;
+};
+
+const textToolbarButtons: ToolbarButton[] = [
+  { key: 'bold', icon: Bold, title: 'Bold', isActive: (e) => e.isActive('bold'), run: (e) => e.chain().focus().toggleBold().run() },
+  { key: 'italic', icon: Italic, title: 'Italic', isActive: (e) => e.isActive('italic'), run: (e) => e.chain().focus().toggleItalic().run() },
+  { key: 'strike', icon: Strikethrough, title: 'Strikethrough', isActive: (e) => e.isActive('strike'), run: (e) => e.chain().focus().toggleStrike().run() },
+  { key: 'h1', icon: Heading1, title: 'Heading 1', isActive: (e) => e.isActive('heading', { level: 1 }), run: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
+  { key: 'h2', icon: Heading2, title: 'Heading 2', isActive: (e) => e.isActive('heading', { level: 2 }), run: (e) => e.chain().focus().toggleHeading({ level: 2 }).run() },
+  { key: 'h3', icon: Heading3, title: 'Heading 3', isActive: (e) => e.isActive('heading', { level: 3 }), run: (e) => e.chain().focus().toggleHeading({ level: 3 }).run() },
+  { key: 'justify', icon: AlignJustify, title: 'Justify text', isActive: (e) => e.isActive({ textAlign: 'justify' }), run: (e) => e.chain().focus().setTextAlign(e.isActive({ textAlign: 'justify' }) ? 'left' : 'justify').run() },
+  { key: 'quote', icon: Quote, title: 'Quote', isActive: (e) => e.isActive('blockquote'), run: (e) => e.chain().focus().toggleBlockquote().run() },
+  { key: 'code', icon: Code, title: 'Inline code', isActive: (e) => e.isActive('code'), run: (e) => e.chain().focus().toggleCode().run() },
+];
 
 
 type TiptapEditorProps = {
@@ -355,157 +375,18 @@ export function TiptapEditor({
           className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
           onMouseDown={(e) => e.preventDefault()}
         >
-          {/* Bold */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('bold')
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Bold"
-          >
-            <Bold size={16} />
-          </button>
-
-          {/* Italic */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('italic')
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Italic"
-          >
-            <Italic size={16} />
-          </button>
-
-          {/* Strike */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('strike')
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Strikethrough"
-          >
-            <Strikethrough size={16} />
-          </button>
-
-          <div className="w-px h-5 bg-border" />
-
-          {/* Heading 1 */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 1 })
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Heading 1"
-          >
-            <Heading1 size={16} />
-          </button>
-
-          {/* Heading 2 */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 2 })
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Heading 2"
-          >
-            <Heading2 size={16} />
-          </button>
-
-          {/* Heading 3 */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('heading', { level: 3 })
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Heading 3"
-          >
-            <Heading3 size={16} />
-          </button>
-
-          <div className="w-px h-5 bg-border" />
-
-          {/* Justify text */}
-          <button
-            type="button"
-            onClick={() => {
-              if (editor.isActive({ textAlign: 'justify' })) {
-                editor.chain().focus().setTextAlign('left').run();
-              } else {
-                editor.chain().focus().setTextAlign('justify').run();
-              }
-            }}
-            className={`p-2.5 rounded transition-colors ${editor.isActive({ textAlign: 'justify' })
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Justify text"
-          >
-            <AlignJustify size={16} />
-          </button>
-
-          <div className="w-px h-5 bg-border" />
-
-          {/* Quote */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('blockquote')
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Quote"
-          >
-            <Quote size={16} />
-          </button>
-
-          {/* Inline Code */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('code')
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Inline code"
-          >
-            <Code size={16} />
-          </button>
-
-          {/* Clear formatting */}
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
-            className="p-2.5 rounded text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
-            title="Clear formatting"
-          >
-            <Eraser size={16} />
-          </button>
-
-          {/* Link */}
-          <button
-            type="button"
-            onClick={setLink}
-            className={`p-2.5 rounded transition-colors ${editor.isActive('link')
-              ? 'text-accent bg-surface'
-              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            title="Add link"
-          >
-            <LinkIcon size={16} />
-          </button>
+          {textToolbarButtons.map(({ key, icon: Icon, title, isActive, run }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => run(editor)}
+              className={`p-2.5 rounded transition-colors ${isActive(editor) ? 'text-accent bg-surface' : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+              title={title}
+            >
+              <Icon size={16} />
+            </button>
+          ))}
         </div>
       </BubbleMenu>
       {/* ====== IMAGE BUBBLE MENU ====== */}

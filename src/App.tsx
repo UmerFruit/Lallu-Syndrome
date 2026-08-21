@@ -26,6 +26,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminPage } from '@/pages/AdminPage';
 import { PublicationPage } from '@/pages/PublicationPage';
 import { PublicationsPage } from '@/pages/PublicationsPage';
+import { PageSpinner } from './components/ui/Skeleton';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -38,11 +39,7 @@ function ScrollToTop() {
 function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
   const { user, isLoading } = useAuth();
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
@@ -76,11 +73,7 @@ function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
   const { user, profile, isLoading, isProfileLoading } = useAuth();
 
   if (isLoading || isProfileLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageSpinner />; 
   }
 
   if (!user) return <Navigate to="/login" replace />;

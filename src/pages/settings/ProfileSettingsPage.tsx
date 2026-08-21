@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadAvatar } from '@/services/profileService';
+import { Input } from '@/components/ui/Input';
+
 type FormState = {
     display_name: string;
     username: string;
@@ -20,11 +22,6 @@ const initialForm: FormState = {
     github_url: '',
     linkedin_url: '',
 };
-
-const inputClass =
-    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
-
-const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
 
 function normalizeUrl(value: string): string {
     const trimmed = value.trim();
@@ -116,6 +113,7 @@ export function ProfileSettingsPage() {
             </div>
         );
     }
+
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !user) return;
@@ -142,6 +140,7 @@ export function ProfileSettingsPage() {
             e.target.value = ''; // Reset input so the same file can be selected again if needed
         }
     };
+
     const setField = (name: keyof FormState, value: string) => {
         setForm((prev) => ({
             ...prev,
@@ -245,53 +244,34 @@ export function ProfileSettingsPage() {
                 </div>
 
                 <div className="mt-6 grid gap-6 md:grid-cols-2">
-                    <div>
-                        <label htmlFor="display_name" className={labelClass}>
-                            Display name
-                        </label>
-
-                        <input
-                            id="display_name"
-                            type="text"
-                            value={form.display_name}
-                            onChange={(event) => setField('display_name', event.target.value)}
-                            placeholder="Your name"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.display_name && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.display_name}</p>
-                        )}
-                    </div>
+                    <Input
+                        id="display_name"
+                        label="Display name"
+                        type="text"
+                        value={form.display_name}
+                        onChange={(event) => setField('display_name', event.target.value)}
+                        placeholder="Your name"
+                        error={fieldErrors.display_name}
+                    />
 
                     <div>
-                        <label htmlFor="username" className={labelClass}>
-                            Username
-                        </label>
-
-                        <input
+                        <Input
                             id="username"
+                            label="Username"
                             type="text"
                             value={form.username}
                             onChange={(event) => setField('username', event.target.value)}
                             placeholder="yourusername"
-                            className={inputClass}
+                            error={fieldErrors.username}
                         />
-
                         <p className="mt-1.5 text-xs text-text-secondary">
                             Lowercase letters, numbers, hyphens, and underscores only.
                         </p>
-
-                        {fieldErrors.username && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.username}</p>
-                        )}
                     </div>
                 </div>
 
                 <div className="mt-6">
-                    <label htmlFor="avatar_url" className={labelClass}>
-                        Avatar
-                    </label>
+                    <p className="block text-sm font-medium text-text-primary mb-1.5">Avatar</p>
 
                     <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
                         {/* Avatar preview */}
@@ -311,7 +291,7 @@ export function ProfileSettingsPage() {
                         <div className="flex min-w-0 flex-1 flex-col gap-4">
                             {/* Avatar URL */}
                             <div className="max-w-lg">
-                                <input
+                                <Input
                                     id="avatar_url"
                                     type="text"
                                     value={form.avatar_url}
@@ -319,14 +299,8 @@ export function ProfileSettingsPage() {
                                         setField('avatar_url', event.target.value)
                                     }
                                     placeholder="https://example.com/avatar.jpg"
-                                    className={inputClass}
+                                    error={fieldErrors.avatar_url}
                                 />
-
-                                {fieldErrors.avatar_url && (
-                                    <p className="mt-1.5 text-sm text-accent">
-                                        {fieldErrors.avatar_url}
-                                    </p>
-                                )}
                             </div>
 
                             {/* Upload */}
@@ -343,10 +317,9 @@ export function ProfileSettingsPage() {
 
                                     <label
                                         htmlFor="avatar-upload"
-                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
-                                                ? 'pointer-events-none opacity-50'
-                                                : ''
-                                            }`}
+                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${
+                                            uploading ? 'pointer-events-none opacity-50' : ''
+                                        }`}
                                     >
                                         {uploading ? 'Uploading...' : 'Choose image'}
                                     </label>
@@ -377,7 +350,7 @@ export function ProfileSettingsPage() {
                 </div>
 
                 <div className="mt-6">
-                    <label htmlFor="bio" className={labelClass}>
+                    <label htmlFor="bio" className="block text-sm font-medium text-text-primary mb-1.5">
                         Bio
                     </label>
 
@@ -387,7 +360,7 @@ export function ProfileSettingsPage() {
                         onChange={(event) => setField('bio', event.target.value)}
                         placeholder="Write a short bio..."
                         rows={5}
-                        className={`${inputClass} resize-y`}
+                        className="w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none resize-y"
                     />
 
                     <div className="mt-1.5 flex items-center justify-between">
@@ -413,62 +386,35 @@ export function ProfileSettingsPage() {
                 </div>
 
                 <div className="mt-6 grid gap-6 md:grid-cols-3">
-                    <div>
-                        <label htmlFor="website_url" className={labelClass}>
-                            Website
-                        </label>
+                    <Input
+                        id="website_url"
+                        label="Website"
+                        type="text"
+                        value={form.website_url}
+                        onChange={(event) => setField('website_url', event.target.value)}
+                        placeholder="yoursite.com"
+                        error={fieldErrors.website_url}
+                    />
 
-                        <input
-                            id="website_url"
-                            type="text"
-                            value={form.website_url}
-                            onChange={(event) => setField('website_url', event.target.value)}
-                            placeholder="yoursite.com"
-                            className={inputClass}
-                        />
+                    <Input
+                        id="github_url"
+                        label="GitHub"
+                        type="text"
+                        value={form.github_url}
+                        onChange={(event) => setField('github_url', event.target.value)}
+                        placeholder="github.com/username"
+                        error={fieldErrors.github_url}
+                    />
 
-                        {fieldErrors.website_url && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.website_url}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label htmlFor="github_url" className={labelClass}>
-                            GitHub
-                        </label>
-
-                        <input
-                            id="github_url"
-                            type="text"
-                            value={form.github_url}
-                            onChange={(event) => setField('github_url', event.target.value)}
-                            placeholder="github.com/username"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.github_url && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.github_url}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label htmlFor="linkedin_url" className={labelClass}>
-                            LinkedIn
-                        </label>
-
-                        <input
-                            id="linkedin_url"
-                            type="text"
-                            value={form.linkedin_url}
-                            onChange={(event) => setField('linkedin_url', event.target.value)}
-                            placeholder="linkedin.com/in/username"
-                            className={inputClass}
-                        />
-
-                        {fieldErrors.linkedin_url && (
-                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.linkedin_url}</p>
-                        )}
-                    </div>
+                    <Input
+                        id="linkedin_url"
+                        label="LinkedIn"
+                        type="text"
+                        value={form.linkedin_url}
+                        onChange={(event) => setField('linkedin_url', event.target.value)}
+                        placeholder="linkedin.com/in/username"
+                        error={fieldErrors.linkedin_url}
+                    />
                 </div>
             </section>
 

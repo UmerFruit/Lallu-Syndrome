@@ -1,9 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 
-
-export type AdminProfile = Profile
-
 export type AdminComment = {
   id: string;
   article_id: string;
@@ -29,14 +26,14 @@ export type AdminArticle = {
 };
 
 // ─── Users ───────────────────────────────────────────────────
-export async function getAllProfiles(): Promise<AdminProfile[]> {
+export async function getAllProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data as AdminProfile[];
+  return data as Profile[];
 }
 
 export async function updateUserAdminStatus(

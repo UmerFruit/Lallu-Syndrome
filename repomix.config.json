@@ -9,10 +9,7 @@
       "src/components/ui/Strands.tsx",
       "src/components/ui/ParticleText.tsx",
       ".bolt/**",
-      ".env",
-      "src/components/interactions/CommentSection.tsx",
-      "src/pages/settings/ProfileSettingsPage.tsx",
-      "src/components/editor/TiptapEditor.tsx"
+      ".env"
     ]
   }
 }

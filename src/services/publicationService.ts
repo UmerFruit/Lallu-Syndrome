@@ -32,6 +32,7 @@ export async function getMyPublications(userId: string): Promise<Publication[]> 
   return data.map(mapPublication);
 }
 
+
 export async function getPublicationBySlug(slug: string): Promise<Publication | null> {
   const { data, error } = await supabase
     .from('publications')
@@ -157,16 +158,4 @@ export async function deletePublication(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
-}
-export async function getPublicationsByOwner(ownerId: string): Promise<Publication[]> {
-  const { data, error } = await supabase
-    .from('publications')
-    .select('*')
-    .eq('owner_id', ownerId)
-    .order('is_default', { ascending: false })
-    .order('created_at', { ascending: true });
-
-  if (error) throw error;
-
-  return data.map(mapPublication);
 }

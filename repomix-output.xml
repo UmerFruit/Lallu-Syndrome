@@ -32,7 +32,7 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env, src/components/interactions/CommentSection.tsx, src/pages/settings/ProfileSettingsPage.tsx, src/components/editor/TiptapEditor.tsx
+- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -61,7 +61,9 @@ src/
       processPastedHtml.ts
       SlashCommand.tsx
       SlashCommandMenu.tsx
+      TiptapEditor.tsx
     interactions/
+      CommentSection.tsx
       LikeButton.tsx
       ShareButton.tsx
     layout/
@@ -70,8 +72,6 @@ src/
       Navbar.tsx
       SettingsLayout.tsx
       UserMenu.tsx
-    templates/
-      SettingsForm.tsx
     ui/
       Badge.tsx
       Button.tsx
@@ -96,6 +96,7 @@ src/
       SignupPage.tsx
     settings/
       PasswordSettingsPage.tsx
+      ProfileSettingsPage.tsx
     AboutPage.tsx
     AdminPage.tsx
     ArticleEditorPage.tsx
@@ -106,6 +107,8 @@ src/
     DashboardPage.tsx
     HomePage.tsx
     NotFoundPage.tsx
+    PublicationPage.tsx
+    PublicationsPage.tsx
     WriterProfilePage.tsx
   services/
     adminService.ts
@@ -113,6 +116,7 @@ src/
     authService.ts
     categoryService.ts
     profileService.ts
+    publicationService.ts
     storageService.ts
   types/
     database.ts
@@ -135,6 +139,7 @@ supabase/
     20260820033358_fixes.sql
     20260820072952_reverse_roles.sql
     20260820083616_reverse_setup_and_new.sql
+    20260820114326_publications.sql
 .gitignore
 eslint.config.js
 index.html
@@ -145,15 +150,12 @@ tailwind.config.js
 tsconfig.app.json
 tsconfig.json
 tsconfig.node.json
+vercel.json
 vite.config.ts
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="src/components/templates/SettingsForm.tsx">
-
-</file>
 
 <file path="public/favicon.svg">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
@@ -1133,6 +1135,373 @@ export function NotFoundPage() {
 }
 </file>
 
+<file path="src/pages/PublicationPage.tsx">
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import type { Article, Publication } from '@/types';
+import { getPublicationBySlug } from '@/services/publicationService';
+import { getArticlesByPublication } from '@/services/articleService';
+import { PageContainer } from '@/components/layout/Navbar';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+
+export function PublicationPage() {
+  const { slug } = useParams<{ slug: string }>();
+
+  const [publication, setPublication] = useState<Publication | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        setNotFound(false);
+
+        const pub = await getPublicationBySlug(slug);
+
+        if (!mounted) return;
+
+        if (!pub) {
+          setNotFound(true);
+          return;
+        }
+
+        setPublication(pub);
+
+        const publicationArticles = await getArticlesByPublication(pub.slug);
+
+        if (!mounted) return;
+
+        setArticles(publicationArticles);
+      } catch (error) {
+        console.error('Failed to load publication:', error);
+
+        if (mounted) {
+          setNotFound(true);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <PageContainer className="py-12">
+        <div className="mb-10 space-y-3">
+          <div className="h-4 w-32 animate-pulse rounded bg-elevated" />
+          <div className="h-10 w-64 animate-pulse rounded bg-elevated" />
+          <div className="h-4 w-96 max-w-full animate-pulse rounded bg-elevated" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <ArticleCardSkeleton key={i} />
+          ))}
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (notFound || !publication) {
+    return (
+      <PageContainer className="py-24 text-center">
+        <p className="mb-4 font-mono text-sm uppercase tracking-[0.25em] text-text-muted">
+          Publication
+        </p>
+
+        <h1 className="mb-4 font-serif text-4xl font-medium tracking-tight text-text-primary">
+          Not found<span className="text-accent">.</span>
+        </h1>
+
+        <p className="mx-auto mb-8 max-w-md text-text-secondary">
+          This publication does not exist or may have been removed.
+        </p>
+
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-accent transition-colors hover:text-accent-hover"
+        >
+          <ArrowLeft size={16} />
+          Back to home
+        </Link>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer className="py-12">
+      <header className="mb-10 max-w-2xl">
+        <p className="mb-3 font-mono text-xs uppercase tracking-wider text-text-muted">
+          Publication
+        </p>
+
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary md:text-4xl">
+          {publication.name}
+        </h1>
+
+        {publication.description && (
+          <p className="mt-3 text-text-secondary">
+            {publication.description}
+          </p>
+        )}
+
+       
+      </header>
+
+      {articles.length === 0 ? (
+        <p className="py-12 text-center text-text-muted">
+          No published articles yet.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article) => (
+            <ArticleCard key={article.id} article={article} />
+          ))}
+        </div>
+      )}
+    </PageContainer>
+  );
+}
+</file>
+
+<file path="src/pages/PublicationsPage.tsx">
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { PageContainer } from '@/components/layout/Navbar';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Badge } from '@/components/ui/Badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
+import {
+    createPublication,
+    deletePublication,
+    getMyPublications,
+} from '@/services/publicationService';
+import type { Publication } from '@/types';
+
+export function PublicationsPage() {
+    const { user } = useAuth();
+    const { toast } = useToast();
+
+    const [publications, setPublications] = useState<Publication[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [creating, setCreating] = useState(false);
+
+    const load = useCallback(async () => {
+        if (!user) return;
+
+        try {
+            const data = await getMyPublications(user.id);
+            setPublications(data);
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to load publications.');
+        } finally {
+            setLoading(false);
+        }
+    }, [user, toast]);
+
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    const handleCreate = async (event: FormEvent) => {
+        event.preventDefault();
+
+        if (!user) return;
+
+        const trimmedName = name.trim();
+
+        if (!trimmedName) {
+            toast.error('Publication name is required.');
+            return;
+        }
+
+        setCreating(true);
+
+        try {
+            await createPublication(user.id, {
+                name: trimmedName,
+                description: description.trim() || undefined,
+            });
+
+            setName('');
+            setDescription('');
+
+            await load();
+
+            toast.success('Publication created.');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to create publication.');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleDelete = async (publication: Publication) => {
+        if (publication.isDefault) return;
+
+        if (!confirm(`Delete "${publication.name}"? This cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            await deletePublication(publication.id);
+            await load();
+            toast.success('Publication deleted.');
+        } catch (error) {
+            console.error(error);
+            toast.error('Cannot delete publication. It may still contain articles.');
+        }
+    };
+
+    return (
+        <PageContainer className="py-8 md:py-12">
+            <div className="mb-8">
+                <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary">
+                    Publications
+                </h1>
+
+                <p className="mt-1 text-sm text-text-secondary">
+                    Organize your articles into separate blogs or publications.
+                </p>
+            </div>
+
+            <div className="mb-10 rounded border border-border-subtle bg-surface p-5">
+                <h2 className="mb-4 font-mono text-xs uppercase tracking-wider text-text-muted">
+                    New publication
+                </h2>
+
+                <form onSubmit={handleCreate} className="space-y-4">
+                    <Input
+                        label="Name"
+                        placeholder="My Tech Blog"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+
+                    <div>
+                        <label
+                            htmlFor="publication-description"
+                            className="mb-1.5 block text-sm font-medium text-text-secondary"
+                        >
+                            Description
+                        </label>
+
+                        <textarea
+                            id="publication-description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Optional description"
+                            rows={3}
+                            className="w-full resize-y rounded border border-border bg-surface px-3.5 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none sm:text-sm"
+                        />
+                    </div>
+
+                    <Button type="submit" loading={creating}>
+                        <Plus size={16} />
+                        Create publication
+                    </Button>
+                </form>
+            </div>
+
+            {loading ? (
+                <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                            key={i}
+                            className="h-16 animate-pulse rounded border border-border-subtle bg-surface"
+                        />
+                    ))}
+                </div>
+            ) : publications.length === 0 ? (
+                <p className="py-12 text-center text-text-muted">
+                    No publications yet.
+                </p>
+            ) : (
+                <div className="space-y-2">
+                    {publications.map((publication) => (
+                        <div
+                            key={publication.id}
+                            className="flex items-center gap-4 rounded border border-border-subtle bg-surface p-4"
+                        >
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="truncate text-sm font-medium text-text-primary">
+                                        {publication.name}
+                                    </p>
+
+                                    {publication.isDefault && (
+                                        <Badge variant="accent">default</Badge>
+                                    )}
+                                </div>
+
+                                {publication.description && (
+                                    <p className="mt-1 truncate text-xs text-text-secondary">
+                                        {publication.description}
+                                    </p>
+                                )}
+                            </div>
+
+                            <Link
+                                to={`/p/${publication.slug}`}
+                                className="inline-flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+                            >
+                                View
+                                <ExternalLink size={12} />
+                            </Link>
+
+                            {!publication.isDefault && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(publication)}
+                                    className="rounded p-2 text-text-muted transition-colors hover:bg-elevated hover:text-accent"
+                                    aria-label={`Delete ${publication.name}`}
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="mt-12">
+                <Link
+                    to="/dashboard"
+                    className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary"
+                >
+                    <ArrowLeft size={16} />
+                    Back to dashboard
+                </Link>
+            </div>
+        </PageContainer>
+    );
+}
+</file>
+
 <file path="src/services/adminService.ts">
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
@@ -1275,6 +1644,181 @@ export async function adminDeleteArticle(articleId: string): Promise<void> {
     .eq('id', articleId);
 
   if (error) throw error;
+}
+</file>
+
+<file path="src/services/publicationService.ts">
+import { supabase } from '@/lib/supabase';
+import type { Publication } from '@/types';
+import { slugify } from '@/utils/slugify';
+import type { Database } from '@/types/database';
+
+type PublicationRow = Database['public']['Tables']['publications']['Row'];
+
+function mapPublication(row: PublicationRow): Publication {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description,
+    logoUrl: row.logo_url,
+    isDefault: row.is_default,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getMyPublications(userId: string): Promise<Publication[]> {
+  const { data, error } = await supabase
+    .from('publications')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  return data.map(mapPublication);
+}
+
+export async function getPublicationBySlug(slug: string): Promise<Publication | null> {
+  const { data, error } = await supabase
+    .from('publications')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data ? mapPublication(data) : null;
+}
+
+async function createFallbackDefaultPublication(userId: string): Promise<Publication> {
+  const { data, error } = await supabase
+    .from('publications')
+    .insert({
+      owner_id: userId,
+      name: 'The Journal',
+      slug: slugify('The Journal'),
+      is_default: true,
+    })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+
+  return mapPublication(data);
+}
+
+export async function getDefaultPublication(userId: string): Promise<Publication> {
+  const { data, error } = await supabase
+    .from('publications')
+    .select('*')
+    .eq('owner_id', userId)
+    .eq('is_default', true)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (data) return mapPublication(data);
+
+  try {
+    return await createFallbackDefaultPublication(userId);
+  } catch (error: any) {
+    // If duplicate default happened because of race condition, fetch again.
+    if (error?.code === '23505') {
+      const { data: existing, error: retryError } = await supabase
+        .from('publications')
+        .select('*')
+        .eq('owner_id', userId)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      if (retryError) throw retryError;
+
+      if (existing) return mapPublication(existing);
+    }
+
+    throw error;
+  }
+}
+
+export async function createPublication(
+  ownerId: string,
+  input: {
+    name: string;
+    description?: string;
+  }
+): Promise<Publication> {
+  let lastError: any = null;
+
+  // Retry a few times in case of slug collision.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const slug = slugify(input.name);
+
+    const { data, error } = await supabase
+      .from('publications')
+      .insert({
+        owner_id: ownerId,
+        name: input.name,
+        slug,
+        description: input.description ?? null,
+        is_default: false,
+      })
+      .select('*')
+      .single();
+
+    if (!error) return mapPublication(data);
+
+    lastError = error;
+
+    if (error.code !== '23505') {
+      throw error;
+    }
+  }
+
+  throw lastError ?? new Error('Failed to create publication.');
+}
+
+export async function updatePublication(
+  id: string,
+  values: {
+    name?: string;
+    description?: string | null;
+  }
+): Promise<Publication> {
+  const { data, error } = await supabase
+    .from('publications')
+    .update(values)
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+
+  return mapPublication(data);
+}
+
+export async function deletePublication(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('publications')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+export async function getPublicationsByOwner(ownerId: string): Promise<Publication[]> {
+  const { data, error } = await supabase
+    .from('publications')
+    .select('*')
+    .eq('owner_id', ownerId)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  return data.map(mapPublication);
 }
 </file>
 
@@ -1723,6 +2267,225 @@ with check (public.is_admin(auth.uid()));
 update public.profiles set is_admin = true where id = '1d571977-83a0-4cf0-a573-7fe1e92fea8b';
 </file>
 
+<file path="supabase/migrations/20260820114326_publications.sql">
+-- ============================================================
+-- Publications / minimal multi-publication support
+-- ============================================================
+
+-- 1. Publications table
+create table if not exists public.publications (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null default 'The Journal',
+  slug text not null unique,
+  description text,
+  logo_url text,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint publications_name_length check (char_length(name) between 1 and 100),
+  constraint publications_slug_length check (char_length(slug) between 1 and 100),
+  constraint publications_description_length check (description is null or char_length(description) <= 500)
+);
+
+-- Only one default publication per user
+create unique index if not exists publications_one_default_per_owner
+on public.publications(owner_id)
+where is_default;
+
+-- updated_at trigger
+drop trigger if exists publications_set_updated_at on public.publications;
+create trigger publications_set_updated_at
+before update on public.publications
+for each row execute function public.set_updated_at();
+
+-- 2. Add publication_id to articles
+alter table public.articles
+add column if not exists publication_id uuid references public.publications(id);
+
+-- 3. Slug helper
+create or replace function public.generate_publication_slug(p_owner_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  base text;
+  candidate text;
+  i integer := 0;
+begin
+  select username
+  into v_username
+  from public.profiles
+  where id = p_owner_id;
+
+  if v_username is not null and char_length(v_username) >= 3 then
+    base := v_username;
+  else
+    base := 'journal-' || left(replace(p_owner_id::text, '-', ''), 8);
+  end if;
+
+  candidate := base;
+
+  while exists (
+    select 1
+    from public.publications
+    where slug = candidate
+  ) loop
+    i := i + 1;
+    candidate := base || '-' || i;
+  end loop;
+
+  return candidate;
+end;
+$$;
+
+-- 4. Default publication helper
+create or replace function public.create_default_publication(p_owner_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1
+    from public.publications
+    where owner_id = p_owner_id
+      and is_default = true
+  ) then
+    insert into public.publications (owner_id, name, slug, is_default)
+    values (
+      p_owner_id,
+      'The Journal',
+      public.generate_publication_slug(p_owner_id),
+      true
+    );
+  end if;
+end;
+$$;
+
+-- 5. Create default publication for new users
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, display_name)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'name', new.email, 'User')
+  );
+
+  perform public.create_default_publication(new.id);
+
+  return new;
+end;
+$$;
+
+-- 6. Backfill default publications for existing users
+do $$
+declare
+  r record;
+begin
+  for r in
+    select id
+    from public.profiles
+  loop
+    perform public.create_default_publication(r.id);
+  end loop;
+end;
+$$;
+
+-- 7. Assign existing articles to owner's default publication
+update public.articles a
+set publication_id = p.id
+from public.publications p
+where a.publication_id is null
+  and p.owner_id = a.author_id
+  and p.is_default = true;
+
+-- Now every article must have a publication
+alter table public.articles
+alter column publication_id set not null;
+
+-- 8. RLS for publications
+alter table public.publications enable row level security;
+
+drop policy if exists "Publications are publicly readable" on public.publications;
+drop policy if exists "Users can create their own publications" on public.publications;
+drop policy if exists "Owners can update their own publications" on public.publications;
+drop policy if exists "Owners can delete non-default publications" on public.publications;
+
+create policy "Publications are publicly readable"
+on public.publications
+for select
+to anon, authenticated
+using (true);
+
+create policy "Users can create their own publications"
+on public.publications
+for insert
+to authenticated
+with check (auth.uid() = owner_id);
+
+create policy "Owners can update their own publications"
+on public.publications
+for update
+to authenticated
+using (auth.uid() = owner_id)
+with check (auth.uid() = owner_id);
+
+create policy "Owners can delete non-default publications"
+on public.publications
+for delete
+to authenticated
+using (
+  auth.uid() = owner_id
+  and is_default = false
+);
+
+grant select on public.publications to anon, authenticated;
+grant insert, update, delete on public.publications to authenticated;
+
+-- 9. Update article policies to require owning the publication
+drop policy if exists "Authors can create their own articles" on public.articles;
+drop policy if exists "Authors can update their own articles" on public.articles;
+
+create policy "Authors can create articles in their publications"
+on public.articles
+for insert
+to authenticated
+with check (
+  auth.uid() = author_id
+  and exists (
+    select 1
+    from public.publications p
+    where p.id = publication_id
+      and p.owner_id = auth.uid()
+  )
+);
+
+create policy "Authors can update their own articles"
+on public.articles
+for update
+to authenticated
+using (auth.uid() = author_id)
+with check (
+  auth.uid() = author_id
+  and exists (
+    select 1
+    from public.publications p
+    where p.id = publication_id
+      and p.owner_id = auth.uid()
+  )
+);
+</file>
+
 <file path=".gitignore">
 logs
 *.log
@@ -1787,27 +2550,6 @@ export default {
     autoprefixer: {},
   },
 };
-</file>
-
-<file path="repomix.config.json">
-{
-  "output": {
-    "filePath": "repomix-output.xml",
-    "style": "xml"
-  },
-  "ignore": {
-    "customPatterns": [
-      "supabase/.temp/**",
-      "src/components/ui/Strands.tsx",
-      "src/components/ui/ParticleText.tsx",
-      ".bolt/**",
-      ".env",
-      "src/components/interactions/CommentSection.tsx",
-      "src/pages/settings/ProfileSettingsPage.tsx",
-      "src/components/editor/TiptapEditor.tsx"
-    ]
-  }
-}
 </file>
 
 <file path="tailwind.config.js">
@@ -1910,6 +2652,14 @@ export default {
     "noFallthroughCasesInSwitch": true
   },
   "include": ["vite.config.ts"]
+}
+</file>
+
+<file path="vercel.json">
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
 </file>
 
@@ -2881,6 +3631,505 @@ export function PasswordSettingsPage() {
 }
 </file>
 
+<file path="src/pages/settings/ProfileSettingsPage.tsx">
+import { useEffect, useState, type FormEvent } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { uploadAvatar } from '@/services/profileService';
+type FormState = {
+    display_name: string;
+    username: string;
+    avatar_url: string;
+    bio: string;
+    website_url: string;
+    github_url: string;
+    linkedin_url: string;
+};
+
+const initialForm: FormState = {
+    display_name: '',
+    username: '',
+    avatar_url: '',
+    bio: '',
+    website_url: '',
+    github_url: '',
+    linkedin_url: '',
+};
+
+const inputClass =
+    'w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none';
+
+const labelClass = 'block text-sm font-medium text-text-primary mb-1.5';
+
+function normalizeUrl(value: string): string {
+    const trimmed = value.trim();
+
+    if (!trimmed) return '';
+
+    // Allow relative paths, useful later for Supabase Storage paths.
+    if (trimmed.startsWith('/')) return trimmed;
+
+    if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+
+    return `https://${trimmed}`;
+}
+
+function isValidUrl(value: string): boolean {
+    if (!value) return true;
+
+    if (value.startsWith('/')) return true;
+
+    try {
+        new URL(value);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function getErrorMessage(error: unknown): string {
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === '23505'
+    ) {
+        return 'That username is already taken.';
+    }
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return 'Could not save your profile. Please try again.';
+}
+
+export function ProfileSettingsPage() {
+    const { user, profile, isLoading, isProfileLoading, updateProfile } = useAuth();
+    const [uploading, setUploading] = useState(false);
+    const [form, setForm] = useState<FormState>(initialForm);
+    const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+
+    useEffect(() => {
+        if (profile) {
+            setForm({
+                display_name: profile.display_name ?? '',
+                username: profile.username ?? '',
+                avatar_url: profile.avatar_url ?? '',
+                bio: profile.bio ?? '',
+                website_url: profile.website_url ?? '',
+                github_url: profile.github_url ?? '',
+                linkedin_url: profile.linkedin_url ?? '',
+            });
+
+            return;
+        }
+
+        if (user) {
+            const metadata = user.user_metadata as Record<string, unknown> | undefined;
+
+            const fallbackDisplayName =
+                typeof metadata?.display_name === 'string'
+                    ? metadata.display_name
+                    : user.email?.split('@')[0] ?? '';
+
+            setForm((current) => ({
+                ...current,
+                display_name: current.display_name || fallbackDisplayName,
+            }));
+        }
+    }, [profile, user]);
+
+    if (isLoading || isProfileLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[40vh]">
+                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !user) return;
+
+        if (!file.type.startsWith('image/')) {
+            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Please select an image file.' }));
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Image must be smaller than 2MB.' }));
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const publicUrl = await uploadAvatar(user.id, file);
+            setForm((prev) => ({ ...prev, avatar_url: publicUrl }));
+            setFieldErrors((prev) => ({ ...prev, avatar_url: undefined }));
+        } catch (err) {
+            console.error('Avatar upload error:', err);
+            setFieldErrors((prev) => ({ ...prev, avatar_url: 'Failed to upload image.' }));
+        } finally {
+            setUploading(false);
+            e.target.value = ''; // Reset input so the same file can be selected again if needed
+        }
+    };
+    const setField = (name: keyof FormState, value: string) => {
+        setForm((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+
+        if (status !== 'idle') {
+            setStatus('idle');
+            setErrorMessage('');
+        }
+
+        setFieldErrors((prev) => ({
+            ...prev,
+            [name]: undefined,
+        }));
+    };
+
+    const validate = (): boolean => {
+        const errors: Partial<Record<keyof FormState, string>> = {};
+
+        const displayName = form.display_name.trim();
+
+        if (!displayName) {
+            errors.display_name = 'Display name is required.';
+        } else if (displayName.length > 100) {
+            errors.display_name = 'Display name must be 100 characters or less.';
+        }
+
+        const username = form.username.trim().toLowerCase();
+
+        if (username && !/^[a-z0-9_-]{3,30}$/.test(username)) {
+            errors.username =
+                'Username must be 3-30 characters and can include lowercase letters, numbers, hyphens, and underscores.';
+        }
+
+        if (form.bio.length > 500) {
+            errors.bio = 'Bio must be 500 characters or less.';
+        }
+
+        const urlFields = ['avatar_url', 'website_url', 'github_url', 'linkedin_url'] as const;
+
+        for (const field of urlFields) {
+            const rawValue = form[field].trim();
+
+            if (!rawValue) continue;
+
+            const normalized = normalizeUrl(rawValue);
+
+            if (!isValidUrl(normalized)) {
+                errors[field] = 'Enter a valid URL.';
+            }
+        }
+
+        setFieldErrors(errors);
+
+        return Object.keys(errors).length === 0;
+    };
+
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!user) return;
+
+        if (!validate()) {
+            setStatus('error');
+            setErrorMessage('Please fix the highlighted fields.');
+            return;
+        }
+
+        setStatus('saving');
+        setErrorMessage('');
+
+        try {
+            await updateProfile({
+                display_name: form.display_name.trim(),
+                username: form.username.trim() ? form.username.trim().toLowerCase() : null,
+                avatar_url: normalizeUrl(form.avatar_url) || null,
+                bio: form.bio.trim() || null,
+                website_url: normalizeUrl(form.website_url) || null,
+                github_url: normalizeUrl(form.github_url) || null,
+                linkedin_url: normalizeUrl(form.linkedin_url) || null,
+            });
+
+            setStatus('success');
+        } catch (error) {
+            setStatus('error');
+            setErrorMessage(getErrorMessage(error));
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-8">
+            <section className="rounded-lg border border-border-subtle bg-bg p-6">
+                <div>
+                    <h2 className="font-serif text-lg font-semibold text-text-primary">
+                        Public profile
+                    </h2>
+                    <p className="mt-1 text-sm text-text-secondary">
+                        This information may be displayed alongside your articles and public profile.
+                    </p>
+                </div>
+
+                <div className="mt-6 grid gap-6 md:grid-cols-2">
+                    <div>
+                        <label htmlFor="display_name" className={labelClass}>
+                            Display name
+                        </label>
+
+                        <input
+                            id="display_name"
+                            type="text"
+                            value={form.display_name}
+                            onChange={(event) => setField('display_name', event.target.value)}
+                            placeholder="Your name"
+                            className={inputClass}
+                        />
+
+                        {fieldErrors.display_name && (
+                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.display_name}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label htmlFor="username" className={labelClass}>
+                            Username
+                        </label>
+
+                        <input
+                            id="username"
+                            type="text"
+                            value={form.username}
+                            onChange={(event) => setField('username', event.target.value)}
+                            placeholder="yourusername"
+                            className={inputClass}
+                        />
+
+                        <p className="mt-1.5 text-xs text-text-secondary">
+                            Lowercase letters, numbers, hyphens, and underscores only.
+                        </p>
+
+                        {fieldErrors.username && (
+                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.username}</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mt-6">
+                    <label htmlFor="avatar_url" className={labelClass}>
+                        Avatar
+                    </label>
+
+                    <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
+                        {/* Avatar preview */}
+                        {form.avatar_url.trim() ? (
+                            <img
+                                src={normalizeUrl(form.avatar_url)}
+                                alt="Avatar preview"
+                                className="h-28 w-28 sm:h-36 sm:w-36 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-28 w-28 sm:h-36 sm:w-36 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted">
+                                No image
+                            </div>
+                        )}
+
+                        {/* Controls */}
+                        <div className="flex min-w-0 flex-1 flex-col gap-4">
+                            {/* Avatar URL */}
+                            <div className="max-w-lg">
+                                <input
+                                    id="avatar_url"
+                                    type="text"
+                                    value={form.avatar_url}
+                                    onChange={(event) =>
+                                        setField('avatar_url', event.target.value)
+                                    }
+                                    placeholder="https://example.com/avatar.jpg"
+                                    className={inputClass}
+                                />
+
+                                {fieldErrors.avatar_url && (
+                                    <p className="mt-1.5 text-sm text-accent">
+                                        {fieldErrors.avatar_url}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Upload */}
+                            <div className="max-w-lg rounded-lg border border-border-subtle bg-surface px-4 py-3">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-text-primary">
+                                            Upload an image
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-text-muted">
+                                            JPG, PNG, WebP, or GIF · Max 2MB
+                                        </p>
+                                    </div>
+
+                                    <label
+                                        htmlFor="avatar-upload"
+                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading
+                                                ? 'pointer-events-none opacity-50'
+                                                : ''
+                                            }`}
+                                    >
+                                        {uploading ? 'Uploading...' : 'Choose image'}
+                                    </label>
+
+                                    <input
+                                        id="avatar-upload"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleAvatarUpload}
+                                        disabled={uploading}
+                                        className="sr-only"
+                                    />
+                                </div>
+
+                                {uploading && (
+                                    <div className="mt-2">
+                                        <div className="h-1 w-full overflow-hidden rounded-full bg-elevated">
+                                            <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
+                                        </div>
+                                        <p className="mt-1 text-xs text-text-muted">
+                                            Uploading...
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-6">
+                    <label htmlFor="bio" className={labelClass}>
+                        Bio
+                    </label>
+
+                    <textarea
+                        id="bio"
+                        value={form.bio}
+                        onChange={(event) => setField('bio', event.target.value)}
+                        placeholder="Write a short bio..."
+                        rows={5}
+                        className={`${inputClass} resize-y`}
+                    />
+
+                    <div className="mt-1.5 flex items-center justify-between">
+                        {fieldErrors.bio ? (
+                            <p className="text-sm text-red-500">{fieldErrors.bio}</p>
+                        ) : (
+                            <p className="text-xs text-text-secondary">
+                                A short description shown on your profile and articles.
+                            </p>
+                        )}
+
+                        <p className="text-xs text-text-secondary">{form.bio.length}/500</p>
+                    </div>
+                </div>
+            </section>
+
+            <section className="rounded-lg border border-border-subtle bg-bg p-6">
+                <div>
+                    <h2 className="font-serif text-lg font-semibold text-text-primary">Links</h2>
+                    <p className="mt-1 text-sm text-text-secondary">
+                        Optional external links for your profile.
+                    </p>
+                </div>
+
+                <div className="mt-6 grid gap-6 md:grid-cols-3">
+                    <div>
+                        <label htmlFor="website_url" className={labelClass}>
+                            Website
+                        </label>
+
+                        <input
+                            id="website_url"
+                            type="text"
+                            value={form.website_url}
+                            onChange={(event) => setField('website_url', event.target.value)}
+                            placeholder="yoursite.com"
+                            className={inputClass}
+                        />
+
+                        {fieldErrors.website_url && (
+                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.website_url}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label htmlFor="github_url" className={labelClass}>
+                            GitHub
+                        </label>
+
+                        <input
+                            id="github_url"
+                            type="text"
+                            value={form.github_url}
+                            onChange={(event) => setField('github_url', event.target.value)}
+                            placeholder="github.com/username"
+                            className={inputClass}
+                        />
+
+                        {fieldErrors.github_url && (
+                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.github_url}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label htmlFor="linkedin_url" className={labelClass}>
+                            LinkedIn
+                        </label>
+
+                        <input
+                            id="linkedin_url"
+                            type="text"
+                            value={form.linkedin_url}
+                            onChange={(event) => setField('linkedin_url', event.target.value)}
+                            placeholder="linkedin.com/in/username"
+                            className={inputClass}
+                        />
+
+                        {fieldErrors.linkedin_url && (
+                            <p className="mt-1.5 text-sm text-red-500">{fieldErrors.linkedin_url}</p>
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            <div className="flex items-center gap-3">
+                <button
+                    type="submit"
+                    disabled={status === 'saving'}
+                    className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    {status === 'saving' ? 'Saving...' : 'Save changes'}
+                </button>
+
+                {status === 'success' && (
+                    <span className="text-sm font-medium text-emerald-500">
+                        Profile saved.
+                    </span>
+                )}
+            </div>
+
+            {status === 'error' && errorMessage && (
+                <p className="text-sm text-red-500">{errorMessage}</p>
+            )}
+        </form>
+    );
+}
+</file>
+
 <file path="src/pages/CreatorPage.tsx">
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -3007,223 +4256,6 @@ export function CreatorPage() {
           </footer>
         </div>
       </PageContainer>
-    </div>
-  );
-}
-</file>
-
-<file path="src/pages/WriterProfilePage.tsx">
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
-import type { Article } from '@/types';
-import type { Profile } from '@/services/profileService';
-import { getProfileByUsername } from '@/services/profileService';
-import { getPublishedArticlesByAuthor } from '@/services/articleService';
-import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
-
-export function WriterProfilePage() {
-  const { username } = useParams<{ username: string }>();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loadingArticles, setLoadingArticles] = useState(true);
-  const [status, setStatus] = useState<'loading' | 'found' | 'not-found'>('loading');
-
-  useEffect(() => {
-    if (!username) return;
-    let mounted = true;
-
-    setStatus('loading');
-    setProfile(null);
-    setArticles([]);
-    setLoadingArticles(true);
-
-    (async () => {
-      try {
-        const found = await getProfileByUsername(username.toLowerCase());
-        if (!mounted) return;
-        if (!found) {
-          setStatus('not-found');
-          setLoadingArticles(false);
-          return;
-        }
-        setProfile(found);
-        setStatus('found');
-        const writerArticles = await getPublishedArticlesByAuthor(found.id);
-        if (!mounted) return;
-        setArticles(writerArticles);
-      } catch (error) {
-        console.error('Failed to load writer profile:', error);
-        if (!mounted) return;
-        setStatus('not-found');
-      } finally {
-        if (mounted) setLoadingArticles(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [username]);
-
-  const externalLinks = useMemo(() => {
-    if (!profile) return [];
-    return [
-      { label: 'Website', href: profile.website_url },
-      { label: 'GitHub', href: profile.github_url },
-      { label: 'LinkedIn', href: profile.linkedin_url },
-    ].filter((link): link is { label: string; href: string } => Boolean(link.href));
-  }, [profile]);
-
-  const totalLikes = useMemo(
-    () => articles.reduce((sum, article) => sum + article.likes, 0),
-    [articles]
-  );
-
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]" role="status" aria-label="Loading writer profile">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (status === 'not-found' || !profile) {
-    return (
-      <PageContainer className="py-24 text-center">
-        <UserX size={32} className="mx-auto text-text-muted mb-4" />
-        <h1 className="font-serif text-2xl font-semibold text-text-primary mb-2">
-          Writer not found
-        </h1>
-        <p className="text-text-muted mb-6">
-          This profile doesn't exist, or the username has changed.
-        </p>
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to articles
-        </Link>
-      </PageContainer>
-    );
-  }
-
-  const initial = profile.display_name.charAt(0).toUpperCase();
-
-  return (
-    <div className="grain">
-      <PageContainer className="py-12 md:py-20">
-        {/* Profile header */}
-        <header className="mx-auto max-w-2xl text-center">
-          <p
-            className="anim-fade-up font-mono text-sm uppercase tracking-[0.25em] text-text-muted"
-            style={{ animationDelay: '0.05s' }}
-          >
-            @{profile.username}
-          </p>
-
-          <div
-            className="anim-fade-up mt-8 flex justify-center"
-            style={{ animationDelay: '0.2s' }}
-          >
-            {profile.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name}
-                className="h-32 w-32 rounded-full border-2 border-border bg-elevated object-cover md:h-36 md:w-36"
-              />
-            ) : (
-              <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-border bg-elevated font-serif text-4xl font-medium text-text-muted md:h-36 md:w-36">
-                {initial}
-              </div>
-            )}
-          </div>
-
-          <h1
-            className="anim-wipe mt-8 font-serif text-3xl font-medium leading-tight text-text-primary md:text-5xl"
-            style={{ animationDelay: '0.4s' }}
-          >
-            {profile.display_name}
-          </h1>
-
-          {profile.bio && (
-            <p
-              className="anim-fade-up mx-auto mt-5 max-w-md text-base leading-relaxed text-text-secondary"
-              style={{ animationDelay: '0.6s' }}
-            >
-              {profile.bio}
-            </p>
-          )}
-
-          {externalLinks.length > 0 && (
-            <div
-              className="anim-fade-up mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
-              style={{ animationDelay: '0.75s' }}
-            >
-              {externalLinks.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
-                >
-                  {link.label}
-                  <ArrowUpRight size={13} className="anim-arrow" />
-                </a>
-              ))}
-            </div>
-          )}
-
-          {/* Stats */}
-          <div
-            className="anim-fade-up mt-10 flex items-center justify-center gap-8"
-            style={{ animationDelay: '0.9s' }}
-          >
-            <Stat value={articles.length} label={articles.length === 1 ? 'Article' : 'Articles'} />
-            <span className="h-8 w-px bg-border-subtle" aria-hidden="true" />
-            <Stat value={totalLikes} label={totalLikes === 1 ? 'Like' : 'Likes'} />
-          </div>
-        </header>
-
-        {/* Published articles */}
-        <section className="mx-auto mt-12 md:mt-16 max-w-content">
-          <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
-            Published writing
-          </h2>
-          {loadingArticles ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <ArticleCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : articles.length === 0 ? (
-            <p className="py-12 text-center text-text-muted">
-              No published articles yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {articles.map((article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
-            </div>
-          )}
-        </section>
-      </PageContainer>
-    </div>
-  );
-}
-
-function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
-  return (
-    <div className="text-center">
-      <p className="font-serif text-2xl font-medium text-text-primary md:text-3xl">{value}</p>
-      <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
-        {label}
-      </p>
     </div>
   );
 }
@@ -3415,6 +4447,24 @@ using (auth.uid() = author_id and public.is_writer(auth.uid()));
 create policy "Admins can delete any comment"
 on public.comments for delete to authenticated
 using (public.is_admin(auth.uid()));
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "customPatterns": [
+      "supabase/.temp/**",
+      "src/components/ui/Strands.tsx",
+      "src/components/ui/ParticleText.tsx",
+      ".bolt/**",
+      ".env"
+    ]
+  }
+}
 </file>
 
 <file path="src/components/editor/AlignedImage.ts">
@@ -4089,370 +5139,6 @@ export async function getProfileByUsername(username: string): Promise<Profile | 
 }
 </file>
 
-<file path="src/types/database.ts">
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
-
-export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.15"
-  }
-  public: {
-    Tables: {
-      article_likes: {
-        Row: {
-          article_id: string
-          created_at: string
-          user_id: string
-        }
-        Insert: {
-          article_id: string
-          created_at?: string
-          user_id: string
-        }
-        Update: {
-          article_id?: string
-          created_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_likes_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_likes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      articles: {
-        Row: {
-          author_id: string
-          category_id: number
-          content: string
-          cover_image: string | null
-          created_at: string
-          id: string
-          published_at: string | null
-          reading_time: number | null
-          slug: string
-          status: Database["public"]["Enums"]["article_status"]
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          author_id: string
-          category_id: number
-          content: string
-          cover_image?: string | null
-          created_at?: string
-          id?: string
-          published_at?: string | null
-          reading_time?: number | null
-          slug: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string
-          category_id?: number
-          content?: string
-          cover_image?: string | null
-          created_at?: string
-          id?: string
-          published_at?: string | null
-          reading_time?: number | null
-          slug?: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "articles_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "articles_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          created_at: string
-          id: number
-          name: string
-          slug: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          name: string
-          slug: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          name?: string
-          slug?: string
-        }
-        Relationships: []
-      }
-      comments: {
-        Row: {
-          article_id: string
-          author_id: string
-          content: string
-          created_at: string
-          id: string
-          parent_id: string | null
-        }
-        Insert: {
-          article_id: string
-          author_id: string
-          content: string
-          created_at?: string
-          id?: string
-          parent_id?: string | null
-        }
-        Update: {
-          article_id?: string
-          author_id?: string
-          content?: string
-          created_at?: string
-          id?: string
-          parent_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comments_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          bio: string | null
-          created_at: string
-          display_name: string
-          github_url: string | null
-          id: string
-          is_admin: boolean
-          linkedin_url: string | null
-          updated_at: string
-          username: string | null
-          website_url: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          display_name: string
-          github_url?: string | null
-          id: string
-          is_admin?: boolean
-          linkedin_url?: string | null
-          updated_at?: string
-          username?: string | null
-          website_url?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          display_name?: string
-          github_url?: string | null
-          id?: string
-          is_admin?: boolean
-          linkedin_url?: string | null
-          updated_at?: string
-          username?: string | null
-          website_url?: string | null
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      is_admin: { Args: { user_id: string }; Returns: boolean }
-    }
-    Enums: {
-      article_status: "draft" | "published"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      article_status: ["draft", "published"],
-    },
-  },
-} as const
-</file>
-
 <file path="src/utils/date.ts">
 export function formatDate(date: string): string {
   const d = new Date(date);
@@ -4683,147 +5369,6 @@ export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
 }
 </file>
 
-<file path="src/pages/auth/SignupPage.tsx">
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { signup } from '@/services/authService';
-// import { Turnstile } from '@/components/auth/Turnstile';
-
-// Replace with your actual Cloudflare Turnstile Site Key
-// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
-export function SignupPage() {
-  const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    captcha?: string;
-    form?: string;
-  }>({});
-  const [loading, setLoading] = useState(false);
-
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!name) e.name = 'Name is required.';
-    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
-    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      await signup(name, email, password, captchaToken ?? undefined);
-      navigate('/dashboard');
-    } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <AuthLayout
-      title="Create account"
-      subtitle="Start writing and publishing on Lallu Syndrome."
-      footer={
-        <>
-          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
-          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
-          </div>
-        )}
-        <Input
-          label="Name"
-          type="text"
-          name="name"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={errors.name}
-          autoComplete="name"
-          required
-        />
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-          required
-        />
-        <Input
-          label="Confirm password"
-          isPassword
-          name="confirmPassword"
-          placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          error={errors.confirmPassword}
-          autoComplete="new-password"
-          required
-        />
-
-        {/* Turnstile Captcha */}
-        {/* <div>
-          <Turnstile
-            siteKey={TURNSTILE_SITE_KEY}
-            onVerify={(token) => {
-              setCaptchaToken(token);
-              setErrors((prev) => ({ ...prev, captcha: undefined }));
-            }}
-          />
-          {errors.captcha && (
-            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
-          )}
-        </div> */}
-
-        <Button type="submit" className="w-full" loading={loading}>
-          Create account
-        </Button>
-      </form>
-    </AuthLayout>
-  );
-}
-</file>
-
 <file path="src/pages/CategoryPage.tsx">
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -4898,6 +5443,721 @@ export function CategoryPage() {
     </PageContainer>
   );
 }
+</file>
+
+<file path="src/pages/WriterProfilePage.tsx">
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
+import type { Article, Publication,Profile } from '@/types';
+import { getProfileByUsername } from '@/services/profileService';
+import { getPublishedArticlesByAuthor } from '@/services/articleService';
+import { getPublicationsByOwner } from '@/services/publicationService';
+import { PageContainer } from '@/components/layout/Navbar';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+
+export function WriterProfilePage() {
+  const { username } = useParams<{ username: string }>();
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [publications, setPublications] = useState<Publication[]>([]);
+  const [loadingArticles, setLoadingArticles] = useState(true);
+  const [status, setStatus] = useState<'loading' | 'found' | 'not-found'>('loading');
+
+  useEffect(() => {
+    if (!username) return;
+
+    let mounted = true;
+
+    setStatus('loading');
+    setProfile(null);
+    setArticles([]);
+    setPublications([]);
+    setLoadingArticles(true);
+
+    (async () => {
+      try {
+        const found = await getProfileByUsername(username.toLowerCase());
+
+        if (!mounted) return;
+
+        if (!found) {
+          setStatus('not-found');
+          setLoadingArticles(false);
+          return;
+        }
+
+        setProfile(found);
+        setStatus('found');
+
+        const [writerArticles, writerPublications] = await Promise.all([
+          getPublishedArticlesByAuthor(found.id),
+          getPublicationsByOwner(found.id).catch(() => [] as Publication[]),
+        ]);
+
+        if (!mounted) return;
+
+        setArticles(writerArticles);
+        setPublications(writerPublications);
+      } catch (error) {
+        console.error('Failed to load writer profile:', error);
+
+        if (!mounted) return;
+
+        setStatus('not-found');
+      } finally {
+        if (mounted) setLoadingArticles(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [username]);
+
+  const externalLinks = useMemo(() => {
+    if (!profile) return [];
+
+    return [
+      { label: 'Website', href: profile.website_url },
+      { label: 'GitHub', href: profile.github_url },
+      { label: 'LinkedIn', href: profile.linkedin_url },
+    ].filter((link): link is { label: string; href: string } => Boolean(link.href));
+  }, [profile]);
+
+  const totalLikes = useMemo(
+    () => articles.reduce((sum, article) => sum + article.likes, 0),
+    [articles]
+  );
+
+  const latestArticles = articles.slice(0, 3);
+
+  if (status === 'loading') {
+    return (
+      <div
+        className="flex items-center justify-center min-h-[60vh]"
+        role="status"
+        aria-label="Loading writer profile"
+      >
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'not-found' || !profile) {
+    return (
+      <PageContainer className="py-24 text-center">
+        <UserX size={32} className="mx-auto text-text-muted mb-4" />
+
+        <h1 className="font-serif text-2xl font-semibold text-text-primary mb-2">
+          Writer not found
+        </h1>
+
+        <p className="text-text-muted mb-6">
+          This profile doesn't exist, or the username has changed.
+        </p>
+
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to articles
+        </Link>
+      </PageContainer>
+    );
+  }
+
+  const initial = profile.display_name.charAt(0).toUpperCase();
+
+  return (
+    <div className="grain">
+      <PageContainer className="py-12 md:py-20">
+        {/* Profile header */}
+        <header className="mx-auto max-w-2xl text-center">
+          <p
+            className="anim-fade-up font-mono text-sm uppercase tracking-[0.25em] text-text-muted"
+            style={{ animationDelay: '0.05s' }}
+          >
+            @{profile.username}
+          </p>
+
+          <div
+            className="anim-fade-up mt-8 flex justify-center"
+            style={{ animationDelay: '0.2s' }}
+          >
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name}
+                className="h-32 w-32 rounded-full border-2 border-border bg-elevated object-cover md:h-36 md:w-36"
+              />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-border bg-elevated font-serif text-4xl font-medium text-text-muted md:h-36 md:w-36">
+                {initial}
+              </div>
+            )}
+          </div>
+
+          <h1
+            className="anim-wipe mt-8 font-serif text-3xl font-medium leading-tight text-text-primary md:text-5xl"
+            style={{ animationDelay: '0.4s' }}
+          >
+            {profile.display_name}
+          </h1>
+
+          {profile.bio && (
+            <p
+              className="anim-fade-up mx-auto mt-5 max-w-md text-base leading-relaxed text-text-secondary"
+              style={{ animationDelay: '0.6s' }}
+            >
+              {profile.bio}
+            </p>
+          )}
+
+          {externalLinks.length > 0 && (
+            <div
+              className="anim-fade-up mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+              style={{ animationDelay: '0.75s' }}
+            >
+              {externalLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+                >
+                  {link.label}
+                  <ArrowUpRight size={13} className="anim-arrow" />
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* Stats */}
+          <div
+            className="anim-fade-up mt-10 flex items-center justify-center gap-8"
+            style={{ animationDelay: '0.9s' }}
+          >
+            <Stat
+              value={articles.length}
+              label={articles.length === 1 ? 'Article' : 'Articles'}
+            />
+
+            <span className="h-8 w-px bg-border-subtle" aria-hidden="true" />
+
+            <Stat value={totalLikes} label={totalLikes === 1 ? 'Like' : 'Likes'} />
+          </div>
+        </header>
+
+        {/* Publications */}
+        {publications.length > 0 && (
+          <section className="mx-auto mt-12 md:mt-16 max-w-content">
+            <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
+              Publications
+            </h2>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {publications.map((publication) => (
+                <Link
+                  key={publication.id}
+                  to={`/p/${publication.slug}`}
+                  className="group rounded border border-border-subtle bg-surface p-4 transition-colors hover:border-border"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-medium text-text-primary transition-colors group-hover:text-accent">
+                      {publication.name}
+                    </p>
+
+                    {publication.isDefault && (
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                        default
+                      </span>
+                    )}
+                  </div>
+
+                  {publication.description && (
+                    <p className="mt-2 line-clamp-2 text-xs text-text-secondary">
+                      {publication.description}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Latest articles */}
+        <section className="mx-auto mt-12 md:mt-16 max-w-content">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-muted">
+            Latest writing
+          </h2>
+
+          {loadingArticles ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <ArticleCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : latestArticles.length === 0 ? (
+            <p className="py-12 text-center text-text-muted">
+              No published articles yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {latestArticles.map((article) => (
+                <ArticleCard key={article.id} article={article} />
+              ))}
+            </div>
+          )}
+        </section>
+      </PageContainer>
+    </div>
+  );
+}
+
+function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
+  return (
+    <div className="text-center">
+      <p className="font-serif text-2xl font-medium text-text-primary md:text-3xl">
+        {value}
+      </p>
+
+      <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+        {label}
+      </p>
+    </div>
+  );
+}
+</file>
+
+<file path="src/types/database.ts">
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
+  public: {
+    Tables: {
+      article_likes: {
+        Row: {
+          article_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_likes_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      articles: {
+        Row: {
+          author_id: string
+          category_id: number
+          content: string
+          cover_image: string | null
+          created_at: string
+          id: string
+          publication_id: string
+          published_at: string | null
+          reading_time: number | null
+          slug: string
+          status: Database["public"]["Enums"]["article_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          category_id: number
+          content: string
+          cover_image?: string | null
+          created_at?: string
+          id?: string
+          publication_id: string
+          published_at?: string | null
+          reading_time?: number | null
+          slug: string
+          status?: Database["public"]["Enums"]["article_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          category_id?: number
+          content?: string
+          cover_image?: string | null
+          created_at?: string
+          id?: string
+          publication_id?: string
+          published_at?: string | null
+          reading_time?: number | null
+          slug?: string
+          status?: Database["public"]["Enums"]["article_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_publication_id_fkey"
+            columns: ["publication_id"]
+            isOneToOne: false
+            referencedRelation: "publications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          article_id: string
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          parent_id: string | null
+        }
+        Insert: {
+          article_id: string
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+        }
+        Update: {
+          article_id?: string
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string
+          github_url: string | null
+          id: string
+          is_admin: boolean
+          linkedin_url: string | null
+          updated_at: string
+          username: string | null
+          website_url: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name: string
+          github_url?: string | null
+          id: string
+          is_admin?: boolean
+          linkedin_url?: string | null
+          updated_at?: string
+          username?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          github_url?: string | null
+          id?: string
+          is_admin?: boolean
+          linkedin_url?: string | null
+          updated_at?: string
+          username?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      publications: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          logo_url: string | null
+          name: string
+          owner_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          owner_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publications_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      create_default_publication: {
+        Args: { p_owner_id: string }
+        Returns: undefined
+      }
+      generate_publication_slug: {
+        Args: { p_owner_id: string }
+        Returns: string
+      }
+      is_admin: { Args: { user_id: string }; Returns: boolean }
+    }
+    Enums: {
+      article_status: "draft" | "published"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      article_status: ["draft", "published"],
+    },
+  },
+} as const
 </file>
 
 <file path="tsconfig.app.json">
@@ -5236,129 +6496,6 @@ export function PageContainer({
 }
 </file>
 
-<file path="src/contexts/AuthContext.tsx">
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react';
-import { getAuthState, onAuthChange, logout as authLogout } from '@/services/authService';
-import type { User } from '@supabase/supabase-js';
-import {
-  getProfile,
-  saveProfile,
-  type Profile,
-  type ProfileSaveValues,
-} from '@/services/profileService';
-
-type AuthContextValue = {
-  user: User | null;
-  isLoading: boolean;
-  profile: Profile | null;
-  isProfileLoading: boolean;
-  logout: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  updateProfile: (values: ProfileSaveValues) => Promise<Profile>;
-};
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
-
-  const fetchProfile = useCallback(async (userId: string) => {
-    setIsProfileLoading(true);
-
-    try {
-      const data = await getProfile(userId);
-      setProfile(data);
-    } catch {
-      setProfile(null);
-    } finally {
-      setIsProfileLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const state = await getAuthState();
-      setUser(state.user);
-      setIsLoading(false);
-    };
-
-    initializeAuth();
-
-    const unsub = onAuthChange((state) => {
-      setUser(state.user);
-      setIsLoading(state.isLoading);
-    });
-
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setProfile(null);
-      setIsProfileLoading(false);
-      return;
-    }
-
-    void fetchProfile(user.id);
-  }, [user, fetchProfile]);
-
-  const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    await fetchProfile(user.id);
-  }, [user, fetchProfile]);
-
-  const updateProfile = useCallback(
-    async (values: ProfileSaveValues) => {
-      if (!user) {
-        throw new Error('You must be logged in to update your profile.');
-      }
-
-      const updatedProfile = await saveProfile(user.id, values);
-      setProfile(updatedProfile);
-      return updatedProfile;
-    },
-    [user]
-  );
-
-  const logout = useCallback(async () => {
-    await authLogout();
-  }, []);
-
-  const contextValue = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      isLoading,
-      profile,
-      isProfileLoading,
-      logout,
-      refreshProfile,
-      updateProfile,
-    }),
-    [user, isLoading, profile, isProfileLoading, logout, refreshProfile, updateProfile]
-  );
-
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
-}
-</file>
-
 <file path="src/pages/ArticlesPage.tsx">
 import { useEffect, useState } from 'react';
 import type { Article, Category } from '@/types';
@@ -5506,6 +6643,610 @@ export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
       className="article-prose"
       dangerouslySetInnerHTML={{ __html: finalHtml }}
     />
+  );
+}
+</file>
+
+<file path="src/components/interactions/CommentSection.tsx">
+// src/components/interactions/CommentSection.tsx
+import { useEffect, useState, type FormEvent } from 'react';
+import { Send, Trash2 } from 'lucide-react';
+import type { Comment } from '@/types';
+import { getComments, addComment, deleteComment } from '@/services/articleService';
+import { useAuth } from '@/contexts/AuthContext';
+import { relativeTime } from '@/utils/date';
+import type { User } from '@supabase/supabase-js';
+
+type CommentSectionProps = {
+  articleId: string;
+};
+
+export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+
+  useEffect(() => {
+    let mounted = true;
+    const loadComments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await getComments(articleId);
+        if (mounted) setComments(result);
+      } catch {
+        if (mounted) setError('Unable to load comments.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadComments();
+    return () => { mounted = false; };
+  }, [articleId]);
+
+  // Helper to add a new comment/reply to the local state
+  const handleAddComment = (newComment: Comment) => {
+    setComments((prev) => [...prev, newComment]);
+  };
+
+  // Helper to remove a deleted comment (and its nested replies) from local state
+  const handleDeleteComment = (commentId: string) => {
+    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
+  };
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmedContent = content.trim();
+    if (!trimmedContent || !user || submitting) return;
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      const newComment = await addComment(articleId, trimmedContent);
+      handleAddComment(newComment);
+      setContent('');
+    } catch {
+      setError('Unable to post your comment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const topLevel = comments.filter((comment) => comment.parentId === null);
+  const getReplies = (parentId: string) =>
+    comments.filter((comment) => comment.parentId === parentId);
+
+  let commentsContent: JSX.Element;
+  if (loading) {
+    commentsContent = (
+      <div className="space-y-6">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="animate-pulse">
+            <div className="flex gap-3">
+              <div className="w-9 h-9 rounded-full bg-elevated" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 bg-elevated rounded" />
+                <div className="h-4 w-full bg-elevated rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else if (error && comments.length === 0) {
+    commentsContent = <p className="text-sm text-text-muted">{error}</p>;
+  } else if (topLevel.length === 0) {
+    commentsContent = (
+      <p className="text-sm text-text-muted">
+        No comments yet. Be the first to say something.
+      </p>
+    );
+  } else {
+    commentsContent = (
+      <div className="space-y-6">
+        {topLevel.map((comment) => (
+          <CommentItem
+            key={comment.id}
+            comment={comment}
+            replies={getReplies(comment.id)}
+            articleId={articleId}
+            user={user}
+            onReplyAdded={handleAddComment}
+            onDelete={handleDeleteComment} // <-- ADD THIS
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section className="mt-16 pt-10 border-t border-border-subtle">
+      <h3 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-6">
+        Comments
+      </h3>
+
+      {/* Top-level comment form */}
+      {user ? (
+        <form onSubmit={handleSubmit} className="mb-8">
+          <div className="flex gap-3">
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name ?? 'User'}
+                className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
+                {(profile?.display_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1">
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Write a comment..."
+                rows={3}
+                maxLength={1000}
+                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
+                disabled={submitting}
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  type="submit"
+                  disabled={!content.trim() || submitting}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  <Send size={14} />
+                  {submitting ? 'Posting...' : 'Comment'}
+                </button>
+              </div>
+            </div>
+          </div>
+          {error && <p className="mt-3 text-sm text-accent">{error}</p>}
+        </form>
+      ) : (
+        <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
+          <a href="/login" className="text-accent hover:underline">Sign in</a> to leave a comment.
+        </div>
+      )}
+
+      {commentsContent}
+    </section>
+  );
+}
+
+// Recursive Comment Item component
+function CommentItem({
+  comment,
+  replies,
+  articleId,
+  user,
+  onReplyAdded,
+  onDelete,
+}: Readonly<{
+  comment: Comment;
+  replies: Comment[];
+  articleId: string;
+  user: User | null;
+  onReplyAdded: (newComment: Comment) => void;
+  onDelete: (commentId: string) => void;
+}>) {
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- MODERATION LOGIC ---
+  // Replace with your actual UUID from Supabase Auth dashboard
+  // const ADMIN_UUID = 'YOUR-AUTH-UUID-HERE'; 
+  // const isAdmin = user?.id === ADMIN_UUID;
+  const isOwner = user?.id === comment.authorId;
+  const canDelete = isOwner // || isAdmin;
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this comment?')) return;
+    setIsDeleting(true);
+    try {
+      await deleteComment(comment.id);
+      onDelete(comment.id);
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = replyContent.trim();
+    if (!trimmed || !user || submitting) return;
+    try {
+      setSubmitting(true);
+      const newComment = await addComment(articleId, trimmed, comment.id);
+      onReplyAdded(newComment);
+      setReplyContent('');
+      setIsReplying(false);
+    } catch (error) {
+      console.error('Failed to post reply:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        {comment.avatar ? (
+          <img
+            src={comment.avatar}
+            alt={comment.author}
+            className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
+            {comment.author.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {/* Header with Reply & Delete buttons */}
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-sm font-medium text-text-primary">
+              {comment.author}
+            </span>
+            <span className="font-mono text-xs text-text-muted">
+              {relativeTime(comment.createdAt)}
+            </span>
+            {user && (
+              <button
+                type="button"
+                onClick={() => setIsReplying(!isReplying)}
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
+                {isReplying ? 'Cancel' : 'Reply'}
+              </button>
+            )}
+            {/* DELETE BUTTON */}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                aria-label="Delete comment"
+              >
+                {isDeleting ? '...' : <Trash2 size={14} />}
+              </button>
+            )}
+          </div>
+          
+          {/* Comment Content */}
+          <p className="text-sm text-text-secondary leading-relaxed">
+            {comment.content}
+          </p>
+
+          {/* Inline Reply Form */}
+          {isReplying && (
+            <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Write a reply..."
+                rows={2}
+                maxLength={1000}
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" 
+                disabled={submitting}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!replyContent.trim() || submitting}
+                className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={14} />
+              </button>
+            </form>
+          )}
+
+          {/* Nested Replies */}
+          {replies.length > 0 && (
+            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
+              {replies.map((reply) => (
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  replies={[]} 
+                  articleId={articleId}
+                  user={user}
+                  onReplyAdded={onReplyAdded}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/contexts/AuthContext.tsx">
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import { getAuthState, onAuthChange, logout as authLogout } from '@/services/authService';
+import type { User } from '@supabase/supabase-js';
+import {
+  getProfile,
+  saveProfile,
+} from '@/services/profileService';
+import type { Profile, ProfileSaveValues } from '@/types';
+
+type AuthContextValue = {
+  user: User | null;
+  isLoading: boolean;
+  profile: Profile | null;
+  isProfileLoading: boolean;
+  logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  updateProfile: (values: ProfileSaveValues) => Promise<Profile>;
+};
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    setIsProfileLoading(true);
+
+    try {
+      const data = await getProfile(userId);
+      setProfile(data);
+    } catch {
+      setProfile(null);
+    } finally {
+      setIsProfileLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const state = await getAuthState();
+      setUser(state.user);
+      setIsLoading(false);
+    };
+
+    initializeAuth();
+
+    const unsub = onAuthChange((state) => {
+      setUser(state.user);
+      setIsLoading(state.isLoading);
+    });
+
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      setIsProfileLoading(false);
+      return;
+    }
+
+    void fetchProfile(user.id);
+  }, [user, fetchProfile]);
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    await fetchProfile(user.id);
+  }, [user, fetchProfile]);
+
+  const updateProfile = useCallback(
+    async (values: ProfileSaveValues) => {
+      if (!user) {
+        throw new Error('You must be logged in to update your profile.');
+      }
+
+      const updatedProfile = await saveProfile(user.id, values);
+      setProfile(updatedProfile);
+      return updatedProfile;
+    },
+    [user]
+  );
+
+  const logout = useCallback(async () => {
+    await authLogout();
+  }, []);
+
+  const contextValue = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      isLoading,
+      profile,
+      isProfileLoading,
+      logout,
+      refreshProfile,
+      updateProfile,
+    }),
+    [user, isLoading, profile, isProfileLoading, logout, refreshProfile, updateProfile]
+  );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}
+</file>
+
+<file path="src/pages/auth/SignupPage.tsx">
+import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { signup } from '@/services/authService';
+// import { Turnstile } from '@/components/auth/Turnstile';
+
+// Replace with your actual Cloudflare Turnstile Site Key
+// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    captcha?: string;
+    form?: string;
+  }>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = (): boolean => {
+    const e: typeof errors = {};
+    if (!name) e.name = 'Name is required.';
+    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
+    if (!email) e.email = 'Email is required.';
+    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
+    if (!password) e.password = 'Password is required.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
+    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
+    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    // if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    console.log("I got called 1")
+    if (!validate()) return;
+    setLoading(true);
+    console.log("I got called 2")
+    try {
+      await signup(name, email, password, captchaToken ?? undefined);
+      navigate('/dashboard');
+      console.log("I got called 3")
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+      console.log("I got called 4")
+    } finally {
+      setLoading(false);
+      console.log("I got called 5")
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Create account"
+      subtitle="Start writing and publishing on Lallu Syndrome."
+      footer={
+        <>
+          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errors.form && (
+          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
+            {errors.form}
+          </div>
+        )}
+        <Input
+          label="Name"
+          type="text"
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+          autoComplete="name"
+          required
+        />
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          autoComplete="email"
+          required
+        />
+        <Input
+          label="Password"
+          isPassword
+          name="password"
+          placeholder="At least 6 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          autoComplete="new-password"
+          required
+        />
+        <Input
+          label="Confirm password"
+          isPassword
+          name="confirmPassword"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          error={errors.confirmPassword}
+          autoComplete="new-password"
+          required
+        />
+
+        {/* Turnstile Captcha */}
+        {/* <div>
+          <Turnstile
+            siteKey={TURNSTILE_SITE_KEY}
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              setErrors((prev) => ({ ...prev, captcha: undefined }));
+            }}
+          />
+          {errors.captcha && (
+            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
+          )}
+        </div> */}
+
+        <Button type="submit" className="w-full" loading={loading}>
+          Create account
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
 </file>
@@ -5863,162 +7604,6 @@ export function AboutPage() {
     </div>
   );
 }
-</file>
-
-<file path="src/App.tsx">
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { type ReactNode, useEffect } from 'react';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { HomePage } from '@/pages/HomePage';
-import { ArticlesPage } from '@/pages/ArticlesPage';
-import { ArticlePage } from '@/pages/ArticlePage';
-import { CategoryPage } from '@/pages/CategoryPage';
-import { AboutPage } from '@/pages/AboutPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { SignupPage } from '@/pages/auth/SignupPage';
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
-import { SettingsLayout } from '@/components/layout/SettingsLayout';
-import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
-import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
-import { ToastProvider } from '@/contexts/ToastContext';
-import { CreatorPage } from '@/pages/CreatorPage';
-import { WriterProfilePage } from '@/pages/WriterProfilePage';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { NotFoundPage } from './pages/NotFoundPage';
-import { AdminPage } from '@/pages/AdminPage';
-
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  return null;
-}
-
-function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
-  );
-}
-
-function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen bg-bg">{children}</div>
-  );
-}
-
-function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-    </div>
-  );
-}
-function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, profile, isLoading, isProfileLoading } = useAuth();
-
-  if (isLoading || isProfileLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-
-  if (!profile?.is_admin) { 
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-}
-function AppRoutes() {
-  return (
-    <>
-      <ScrollToTop />
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
-        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
-        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
-        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
-        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
-        <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
-        <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
-
-        {/* Auth routes */}
-        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
-        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
-        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
-        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
-
-        {/* Dashboard routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route
-          path="/settings"
-          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
-        >
-          <Route index element={<Navigate to="profile" replace />} />
-          <Route path="profile" element={<ProfileSettingsPage />} />
-          <Route path="password" element={<PasswordSettingsPage />} />
-
-        </Route>
-
-        {/* Admin routes */}
-        <Route path="/admin" element={<AdminRoute><AppLayout><AdminPage /></AppLayout></AdminRoute>} />
-
-        {/* Fallback */}
-        <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
-      </Routes>
-    </>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <ErrorBoundary>
-              <AppRoutes />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
-  );
-}
-
-export default App;
 </file>
 
 <file path="src/index.css">
@@ -6430,6 +8015,166 @@ export default App;
 }
 </file>
 
+<file path="src/App.tsx">
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { type ReactNode, useEffect } from 'react';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { HomePage } from '@/pages/HomePage';
+import { ArticlesPage } from '@/pages/ArticlesPage';
+import { ArticlePage } from '@/pages/ArticlePage';
+import { CategoryPage } from '@/pages/CategoryPage';
+import { AboutPage } from '@/pages/AboutPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
+import { LoginPage } from '@/pages/auth/LoginPage';
+import { SignupPage } from '@/pages/auth/SignupPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { SettingsLayout } from '@/components/layout/SettingsLayout';
+import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
+import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
+import { ToastProvider } from '@/contexts/ToastContext';
+import { CreatorPage } from '@/pages/CreatorPage';
+import { WriterProfilePage } from '@/pages/WriterProfilePage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { AdminPage } from '@/pages/AdminPage';
+import { PublicationPage } from '@/pages/PublicationPage';
+import { PublicationsPage } from '@/pages/PublicationsPage';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
+function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
+function EditorLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen bg-bg">{children}</div>
+  );
+}
+
+function AuthLayoutShell({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="min-h-screen flex flex-col bg-bg">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
+function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
+  const { user, profile, isLoading, isProfileLoading } = useAuth();
+
+  if (isLoading || isProfileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (!profile?.is_admin) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+function AppRoutes() {
+  return (
+    <>
+      <ScrollToTop />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
+        <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
+        <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
+        <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />
+        <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
+        <Route path="/creator" element={<AppLayout><CreatorPage /></AppLayout>} />
+        <Route path="/writers/:username" element={<AppLayout><WriterProfilePage /></AppLayout>} />
+        <Route path="/p/:slug" element={<AppLayout> <PublicationPage /> </AppLayout>} />
+
+        {/* Auth routes */}
+        <Route path="/login" element={<AuthLayoutShell><LoginPage /></AuthLayoutShell>} />
+        <Route path="/signup" element={<AuthLayoutShell><SignupPage /></AuthLayoutShell>} />
+        <Route path="/forgot-password" element={<AuthLayoutShell><ForgotPasswordPage /></AuthLayoutShell>} />
+        <Route path="/reset-password" element={<AuthLayoutShell><ResetPasswordPage /></AuthLayoutShell>} />
+
+        {/* Dashboard routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
+        <Route path="/dashboard/publications" element={<ProtectedRoute>  <AppLayout> <PublicationsPage />  </AppLayout></ProtectedRoute>}
+        />
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><AppLayout><SettingsLayout /></AppLayout></ProtectedRoute>}
+        >
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="password" element={<PasswordSettingsPage />} />
+
+        </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin" element={<AdminRoute><AppLayout><AdminPage /></AppLayout></AdminRoute>} />
+
+        {/* Fallback */}
+        <Route path="*" element={<AppLayout><NotFoundPage /></AppLayout>} />
+      </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
+</file>
+
 <file path="src/pages/DashboardPage.tsx">
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -6561,13 +8306,22 @@ export function DashboardPage() {
             {user ? `Signed in as ${user.user_metadata.name}` : 'Manage your writing.'}
           </p>
         </div>
-        <Link
-          to="/dashboard/articles/new"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors duration-200"
-        >
-          <Plus size={16} />
-          New Article
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/dashboard/publications"
+            className="inline-flex items-center gap-1.5 rounded border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary"
+          >
+            Publications
+          </Link>
+
+          <Link
+            to="/dashboard/articles/new"
+            className="inline-flex items-center gap-1.5 rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          >
+            <Plus size={16} />
+            New Article
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -6875,7 +8629,9 @@ export type Author = {
 export type ArticleInput = Pick<
   Article,
   'title' | 'slug' | 'content' | 'category' | 'coverImage' | 'status' | 'publishedAt'
->;
+> & {
+  publicationId?: string;
+};
 
 export type Comment = {
   id: string;
@@ -6893,7 +8649,17 @@ export type Category = {
   slug: string;
   name: string;
 };
-
+export type Publication = {
+  id: string;
+  ownerId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 export type Article = {
   id: string;
   slug: string;
@@ -6902,6 +8668,12 @@ export type Article = {
   category: string;
   coverImage: string;
   author: Author;
+  publicationId: string;
+  publication: {
+    id: string;
+    slug: string;
+    name: string;
+  };
   publishedAt?: string;
   createdAt: string;
   updatedAt?: string;
@@ -6924,7 +8696,7 @@ export type Profile = {
   website_url: string | null;
   github_url: string | null;
   linkedin_url: string | null;
-  is_admin: boolean; 
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -6938,6 +8710,483 @@ export type ProfileSaveValues = {
   github_url?: string | null;
   linkedin_url?: string | null;
 };
+</file>
+
+<file path="src/components/editor/TiptapEditor.tsx">
+import { useEditor, EditorContent } from '@tiptap/react';
+import { useRef } from 'react';
+import type { Editor } from '@tiptap/core';
+import { BubbleMenu } from '@tiptap/react/menus';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import Link from '@tiptap/extension-link';
+import { CodeBlock } from './CodeBlock';
+import { AlignedImage } from './AlignedImage';
+import { SlashCommand } from './SlashCommand';
+import TextAlign from '@tiptap/extension-text-align';
+import { processPastedHtml } from './processPastedHtml';
+import { useToast } from '@/contexts/ToastContext';
+// import '@tiptap/react/menus/styles.css';
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Link as LinkIcon,
+  Quote,
+  Code,
+  Eraser,
+  Heading1,
+  Heading2,
+  Heading3,
+  AlignJustify,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+} from 'lucide-react';
+
+type ToolbarButton = {
+  key: string;
+  icon: React.ComponentType<{ size?: number }>;
+  title: string;
+  isActive: (editor: Editor) => boolean;
+  run: (editor: Editor) => void;
+};
+
+const textToolbarButtons: ToolbarButton[] = [
+  { key: 'bold', icon: Bold, title: 'Bold', isActive: (e) => e.isActive('bold'), run: (e) => e.chain().focus().toggleBold().run() },
+  { key: 'italic', icon: Italic, title: 'Italic', isActive: (e) => e.isActive('italic'), run: (e) => e.chain().focus().toggleItalic().run() },
+  { key: 'strike', icon: Strikethrough, title: 'Strikethrough', isActive: (e) => e.isActive('strike'), run: (e) => e.chain().focus().toggleStrike().run() },
+  { key: 'h1', icon: Heading1, title: 'Heading 1', isActive: (e) => e.isActive('heading', { level: 1 }), run: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
+  { key: 'h2', icon: Heading2, title: 'Heading 2', isActive: (e) => e.isActive('heading', { level: 2 }), run: (e) => e.chain().focus().toggleHeading({ level: 2 }).run() },
+  { key: 'h3', icon: Heading3, title: 'Heading 3', isActive: (e) => e.isActive('heading', { level: 3 }), run: (e) => e.chain().focus().toggleHeading({ level: 3 }).run() },
+  { key: 'quote', icon: Quote, title: 'Quote', isActive: (e) => e.isActive('blockquote'), run: (e) => e.chain().focus().toggleBlockquote().run() },
+  { key: 'code', icon: Code, title: 'Inline code', isActive: (e) => e.isActive('code'), run: (e) => e.chain().focus().toggleCode().run() },
+];
+
+
+type TiptapEditorProps = {
+  value: string;
+  onChange: (html: string) => void;
+  onImageUpload: (file: File) => Promise<string>;
+};
+function isDirectImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+
+    return /\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(url.pathname + url.search);
+  } catch {
+    return false;
+  }
+}
+export function TiptapEditor({
+  value,
+  onChange,
+  onImageUpload
+}: Readonly<TiptapEditorProps>) {
+
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const openImagePicker = (targetEditor: Editor) => {
+    fileInputRef.current?.click();
+
+    const handleFileChange = async () => {
+      const file = fileInputRef.current?.files?.[0];
+
+      if (!file) return;
+
+      try {
+        const url = await onImageUpload(file);
+
+        targetEditor
+          .chain()
+          .focus()
+          .setImage({
+            src: url,
+            alt: file.name,
+          })
+          .run();
+      } catch (error) {
+        console.error('Failed to upload image:', error);
+        toast.error('Failed to upload image. Please try again.');
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+
+        fileInputRef.current?.removeEventListener(
+          'change',
+          handleFileChange
+        );
+      }
+    };
+
+    fileInputRef.current?.addEventListener(
+      'change',
+      handleFileChange,
+      { once: true }
+    );
+  };
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        codeBlock: false,
+        link: false,
+      }),
+      Placeholder.configure({
+        placeholder: "Type '/' for commands...",
+      }),
+      Link.configure({
+        openOnClick: false,
+      }),
+      TextAlign.extend({
+        addKeyboardShortcuts() {
+          return {}; // disable all TextAlign shortcuts
+        },
+      }).configure({
+        types: ['paragraph', 'heading'],
+      }),
+      SlashCommand.configure({
+        onImageUpload: openImagePicker,
+      }),
+      AlignedImage,
+      CodeBlock,
+    ],
+
+
+    content: value,
+
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: 'article-prose focus:outline-none min-h-[300px]',
+      },
+
+      handlePaste: (_view, event) => {
+        const clipboardData = event.clipboardData;
+
+        if (!clipboardData) {
+          return false;
+        }
+
+        // 1. Pasted image file from clipboard
+        const items = Array.from(clipboardData.items);
+
+        const imageItem = items.find((item) =>
+          item.type.startsWith('image/')
+        );
+
+        if (imageItem) {
+          const file = imageItem.getAsFile();
+
+          if (!file) {
+            return false;
+          }
+
+          const position = editor?.state.selection.from;
+
+          void (async () => {
+            try {
+              const url = await onImageUpload(file);
+
+              if (!editor || position === undefined) {
+                return;
+              }
+
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(position, {
+                  type: 'image',
+                  attrs: {
+                    src: url,
+                    alt: file.name,
+                  },
+                })
+                .run();
+            } catch (error) {
+              console.error('Failed to upload pasted image:', error);
+              toast.error('Failed to upload image. Please try again.');
+            }
+          })();
+
+          return true;
+        }
+
+        // 2. Direct image URL pasted as text
+        const pastedText = clipboardData.getData('text/plain').trim();
+
+        if (pastedText && isDirectImageUrl(pastedText)) {
+          if (!editor) return true;
+          editor.chain().focus().setImage({ src: pastedText, alt: '' }).run();
+
+          void (async () => {
+            try {
+              const response = await fetch(pastedText);
+              if (!response.ok) return;
+              const blob = await response.blob();
+              if (!blob.type.startsWith('image/')) return;
+
+              const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
+              const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+              const url = await onImageUpload(file);
+
+              // Find the image node by its original src and update it
+              editor.chain().command(({ tr }) => {
+                let updated = false;
+                tr.doc.descendants((node, pos) => {
+                  if (node.type.name === 'image' && node.attrs.src === pastedText) {
+                    tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
+                    updated = true;
+                    return false;
+                  }
+                });
+                return updated;
+              }).run();
+            }
+            catch (error) {
+              console.error('Failed to upload image from URL:', error);
+              toast.error('Failed to upload image from URL. Please try again.');
+            }
+          })();
+
+          return true;
+        }
+
+        // 3. Pasted HTML content
+        const pastedHtml = clipboardData.getData('text/html');
+
+        if (pastedHtml) {
+          if (!editor) return true;
+
+          // Process HTML synchronously to get the content and the list of images
+          const { html: processedHtml, images } = processPastedHtml(pastedHtml);
+
+          // FIX: Let Tiptap parse the HTML string directly. 
+          // This safely handles the schema and replaces active text selections.
+          editor.chain().focus().insertContent(processedHtml).run();
+
+          void (async () => {
+            for (const img of images) {
+              try {
+                const response = await fetch(img.originalSrc);
+                if (!response.ok) continue;
+                const blob = await response.blob();
+                if (!blob.type.startsWith('image/')) continue;
+
+                const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
+                const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+                const url = await onImageUpload(file);
+
+                // Find the image node by its original src and update it
+                editor.chain().command(({ tr }) => {
+                  let updated = false;
+                  tr.doc.descendants((node, pos) => {
+                    if (node.type.name === 'image' && node.attrs.src === img.originalSrc) {
+                      tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url });
+                      updated = true;
+                      return false;
+                    }
+                  });
+                  return updated;
+                }).run();
+              } catch (error) {
+                console.error(`Failed to process pasted image:`, error);
+                toast.error('Failed to process pasted image. Please try again.');
+              }
+            }
+          })();
+
+          return true;
+        }
+      },
+
+      handleDrop: (_view, event, _slice, moved) => {
+        if (moved) {
+          return false;
+        }
+
+        const files = Array.from(event.dataTransfer?.files ?? []);
+
+        const imageFile = files.find((file) =>
+          file.type.startsWith('image/')
+        );
+
+        if (!imageFile) {
+          return false;
+        }
+
+        void (async () => {
+          try {
+            const url = await onImageUpload(imageFile);
+
+            editor?.chain()
+              .focus()
+              .setImage({
+                src: url,
+                alt: imageFile.name,
+              })
+              .run();
+          } catch (error) {
+            console.error('Failed to upload dropped image:', error);
+            toast.error('Failed to upload image. Please try again.');
+          }
+        })();
+
+        return true;
+      },
+    },
+  });
+
+
+  const setLink = () => {
+    if (!editor) return;
+
+    const previousUrl = editor.getAttributes('link').href;
+
+    const url = window.prompt('Enter URL', previousUrl);
+
+    if (url === null) return;
+
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  };
+
+  if (!editor) {
+    return null;
+  }
+  // Predicates for bubble menus
+  const textMenuShouldShow = ({ editor }: { editor: Editor }) => {
+    // Show only when there is a selection and the active node is NOT an image
+    return !editor.isActive('image') && !editor.state.selection.empty;
+  };
+
+  const imageMenuShouldShow = ({ editor }: { editor: Editor }) => {
+    return editor.isActive('image');
+  };
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+      />
+      {/* ====== TEXT BUBBLE MENU ====== */}
+      <BubbleMenu
+        editor={editor}
+        shouldShow={textMenuShouldShow}
+        options={{ placement: 'top', offset: 8 }}
+      >
+        <div
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {textToolbarButtons.map(({ key, icon: Icon, title, isActive, run }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => run(editor)}
+              className={`p-2.5 rounded transition-colors ${isActive(editor) ? 'text-accent bg-surface' : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+              title={title}
+            >
+              <Icon size={16} />
+            </button>
+          ))}
+        </div>
+      </BubbleMenu>
+      {/* ====== IMAGE BUBBLE MENU ====== */}
+      <BubbleMenu
+        editor={editor}
+        shouldShow={imageMenuShouldShow}
+        options={{ placement: 'top', offset: 8 }}
+      >
+        <div
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {/* Alignment */}
+          <button
+            type="button"
+            onClick={() =>
+              editor.chain().focus().updateAttributes('image', { alignment: 'left' }).run()
+            }
+            className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'left'
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Align image left"
+          >
+            <AlignLeft size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              editor.chain().focus().updateAttributes('image', { alignment: 'center' }).run()
+            }
+            className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'center'
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Center image"
+          >
+            <AlignCenter size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              editor.chain().focus().updateAttributes('image', { alignment: 'right' }).run()
+            }
+            className={`p-2.5 rounded transition-colors ${editor.getAttributes('image').alignment === 'right'
+              ? 'text-accent bg-surface'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }`}
+            title="Align image right"
+          >
+            <AlignRight size={16} />
+          </button>
+
+          <div className="w-px h-5 bg-border" />
+
+          {/* Width presets */}
+          {[
+            { label: 'S', width: '25%', title: 'Small image' },
+            { label: 'M', width: '50%', title: 'Medium image' },
+            { label: 'L', width: '75%', title: 'Large image' },
+            { label: 'F', width: '100%', title: 'Full width image' },
+          ].map(({ label, width, title }) => (
+            <button
+              key={width}
+              type="button"
+              onClick={() =>
+                editor.chain().focus().updateAttributes('image', { width }).run()
+              }
+              className={`p-2.5 rounded text-xs transition-colors ${editor.getAttributes('image').width === width
+                ? 'text-accent bg-surface'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+              title={title}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </BubbleMenu>
+
+      <EditorContent editor={editor} />
+    </>
+  );
+}
 </file>
 
 <file path="src/pages/ArticlePage.tsx">
@@ -6989,7 +9238,7 @@ export function ArticlePage() {
   const [error, setError] = useState(false);
   const [liked, setLiked] = useState(false);
   const { user } = useAuth();
-  
+
   const authorCardRef = useRef<HTMLDivElement>(null);
   const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
   const [coverImgError, setCoverImgError] = useState(false);
@@ -7047,14 +9296,14 @@ export function ArticlePage() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); 
+    handleScroll();
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isAuthorCardVisible]);
 
   // 3. Memoized Headings (MUST be before conditional returns)
   const headings = useMemo(
-    () => extractHeadings(article?.content ?? ''), 
+    () => extractHeadings(article?.content ?? ''),
     [article?.content]
   );
 
@@ -7099,6 +9348,16 @@ export function ArticlePage() {
       <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
+          {article.publication && (
+            <div className="mb-3 flex justify-center">
+              <Link
+                to={`/p/${article.publication.slug}`}
+                className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
+              >
+                {article.publication.name}
+              </Link>
+            </div>
+          )}
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>
@@ -7196,22 +9455,28 @@ import { getCategoryBySlug } from '@/services/categoryService';
 import { deleteArticleMedia } from './storageService';
 import type { QueryData } from '@supabase/supabase-js';
 import { slugify } from '@/utils/slugify';
+import { getDefaultPublication } from '@/services/publicationService';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
 const ARTICLE_SELECT = `
-*,
-categories (slug),
-profiles!articles_author_id_fkey (
-display_name,
-username,
-avatar_url,
-bio
-),
-article_likes (
-count
-)
+  *,
+  categories (slug),
+  publications!articles_publication_id_fkey (
+    id,
+    slug,
+    name
+  ),
+  profiles!articles_author_id_fkey (
+    display_name,
+    username,
+    avatar_url,
+    bio
+  ),
+  article_likes (
+    count
+  )
 `;
 
 const articleQuery = supabase
@@ -7221,14 +9486,25 @@ const articleQuery = supabase
 type ArticleWithRelations = QueryData<typeof articleQuery>[number];
 
 function mapSupabaseArticle(article: ArticleWithRelations): Article {
-  if (!article.categories) {
+  const rawCategory = article.categories as any;
+  const rawProfile = article.profiles as any;
+  const rawPublication = (article as any).publications;
+
+  const publication = Array.isArray(rawPublication)
+    ? rawPublication[0]
+    : rawPublication;
+
+  if (!rawCategory) {
     throw new Error(`Category not found for article ${article.id}`);
   }
 
-  if (!article.profiles) {
+  if (!rawProfile) {
     throw new Error(`Profile not found for article ${article.id}`);
   }
 
+  if (!publication) {
+    throw new Error(`Publication not found for article ${article.id}`);
+  }
 
   const likes = article.article_likes?.[0]?.count ?? 0;
 
@@ -7237,13 +9513,19 @@ function mapSupabaseArticle(article: ArticleWithRelations): Article {
     slug: article.slug,
     title: article.title,
     content: article.content,
-    category: article.categories.slug,
+    category: rawCategory.slug,
     coverImage: article.cover_image ?? '',
+    publicationId: article.publication_id,
+    publication: {
+      id: publication.id,
+      slug: publication.slug,
+      name: publication.name,
+    },
     author: {
-      name: article.profiles.display_name,
-      username: article.profiles.username ?? undefined,
-      avatar: article.profiles.avatar_url ?? undefined,
-      bio: article.profiles.bio ?? undefined,
+      name: rawProfile.display_name,
+      username: rawProfile.username ?? undefined,
+      avatar: rawProfile.avatar_url ?? undefined,
+      bio: rawProfile.bio ?? undefined,
     },
     publishedAt: article.published_at ?? undefined,
     createdAt: article.created_at,
@@ -7464,12 +9746,20 @@ export async function createArticle(data: Partial<ArticleInput>): Promise<Articl
     throw new Error(`Category "${categorySlug}" not found.`);
   }
 
+  let publicationId = data.publicationId;
+
+  if (!publicationId) {
+    const defaultPublication = await getDefaultPublication(user.id);
+    publicationId = defaultPublication.id;
+  }
+
   const title = data.title ?? 'Untitled';
   const content = data.content ?? '';
 
   const { data: article, error } = await supabase
     .from('articles')
     .insert({
+      publication_id: publicationId,
       author_id: user.id,
       category_id: category.id,
       title,
@@ -7535,6 +9825,9 @@ export async function updateArticle(id: string, data: Partial<ArticleInput>): Pr
     }
 
     updateData.category_id = category.id;
+  }
+  if (data.publicationId !== undefined) {
+    updateData.publication_id = data.publicationId;
   }
 
   const { data: article, error } = await supabase
@@ -7776,8 +10069,30 @@ export async function deleteComment(commentId: string): Promise<void> {
     .from('comments')
     .delete()
     .eq('id', commentId);
-  
+
   if (error) throw error;
+}
+export async function getArticlesByPublication(publicationSlug: string): Promise<Article[]> {
+  const { data: publication, error: publicationError } = await supabase
+    .from('publications')
+    .select('id')
+    .eq('slug', publicationSlug)
+    .maybeSingle();
+
+  if (publicationError) throw publicationError;
+
+  if (!publication) return [];
+
+  const { data, error } = await supabase
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .eq('status', 'published')
+    .eq('publication_id', publication.id)
+    .order('published_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map(mapSupabaseArticle);
 }
 </file>
 
@@ -7800,6 +10115,8 @@ import {
 } from 'lucide-react';
 import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { useToast } from '@/contexts/ToastContext';
+import { getMyPublications } from '@/services/publicationService';
+import type { Publication } from '@/types';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -7808,7 +10125,7 @@ type SaveState = 'idle' | 'saving' | 'saved';
 export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
   const { toast } = useToast();
@@ -7821,11 +10138,15 @@ export function ArticleEditorPage() {
     status: 'draft' as ArticleStatus,
     publishedAt: ''
   });
+  const [publications, setPublications] = useState<Publication[]>([]);
+  const [publicationId, setPublicationId] = useState<string>('');
   const [loading, setLoading] = useState(!isNew);
   const [preview, setPreview] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedTime, setSavedTime] = useState<string>('');
+  const [publishing, setPublishing] = useState(false);
+  const publishingRef = useRef(false);
 
   type FormField = keyof typeof formData;
   const handleChange = (field: FormField, value: string) => {
@@ -7843,6 +10164,23 @@ export function ArticleEditorPage() {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+
+    getMyPublications(user.id)
+      .then((pubs) => {
+        setPublications(pubs);
+
+        setPublicationId((current) => {
+          if (current) return current;
+
+          const fallback = pubs.find((p) => p.isDefault) ?? pubs[0];
+          return fallback?.id ?? '';
+        });
+      })
+      .catch(console.error);
+  }, [user]);
+
+  useEffect(() => {
     if (!isNew && id) {
       getArticleById(id).then((a) => {
         if (a) {
@@ -7856,6 +10194,7 @@ export function ArticleEditorPage() {
             status: a.status,
             publishedAt: a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 16) : ''
           });
+          setPublicationId(a.publicationId)
         }
         setLoading(false);
       });
@@ -7871,8 +10210,9 @@ export function ArticleEditorPage() {
     ...formData,
     slug: formData.slug || generateSlug(formData.title || 'untitled'),
     readingTime,
+    publicationId: publicationId || undefined,
     publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
-  }), [formData, readingTime]);
+  }), [formData, readingTime, publicationId]);
 
   const saveArticle = useCallback(async () => {
     const data = buildArticleData();
@@ -7886,6 +10226,7 @@ export function ArticleEditorPage() {
       if (isNew && !articleRef.current?.id) {
         const created = await createArticle(data);
         articleRef.current = created;
+        if (!publicationId) { setPublicationId(created.publicationId); }
         navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } else {
         const articleId = articleRef.current?.id ?? id;
@@ -7917,33 +10258,68 @@ export function ArticleEditorPage() {
   }, [formData, saveArticle, loading]);
 
   const handlePublish = async () => {
+    if (publishingRef.current) return;
+
     if (formData.publishedAt && new Date(formData.publishedAt) > new Date()) {
       toast.error('Publication date cannot be in the future.');
       return;
     }
+
+    publishingRef.current = true;
+    setPublishing(true);
+
+    // Stop autosave from fighting the publish request
+    exitRequestedRef.current = true;
+
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+
     const data = {
       ...buildArticleData(),
       status: 'published' as ArticleStatus,
-      publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
+      publishedAt: formData.publishedAt
+        ? new Date(formData.publishedAt).toISOString()
+        : undefined,
     };
-    if (isNew && !articleRef.current?.id) {
-      const created = await createArticle(data);
-      articleRef.current = created;
-      navigate('/dashboard');
-      return;
-    }
-    const articleId = articleRef.current?.id ?? id;
-    if (articleId) {
+
+    try {
+      if (isNew && !articleRef.current?.id) {
+        const created = await createArticle(data);
+        articleRef.current = created;
+        navigate('/dashboard');
+        return;
+      }
+
+      const articleId = articleRef.current?.id ?? id;
+
+      if (!articleId) {
+        toast.error('Could not find article to publish.');
+        exitRequestedRef.current = false;
+        return;
+      }
+
       const updated = await updateArticle(articleId, data);
+
       if (updated) {
         articleRef.current = updated;
+
         try {
           await cleanupArticleContentMedia(articleId, data.content ?? '');
         } catch (error) {
           console.error('Failed to clean up article media:', error);
         }
       }
+
       navigate('/dashboard');
+    } catch (error) {
+      console.error('Failed to publish article:', error);
+      toast.error('Failed to publish article. Please try again.');
+      exitRequestedRef.current = false;
+    } finally {
+      publishingRef.current = false;
+      setPublishing(false);
     }
   };
 
@@ -8118,7 +10494,7 @@ export function ArticleEditorPage() {
               <SettingsIcon size={15} />
               <span className="hidden sm:inline" aria-label="Post settings">Settings</span>
             </button>
-            <Button type="button" size="sm" onClick={handlePublish}>
+            <Button type="button" size="sm" onClick={handlePublish} loading={publishing}>
               Publish
             </Button>
           </div>
@@ -8144,6 +10520,28 @@ export function ArticleEditorPage() {
                   value={formData.coverImage}
                   onChange={(e) => handleChange('coverImage', e.target.value)}
                 />
+              </div>
+              <div>
+                <label htmlFor="publication" className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Publication
+                </label>
+                <select
+                  id="publication"
+                  value={publicationId}
+                  onChange={(e) => setPublicationId(e.target.value)}
+                  className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary text-sm transition-colors focus:border-accent focus:outline-none"
+                >
+                  {publications.length === 0 && (
+                    <option value="">Loading publications...</option>
+                  )}
+
+                  {publications.map((pub) => (
+                    <option key={pub.id} value={pub.id}>
+                      {pub.name}
+                      {pub.isDefault ? ' (default)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label htmlFor="category" className="block text-sm font-medium text-text-secondary mb-1.5">Category</label>
