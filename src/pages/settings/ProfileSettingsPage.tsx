@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadAvatar } from '@/services/profileService';
 import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 
 type FormState = {
     display_name: string;
@@ -419,13 +420,9 @@ export function ProfileSettingsPage() {
             </section>
 
             <div className="flex items-center gap-3">
-                <button
-                    type="submit"
-                    disabled={status === 'saving'}
-                    className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
+                <Button type="submit" loading={status === 'saving'}>
                     {status === 'saving' ? 'Saving...' : 'Save changes'}
-                </button>
+                </Button>
 
                 {status === 'success' && (
                     <span className="text-sm font-medium text-emerald-500">
