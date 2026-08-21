@@ -32,7 +32,7 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env
+- Files matching these patterns are excluded: supabase/.temp/**, src/components/ui/Strands.tsx, src/components/ui/ParticleText.tsx, .bolt/**, .env, package-lock.json
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -86,7 +86,6 @@ src/
   contexts/
     AuthContext.tsx
     ThemeContext.tsx
-    ToastContext.tsx
   lib/
     supabase.ts
   pages/
@@ -123,6 +122,7 @@ src/
     database.ts
     index.ts
   utils/
+    cn.ts
     date.ts
     image.ts
     slugify.ts
@@ -158,46 +158,20 @@ vite.config.ts
 <files>
 This section contains the contents of the repository's files.
 
+<file path="src/utils/cn.ts">
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+</file>
+
 <file path="public/favicon.svg">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="6" fill="#090909"/>
   <text x="16" y="22" font-family="Georgia, serif" font-size="16" font-weight="600" fill="#F4F4F4" text-anchor="middle">LS</text>
 </svg>
-</file>
-
-<file path="src/components/articles/ArticleProgress.tsx">
-import { useEffect, useState } from 'react';
-
-export function ArticleProgress() {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const article = document.getElementById('article-content');
-      if (!article) return;
-
-      const rect = article.getBoundingClientRect();
-      const articleTop = rect.top + window.scrollY;
-      const articleHeight = rect.height;
-      const scrollPos = window.scrollY - articleTop;
-      const progressVal = Math.max(0, Math.min(100, (scrollPos / articleHeight) * 100));
-      setProgress(progressVal);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-[60] h-0.5 bg-transparent pointer-events-none">
-      <div
-        className="h-full bg-accent transition-[width] duration-75 ease-out"
-        style={{ width: `${progress}%` }}
-      />
-    </div>
-  );
-}
 </file>
 
 <file path="src/components/auth/Turnstile.tsx">
@@ -1823,6 +1797,38 @@ export default {
 }
 </file>
 
+<file path="src/components/articles/ArticleProgress.tsx">
+import { useEffect, useState } from 'react';
+
+export function ArticleProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0) {
+        setProgress(0);
+        return;
+      }
+      setProgress(Math.max(0, Math.min(100, (window.scrollY / maxScroll) * 100)));
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[60] h-0.5 bg-transparent pointer-events-none">
+      <div
+        className="h-full bg-accent transition-[width] duration-75 ease-out"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/articles/RelatedArticles.tsx">
 import type { Article } from '@/types';
 import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
@@ -2357,105 +2363,6 @@ export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
   return ctx;
-}
-</file>
-
-<file path="src/contexts/ToastContext.tsx">
-import { createContext, useContext, useState, useCallback, type ReactNode, useMemo } from 'react';
-import { CheckCircle, AlertCircle, X } from 'lucide-react'
-
-type ToastType = 'success' | 'error' | 'info';
-type Toast = {
-    id: string;
-    message: string;
-    type: ToastType;
-};
-
-type ToastContextValue = {
-    toast: {
-        success: (message: string) => void;
-        error: (message: string) => void;
-        info: (message: string) => void;
-    };
-};
-
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
-
-export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
-    const [toasts, setToasts] = useState<Toast[]>([]);
-
-    const showToast = useCallback(
-        (message: string, type: ToastType = 'info') => {
-            const id = crypto.randomUUID();
-
-            setToasts((prev) => [...prev, { id, message, type }]);
-
-            setTimeout(() => {
-                setToasts((prev) => prev.filter((t) => t.id !== id));
-            }, 4000);
-        },
-        []
-    );
-
-    const removeToast = (id: string) => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-    };
-
-    const toastValue = useMemo(
-        () => ({
-            toast: {
-                success: (message: string) => showToast(message, 'success'),
-                error: (message: string) => showToast(message, 'error'),
-                info: (message: string) => showToast(message, 'info'),
-            },
-        }),
-        [showToast]
-    );
-    return (
-        <ToastContext.Provider value={toastValue}>
-            {children}
-
-            {/* Toast Container */}
-            <div className="pointer-events-none fixed bottom-4 left-4 right-4 z-[100] flex flex-col gap-3 sm:left-auto sm:bottom-6 sm:right-6">
-                {toasts.map((t) => {
-                    const toastClassNames: Record<ToastType, string> = {
-                        error: 'bg-red-950/90 border-red-800 text-red-100',
-                        success: 'bg-emerald-950/90 border-emerald-800 text-emerald-100',
-                        info: 'bg-surface/90 border-border text-text-primary',
-                    };
-
-                    let toastIcon: ReactNode = null;
-                    if (t.type === 'error') {
-                        toastIcon = <AlertCircle size={18} className="text-red-400 shrink-0" />;
-                    } else if (t.type === 'success') {
-                        toastIcon = <CheckCircle size={18} className="text-emerald-400 shrink-0" />;
-                    }
-
-                    return <div
-                        key={t.id}
-                        className={`pointer-events-auto flex w-full items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-up backdrop-blur-sm sm:w-auto sm:min-w-[280px] sm:max-w-sm ${toastClassNames[t.type]}`}                    >
-                        {toastIcon}
-                        <p className="text-sm flex-1">{t.message}</p>
-                        <button
-                            type="button"
-                            onClick={() => removeToast(t.id)}
-                            className="text-text-muted hover:text-text-primary transition-colors shrink-0"
-                            aria-label="Dismiss"
-                        >
-                            <X size={14} />
-                        </button>
-                    </div>;
-                })
-                }
-            </div >
-        </ToastContext.Provider >
-    );
-}
-
-export function useToast() {
-    const ctx = useContext(ToastContext);
-    if (!ctx) throw new Error('useToast must be used within ToastProvider');
-    return ctx;
 }
 </file>
 
@@ -3214,30 +3121,6 @@ export async function deletePublication(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
-}
-</file>
-
-<file path="src/utils/slugify.ts">
-function randomSlugSuffix(length = 6): string {
-    return Math.random().toString(36).substring(2, 2 + length).padEnd(length, '0'); // NOSONAR
-}
-
-export function slugify(text: string, appendRandomSuffix = true): string {
-	const baseSlug = text
-		.toString()
-		.normalize('NFD') // Split accented characters into base character + diacritic
-		.replace(/[\u0300-\u036f]/g, '') // Remove the diacritics
-		.toLowerCase()
-		.trim()
-		.replace(/\s+/g, '-') // Replace spaces with hyphens
-		.replace(/[^a-z0-9\s-]/g, '') // Remove remaining non-ASCII characters
-		.replace(/-+/g, '-') // Replace multiple hyphens with a single hyphen
-		.replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-
-	if (!appendRandomSuffix) return baseSlug;
-
-	const suffix = randomSlugSuffix();
-	return baseSlug ? `${baseSlug}-${suffix}` : suffix;
 }
 </file>
 
@@ -4575,41 +4458,39 @@ export function relativeTime(date: string): string {
 }
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="en" class="dark">
+<file path="src/utils/slugify.ts">
+function randomSlugSuffix(length = 6): string {
+    return Math.random().toString(36).substring(2, 2 + length).padEnd(length, '0'); // NOSONAR
+}
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#090909" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Lallu Syndrome" />
-  <title>Lallu Syndrome</title>
-  <meta name="description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
-  <meta property="og:title" content="Lallu Syndrome" />
-  <meta property="og:description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
-  <meta property="og:type" content="website" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-    rel="stylesheet" />
-  <meta property="og:image" content="https://bolt.new/static/og_default.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
-</head>
+export function slugify(text: string, appendRandomSuffix = true): string {
+	const baseSlug = text
+		.toString()
+		.normalize('NFD') // Split accented characters into base character + diacritic
+		.replace(/[\u0300-\u036f]/g, '') // Remove the diacritics
+		.toLowerCase()
+		.trim()
+		.replace(/\s+/g, '-') // Replace spaces with hyphens
+		.replace(/[^a-z0-9\s-]/g, '') // Remove remaining non-ASCII characters
+		.replace(/-+/g, '-') // Replace multiple hyphens with a single hyphen
+		.replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
 
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-</body>
+	if (!appendRandomSuffix) return baseSlug;
 
-</html>
+	const suffix = randomSlugSuffix();
+	return baseSlug ? `${baseSlug}-${suffix}` : suffix;
+}
+
+export function slugifyHeading(text: string, usedIds: Set<string>): string {
+  const baseId = slugify(text, false);
+  let id = baseId;
+  let counter = 2;
+  while (usedIds.has(id)) {
+    id = `${baseId}-${counter++}`;
+  }
+  usedIds.add(id);
+  return id;
+}
 </file>
 
 <file path="repomix.config.json">
@@ -4624,96 +4505,10 @@ export function relativeTime(date: string): string {
       "src/components/ui/Strands.tsx",
       "src/components/ui/ParticleText.tsx",
       ".bolt/**",
-      ".env"
+      ".env",
+      "package-lock.json"
     ]
   }
-}
-</file>
-
-<file path="src/components/articles/TableOfContents.tsx">
-import { useEffect, useState } from 'react';
-import { slugify } from '@/utils/slugify';
-
-type Heading = {
-  id: string;
-  text: string;
-  level: number;
-};
-
-export function extractHeadings(html: string): Heading[] {
-  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
-
-  const headings = Array.from(
-    parsedDoc.querySelectorAll('h1, h2, h3')
-  );
-
-  return headings.map((heading) => {
-    const text = heading.textContent?.trim() ?? '';
-
-    return {
-      id: slugify(text),
-      text,
-      level: Number(heading.tagName.substring(1)),
-    };
-  });
-}
-
-type TableOfContentsProps = {
-  headings: Heading[];
-};
-
-export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
-  const [activeId, setActiveId] = useState<string>('');
-
-  useEffect(() => {
-    if (headings.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveId(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
-    );
-
-    for (const h of headings) {
-      const el = document.getElementById(h.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, [headings]);
-
-  if (headings.length < 3) return null;
-
-  return (
-    <nav className="hidden lg:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-      <h4 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
-        On this page
-      </h4>
-      <ul className="space-y-1.5 border-l border-border-subtle">
-        {headings.map((h) => (
-          <li key={h.id}>
-            <a
-              href={`#${h.id}`}
-              className={`block py-1 text-sm transition-colors duration-200 ${
-                h.level === 3 ? 'pl-6' : 'pl-3'
-              } ${
-                activeId === h.id
-                  ? 'text-accent border-l-2 border-accent -ml-px'
-                  : 'text-text-muted hover:text-text-secondary'
-              }`}
-            >
-              {h.text}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
 }
 </file>
 
@@ -5681,6 +5476,42 @@ export const Constants = {
 } as const
 </file>
 
+<file path="index.html">
+<!doctype html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#090909" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Lallu Syndrome" />
+  <title>Lallu Syndrome</title>
+  <meta name="description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
+  <meta property="og:title" content="Lallu Syndrome" />
+  <meta property="og:description" content="Notes, experiments, and deep dives into technology by Umer Farooq." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
+</file>
+
 <file path="tsconfig.app.json">
 {
   "compilerOptions": {
@@ -5768,6 +5599,90 @@ export function FeaturedArticle({ article }: Readonly<FeaturedArticleProps>) {
         </div>
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/articles/TableOfContents.tsx">
+import { useEffect, useState } from 'react';
+import { slugify, slugifyHeading } from '@/utils/slugify';
+
+type Heading = {
+  id: string;
+  text: string;
+  level: number;
+};
+export function extractHeadings(html: string): Heading[] {
+  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
+  const headings = Array.from(parsedDoc.querySelectorAll('h1, h2, h3'));
+  const usedIds = new Set<string>();
+  return headings
+    .map((heading) => {
+      const text = heading.textContent?.trim() ?? '';
+      return {
+        id: text ? slugifyHeading(text, usedIds) : '',
+        text,
+        level: Number(heading.tagName.substring(1)),
+      };
+    })
+    .filter((heading) => heading.id !== '');
+}
+
+type TableOfContentsProps = {
+  headings: Heading[];
+};
+
+export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
+  const [activeId, setActiveId] = useState<string>('');
+
+  useEffect(() => {
+    if (headings.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveId(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+    );
+
+    for (const h of headings) {
+      const el = document.getElementById(h.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [headings]);
+
+  if (headings.length < 3) return null;
+
+  return (
+    <nav className="hidden lg:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <h4 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
+        On this page
+      </h4>
+      <ul className="space-y-1.5 border-l border-border-subtle">
+        {headings.map((h) => (
+          <li key={h.id}>
+            <a
+              href={`#${h.id}`}
+              className={`block py-1 text-sm transition-colors duration-200 ${
+                h.level === 3 ? 'pl-6' : 'pl-3'
+              } ${
+                activeId === h.id
+                  ? 'text-accent border-l-2 border-accent -ml-px'
+                  : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              {h.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 </file>
@@ -6519,72 +6434,6 @@ function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
 }
 </file>
 
-<file path="src/components/articles/ArticleContent.tsx">
-import { useMemo } from 'react';
-import DOMPurify from 'dompurify';
-import { slugify } from '@/utils/slugify';
-
-type ArticleContentProps = {
-  content: string;
-};
-
-export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
-  const finalHtml = useMemo(() => {
-    if (!content) return '';
-
-    const sanitized = DOMPurify.sanitize(content, {
-      USE_PROFILES: { html: true },
-      ADD_ATTR: ['target', 'rel', 'class', 'style', 'data-width', 'data-alignment'],
-    });
-
-    const parsedDoc = new DOMParser().parseFromString(sanitized, 'text/html');
-
-    // Handle External Links
-    parsedDoc.querySelectorAll<HTMLAnchorElement>('a[href^="http"]').forEach((link) => {
-      try {
-        const url = new URL(link.href);
-        if (url.hostname !== window.location.hostname) {
-          link.setAttribute('target', '_blank');
-          link.setAttribute('rel', 'noopener noreferrer');
-        }
-      } catch {
-        // Keep malformed URLs from retaining unsafe link attributes.
-        link.removeAttribute('target');
-        link.removeAttribute('rel');
-      }
-    });
-
-    // Handle Headings (TOC)
-    const usedIds = new Set<string>();
-    parsedDoc.querySelectorAll('h1, h2, h3').forEach((heading) => {
-      const text = heading.textContent?.trim() ?? '';
-      if (!text) return;
-
-      const baseId = slugify(text);
-      let id = baseId;
-      let counter = 2;
-
-      while (usedIds.has(id)) {
-        id = `${baseId}-${counter++}`;
-      }
-
-      usedIds.add(id);
-      heading.id = id;
-      heading.classList.add('scroll-mt-20');
-    });
-
-    return parsedDoc.body.innerHTML;
-  }, [content]); // <--- Only re-runs if the 'content' string changes
-
-  return (
-    <div
-      className="article-prose"
-      dangerouslySetInnerHTML={{ __html: finalHtml }}
-    />
-  );
-}
-</file>
-
 <file path="src/contexts/AuthContext.tsx">
 import {
   createContext,
@@ -6704,152 +6553,6 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
-}
-</file>
-
-<file path="src/pages/auth/SignupPage.tsx">
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { signup } from '@/services/authService';
-// import { Turnstile } from '@/components/auth/Turnstile';
-
-// Replace with your actual Cloudflare Turnstile Site Key
-// const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
-export function SignupPage() {
-  const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    captcha?: string;
-    form?: string;
-  }>({});
-  const [loading, setLoading] = useState(false);
-
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!name) e.name = 'Name is required.';
-    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
-    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    // if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    console.log("I got called 1")
-    if (!validate()) return;
-    setLoading(true);
-    console.log("I got called 2")
-    try {
-      await signup(name, email, password, captchaToken ?? undefined);
-      navigate('/dashboard');
-      console.log("I got called 3")
-    } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-      console.log("I got called 4")
-    } finally {
-      setLoading(false);
-      console.log("I got called 5")
-    }
-  };
-
-  return (
-    <AuthLayout
-      title="Create account"
-      subtitle="Start writing and publishing on Lallu Syndrome."
-      footer={
-        <>
-          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
-          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
-          </div>
-        )}
-        <Input
-          label="Name"
-          type="text"
-          name="name"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={errors.name}
-          autoComplete="name"
-          required
-        />
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-          required
-        />
-        <Input
-          label="Confirm password"
-          isPassword
-          name="confirmPassword"
-          placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          error={errors.confirmPassword}
-          autoComplete="new-password"
-          required
-        />
-
-        {/* Turnstile Captcha */}
-        {/* <div>
-          <Turnstile
-            siteKey={TURNSTILE_SITE_KEY}
-            onVerify={(token) => {
-              setCaptchaToken(token);
-              setErrors((prev) => ({ ...prev, captcha: undefined }));
-            }}
-          />
-          {errors.captcha && (
-            <p className="mt-1.5 text-xs text-accent">{errors.captcha}</p>
-          )}
-        </div> */}
-
-        <Button type="submit" className="w-full" loading={loading}>
-          Create account
-        </Button>
-      </form>
-    </AuthLayout>
-  );
 }
 </file>
 
@@ -7016,6 +6719,62 @@ export function extractStorageImagePaths(content: string): string[] {
   });
 
   return [...new Set(paths)];
+}
+</file>
+
+<file path="src/components/articles/ArticleContent.tsx">
+import { useMemo } from 'react';
+import DOMPurify from 'dompurify';
+import { slugify, slugifyHeading } from '@/utils/slugify';
+
+type ArticleContentProps = {
+  content: string;
+};
+
+export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
+  const finalHtml = useMemo(() => {
+    if (!content) return '';
+
+    const sanitized = DOMPurify.sanitize(content, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['target', 'rel', 'class', 'style', 'data-width', 'data-alignment'],
+    });
+
+    const parsedDoc = new DOMParser().parseFromString(sanitized, 'text/html');
+
+    // Handle External Links
+    parsedDoc.querySelectorAll<HTMLAnchorElement>('a[href^="http"]').forEach((link) => {
+      try {
+        const url = new URL(link.href);
+        if (url.hostname !== window.location.hostname) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+      } catch {
+        // Keep malformed URLs from retaining unsafe link attributes.
+        link.removeAttribute('target');
+        link.removeAttribute('rel');
+      }
+    });
+
+    // Handle Headings (TOC)
+    const usedIds = new Set<string>();
+    parsedDoc.querySelectorAll('h1, h2, h3').forEach((heading) => {
+      const text = heading.textContent?.trim() ?? '';
+      if (!text) return;
+      heading.id = slugifyHeading(text, usedIds);
+      heading.classList.add('scroll-mt-20');
+    });
+   
+    return parsedDoc.body.innerHTML;
+  }, [content]); 
+
+  return (
+    <div
+      className="article-prose"
+      dangerouslySetInnerHTML={{ __html: finalHtml }}
+    />
+  );
 }
 </file>
 
@@ -7342,6 +7101,135 @@ function CommentItem({
         </div>
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="src/pages/auth/SignupPage.tsx">
+import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { signup } from '@/services/authService';
+
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    captcha?: string;
+    form?: string;
+  }>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = (): boolean => {
+    const e: typeof errors = {};
+    if (!name) e.name = 'Name is required.';
+    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
+    if (!email) e.email = 'Email is required.';
+    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
+    if (!password) e.password = 'Password is required.';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
+    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
+    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    // if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    console.log("I got called 1")
+    if (!validate()) return;
+    setLoading(true);
+    console.log("I got called 2")
+    try {
+      await signup(name, email, password, captchaToken ?? undefined);
+      navigate('/dashboard');
+      console.log("I got called 3")
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
+      console.log("I got called 4")
+    } finally {
+      setLoading(false);
+      console.log("I got called 5")
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Create account"
+      subtitle="Start writing and publishing on Lallu Syndrome."
+      footer={
+        <>
+          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errors.form && (
+          <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
+            {errors.form}
+          </div>
+        )}
+        <Input
+          label="Name"
+          type="text"
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+          autoComplete="name"
+          required
+        />
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          autoComplete="email"
+          required
+        />
+        <Input
+          label="Password"
+          isPassword
+          name="password"
+          placeholder="At least 6 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          autoComplete="new-password"
+          required
+        />
+        <Input
+          label="Confirm password"
+          isPassword
+          name="confirmPassword"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          error={errors.confirmPassword}
+          autoComplete="new-password"
+          required
+        />
+
+        <Button type="submit" className="w-full" loading={loading}>
+          Create account
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
 </file>
@@ -7908,7 +7796,10 @@ export function AboutPage() {
     text-wrap: pretty;
   }
 }
-
+.group:hover .link-underline::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
 /* Oval portrait — the house avatar shape (4:5, egg-framed) */
 .avatar {
   aspect-ratio: 4 / 5;
@@ -8309,7 +8200,11 @@ export default App;
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@radix-ui/react-avatar": "^1.2.6",
+    "@radix-ui/react-dialog": "^1.1.23",
     "@supabase/supabase-js": "^2.112.3",
+    "@tanstack/react-query": "^5.101.4",
     "@tiptap/extension-image": "^3.30.1",
     "@tiptap/extension-link": "^3.30.1",
     "@tiptap/extension-placeholder": "^3.30.1",
@@ -8319,13 +8214,21 @@ export default App;
     "@tiptap/react": "^3.30.1",
     "@tiptap/starter-kit": "^3.30.1",
     "@tiptap/suggestion": "^3.30.1",
+    "clsx": "^2.1.1",
+    "dayjs": "^1.11.23",
     "dompurify": "^3.4.13",
     "lucide-react": "^0.446.0",
+    "nanoid": "^6.0.1",
     "ogl": "^1.0.11",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hook-form": "^7.85.0",
+    "react-intersection-observer": "^11.0.0",
     "react-router-dom": "^7.18.2",
-    "tippy.js": "^6.3.7"
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.6.0",
+    "tippy.js": "^6.3.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
@@ -9113,7 +9016,7 @@ export function TiptapEditor({
 </file>
 
 <file path="src/pages/ArticlePage.tsx">
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
@@ -9132,24 +9035,43 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getFallbackImage } from '@/utils/image';
 
 function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
-  return (
-    <div className="rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5">
+  const cardClass =
+    'block rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5';
+  const inner = (
+    <>
       <div className="flex flex-col items-center gap-3">
         {author.avatar && (
-          <img src={author.avatar} alt={author.name} className="avatar shrink-0 border border-border-subtle bg-elevated" />
+          <img
+            src={author.avatar}
+            alt={author.name}
+            className="avatar shrink-0 border border-border-subtle bg-elevated"
+          />
         )}
-        {author.username ? (
-          <Link to={`/writers/${author.username}`} className="link-underline text-center text-sm font-medium text-text-primary transition-colors hover:text-accent">
-            {author.name}
-          </Link>
-        ) : (
-          <span className="text-center text-sm font-medium text-text-primary">{author.name}</span>
-        )}
+        <span
+          className={`text-center text-sm font-medium text-text-primary transition-colors ${
+            author.username ? 'link-underline group-hover:text-accent' : ''
+          }`}
+        >
+          {author.name}
+        </span>
       </div>
       {author.bio && (
-        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">{author.bio}</p>
+        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">
+          {author.bio}
+        </p>
       )}
-    </div>
+    </>
+  );
+  if (!author.username) {
+    return <div className={cardClass}>{inner}</div>;
+  }
+  return (
+    <Link
+      to={`/writers/${author.username}`}
+      className={`${cardClass} group transition-transform duration-200 hover:-translate-y-0.5`}
+    >
+      {inner}
+    </Link>
   );
 }
 
@@ -9162,8 +9084,6 @@ export function ArticlePage() {
   const [liked, setLiked] = useState(false);
   const { user } = useAuth();
 
-  const authorCardRef = useRef<HTMLDivElement>(null);
-  const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
   const [coverImgError, setCoverImgError] = useState(false);
 
   // 1. Data Fetching Effect
@@ -9204,31 +9124,21 @@ export function ArticlePage() {
     loadArticle();
   }, [slug, user?.id]); // Added user?.id to deps so likes update if auth resolves late
 
-  // 2. Scroll Effect
-  useEffect(() => {
-    const handleScroll = () => {
-      const card = authorCardRef.current;
-      if (!card) return;
-
-      const rect = card.getBoundingClientRect();
-      const isVisible = rect.top < window.innerHeight * 0.9;
-
-      if (isVisible && !isAuthorCardVisible) {
-        setIsAuthorCardVisible(true);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isAuthorCardVisible]);
-
   // 3. Memoized Headings (MUST be before conditional returns)
   const headings = useMemo(
     () => extractHeadings(article?.content ?? ''),
     [article?.content]
   );
+
+  // Helper to bypass React Router hijacking anchor links on the mobile TOC
+  const handleMobileTocClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.pushState(null, '', `#${id}`);
+    }
+  };
 
   // --- Conditional Returns (Early Exits) ---
   if (loading) {
@@ -9268,7 +9178,7 @@ export function ArticlePage() {
     <>
       <ArticleProgress />
 
-      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
+      <article className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
           {article.publication && (
@@ -9320,6 +9230,7 @@ export function ArticlePage() {
                   <li key={h.id}>
                     <a
                       href={`#${h.id}`}
+                      onClick={(e) => handleMobileTocClick(e, h.id)}
                       className={`block py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary ${h.level === 3 ? 'pl-4' : ''}`}
                     >
                       {h.text}

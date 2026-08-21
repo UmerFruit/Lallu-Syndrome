@@ -9,7 +9,8 @@
       "src/components/ui/Strands.tsx",
       "src/components/ui/ParticleText.tsx",
       ".bolt/**",
-      ".env"
+      ".env",
+      "package-lock.json"
     ]
   }
 }
