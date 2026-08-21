@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { PageContainer } from '@/components/layout/Navbar';
 import { getCategories } from '@/services/categoryService';
-import type { Category } from '@/types';
 
 const principles = [
   {
@@ -24,13 +23,10 @@ const principles = [
 ];
 
 export function AboutPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    getCategories()
-      .then(setCategories)
-      .catch(() => setCategories([]));
-  }, []);
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
 
   const marqueeItems = [...categories, ...categories];
 
