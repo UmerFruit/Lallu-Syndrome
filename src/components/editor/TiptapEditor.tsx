@@ -1,5 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import type { Editor } from '@tiptap/core';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -323,7 +323,13 @@ export function TiptapEditor({
       },
     },
   });
+  useEffect(() => {
+    if (!editor) return;
 
+    if (editor.getHTML() !== value) {
+      editor.commands.setContent(value, { emitUpdate: false });
+    }
+  }, [value, editor]);
   if (!editor) {
     return null;
   }
