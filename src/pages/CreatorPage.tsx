@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { PageContainer } from '@/components/layout/Navbar';
 import { getCategories } from '@/services/categoryService';
-import type { Category } from '@/types';
 import { siteConfig } from '@/config/site';
 
 export function CreatorPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    getCategories()
-      .then(setCategories)
-      .catch(() => setCategories([]));
-  }, []);
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+    initialData: [],
+  });
 
   const { creator } = siteConfig;
 
