@@ -6,6 +6,8 @@ import { signup } from '@/services/authService';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useState } from 'react';
+import { CheckCircle } from 'lucide-react';
 
 const signupSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters.'),
@@ -22,18 +24,42 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [sentEmail, setSentEmail] = useState('');
+
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
   });
 
   const onSubmit = async (data: SignupForm) => {
     try {
-      await signup(data.name, data.email, data.password);
-      navigate('/dashboard');
+      const result = await signup(data.name, data.email, data.password);
+      if (result.session) {
+        navigate('/dashboard');
+      } else {
+        setSentEmail(data.email);
+        setNeedsConfirmation(true);
+      }
     } catch (err) {
       setError('root', { message: err instanceof Error ? err.message : 'Something went wrong.' });
     }
   };
+  if (needsConfirmation) {
+    return (
+      <AuthLayout
+        title="Confirm your email"
+        subtitle="We sent you a confirmation link. Click it to activate your account."
+        footer={<AuthLink to="/login">Back to sign in</AuthLink>}
+      >
+        <div className="space-y-4 text-center">
+          <CheckCircle size={40} className="mx-auto text-accent" />
+          <p className="text-sm text-text-secondary">
+            Check <span className="font-medium text-text-primary">{sentEmail}</span> and confirm your signup.
+          </p>
+        </div>
+      </AuthLayout >
+    );
+  }
 
   return (
     <AuthLayout

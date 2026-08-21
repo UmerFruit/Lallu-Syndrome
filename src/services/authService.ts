@@ -39,7 +39,7 @@ export async function signup(name: string, email: string, password: string) {
     },
   });
   if (error) { throw new Error(error.message); }
-  return data.user;
+  return data;
 }
 
 export async function forgotPassword(email: string): Promise<void> {
