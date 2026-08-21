@@ -167,7 +167,6 @@ export function PublicationsPage() {
                 <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
                     <Input label="Name" placeholder="My Tech Blog" {...register('name')} error={formErrors.name?.message} />
                     <div>
-                        <label htmlFor="publication-description" className="mb-1.5 block text-sm font-medium text-text-secondary">Description</label>
                         <Textarea
                             id="publication-description"
                             label="Description"
