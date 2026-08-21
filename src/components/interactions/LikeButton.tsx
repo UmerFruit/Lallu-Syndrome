@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Heart } from 'lucide-react';
 import { toggleLike } from '@/services/articleService';
 import { useAuth } from '@/contexts/AuthContext';
-
+import { useQueryClient } from '@tanstack/react-query';
 type LikeButtonProps = {
   articleId: string;
   initialLikes: number;
@@ -15,7 +15,10 @@ export function LikeButton({ articleId, initialLikes, initiallyLiked = false }: 
   const [animating, setAnimating] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  useEffect(() => { setLiked(initiallyLiked); }, [initiallyLiked]);
+  useEffect(() => { setLikes(initialLikes); }, [initialLikes]);
 
   const handleToggle = async () => {
     if (loading) return;
@@ -32,6 +35,9 @@ export function LikeButton({ articleId, initialLikes, initiallyLiked = false }: 
       const result = await toggleLike(articleId);
       setLiked(result.liked);
       setLikes(result.likes);
+      if (user) {
+        queryClient.setQueryData(['liked', articleId, user.id], result.liked);
+      }
       if (result.liked) {
         setAnimating(true);
         setTimeout(() => setAnimating(false), 300);
