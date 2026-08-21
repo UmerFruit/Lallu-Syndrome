@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/contexts/ToastContext';
+import { toast } from 'sonner';
 import {
     createPublication,
     deletePublication,
@@ -16,8 +16,6 @@ import type { Publication } from '@/types';
 
 export function PublicationsPage() {
     const { user } = useAuth();
-    const { toast } = useToast();
-
     const [publications, setPublications] = useState<Publication[]>([]);
     const [loading, setLoading] = useState(true);
     const [name, setName] = useState('');

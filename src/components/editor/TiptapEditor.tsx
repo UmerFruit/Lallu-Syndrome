@@ -10,8 +10,8 @@ import { AlignedImage } from './AlignedImage';
 import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
-import { useToast } from '@/contexts/ToastContext';
-// import '@tiptap/react/menus/styles.css';
+import { toast } from 'sonner';
+
 import {
   Bold,
   Italic,
@@ -70,7 +70,6 @@ export function TiptapEditor({
   onImageUpload
 }: Readonly<TiptapEditorProps>) {
 
-  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openImagePicker = (targetEditor: Editor) => {

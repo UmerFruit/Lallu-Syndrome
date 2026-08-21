@@ -15,7 +15,7 @@ import {
   X, Check, ImagePlus,
 } from 'lucide-react';
 import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
-import { useToast } from '@/contexts/ToastContext';
+import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import type { Publication } from '@/types';
 import { PageSpinner } from '@/components/ui/Skeleton';
@@ -30,7 +30,6 @@ export function ArticleEditorPage() {
   const { user, profile } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
-  const { toast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     content: '',

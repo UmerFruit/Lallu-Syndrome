@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { type ReactNode, useEffect } from 'react';
-import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -18,7 +18,6 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { SettingsLayout } from '@/components/layout/SettingsLayout';
 import { ProfileSettingsPage } from '@/pages/settings/ProfileSettingsPage';
 import { PasswordSettingsPage } from '@/pages/settings/PasswordSettingsPage';
-import { ToastProvider } from '@/contexts/ToastContext';
 import { CreatorPage } from '@/pages/CreatorPage';
 import { WriterProfilePage } from '@/pages/WriterProfilePage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -27,6 +26,14 @@ import { AdminPage } from '@/pages/AdminPage';
 import { PublicationPage } from '@/pages/PublicationPage';
 import { PublicationsPage } from '@/pages/PublicationsPage';
 import { PageSpinner } from './components/ui/Skeleton';
+import { Toaster } from "sonner";
+
+
+function AppToaster() {
+  const { theme } = useTheme();
+  return <Toaster theme={theme} position="bottom-right" richColors closeButton />;
+}
+
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -73,7 +80,7 @@ function AdminRoute({ children }: Readonly<{ children: ReactNode }>) {
   const { user, profile, isLoading, isProfileLoading } = useAuth();
 
   if (isLoading || isProfileLoading) {
-    return <PageSpinner />; 
+    return <PageSpinner />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -134,15 +141,14 @@ function AppRoutes() {
 function App() {
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <ErrorBoundary>
-              <AppRoutes />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
+      <AppToaster />
+      <AuthProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
+        </BrowserRouter>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
