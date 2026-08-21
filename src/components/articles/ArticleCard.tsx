@@ -21,7 +21,7 @@ export function ArticleGrid({ articles }: { articles: Article[] }) {
 export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
   const [imgError, setImgError] = useState(false);
   const fallback = getFallbackImage(article.id);
-  
+
   // Use fallback if coverImage is empty OR if the image failed to load
   const imageSrc = imgError || !article.coverImage ? fallback : article.coverImage;
 
@@ -41,19 +41,19 @@ export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
           />
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2">
         <Badge variant="accent">{article.category}</Badge>
         <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
       </div>
-      
+
       <h3 className="font-serif text-lg font-medium text-text-primary leading-snug tracking-tight group-hover:text-accent transition-colors duration-200">
         {article.title}
       </h3>
-      
+
       {/* Author & Date Row */}
       <div className="flex items-center gap-2.5 pt-1">
-        <Avatar src={article.author.avatar} name={article.author.name} size="md" />
+        <Avatar src={article.author.avatar} name={article.author.name} className="h-6 w-6 border border-border-subtle" fallbackClassName="text-[10px] font-semibold" />
         <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono min-w-0">
           <span className="text-text-secondary font-medium truncate">{article.author.name}</span>
           <span>•</span>

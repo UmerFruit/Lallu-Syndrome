@@ -1,3 +1,4 @@
+import { cn } from '@/utils/cn';
 import { type ButtonHTMLAttributes, forwardRef } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -29,7 +30,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type="button"
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center gap-2 rounded font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
+        className={cn(
+          'inline-flex items-center justify-center gap-2 rounded font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+          variantClasses[variant],
+          sizeClasses[size],
+          className
+        )}
         {...props}
       >
         {loading && (

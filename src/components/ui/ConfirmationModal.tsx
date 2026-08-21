@@ -1,5 +1,5 @@
-// src/components/ui/ConfirmationModal.tsx
-import React from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Button } from '@/components/ui/Button';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -21,37 +21,22 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isLoading = false,
   onConfirm,
   onClose,
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-lg border border-border bg-elevated p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-text-primary">
-          {title}
-        </h3>
-        <p className="mt-2 text-sm text-text-secondary">
-          {message}
-        </p>
+}) => (
+  <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open && !isLoading) onClose(); }}>
+    <Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in" />
+      <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-elevated p-6 shadow-xl animate-slide-up">
+        <Dialog.Title className="text-lg font-semibold text-text-primary">{title}</Dialog.Title>
+        <Dialog.Description className="mt-2 text-sm text-text-secondary">{message}</Dialog.Description>
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface disabled:opacity-50"
-          >
+          <Button variant="secondary" onClick={onClose} disabled={isLoading}>
             {cancelText}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isLoading}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
-          >
-            {isLoading ? 'Deleting...' : confirmText}
-          </button>
+          </Button>
+          <Button variant="primary" onClick={onConfirm} loading={isLoading}>
+            {confirmText}
+          </Button>
         </div>
-      </div>
-    </div>
-  );
-};
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
+);

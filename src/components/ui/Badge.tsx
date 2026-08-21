@@ -1,3 +1,4 @@
+import { cn } from "@/utils/cn";
 type BadgeProps = {
   children: React.ReactNode;
   variant?: 'default' | 'accent' | 'muted';
@@ -13,7 +14,11 @@ const variantClasses = {
 export function Badge({ children, variant = 'default', className }: Readonly<BadgeProps>) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded border ${variantClasses[variant]} ${className ?? ''}`}
+      className={cn(
+        'inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded border',
+        variantClasses[variant],
+        className,
+      )}
     >
       {children}
     </span>

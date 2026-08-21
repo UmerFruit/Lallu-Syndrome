@@ -118,7 +118,7 @@ function UsersTab() {
           className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
         >
           {/* Avatar */}
-          <Avatar src={p.avatar_url} name={p.display_name} size="md" />
+          <Avatar src={p.avatar_url} name={p.display_name} className="h-9 w-9 border border-border-subtle" />
 
           {/* Info */}
           <div className="flex-1 min-w-0">
@@ -170,7 +170,7 @@ function CommentsTab() {
 
   const handleConfirmDelete = async () => {
     if (!deleteModal.id) return;
-    
+
     setDeleteModal(prev => ({ ...prev, isDeleting: true }));
     try {
       await adminDeleteComment(deleteModal.id);
@@ -196,8 +196,7 @@ function CommentsTab() {
           className="flex items-start gap-4 p-4 rounded border border-border-subtle bg-surface"
         >
           {/* Avatar Component Cleanup */}
-          <Avatar src={comment.author_avatar} name={comment.author_name} size="sm" className="mt-0.5" />
-
+          <Avatar src={comment.author_avatar} name={comment.author_name} className="mt-0.5 h-8 w-8 border border-border-subtle" fallbackClassName="text-xs" />
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -262,7 +261,7 @@ function ArticlesTab() {
 
   const handleConfirmDelete = async () => {
     if (!deleteModal.id) return;
-    
+
     setDeleteModal(prev => ({ ...prev, isDeleting: true }));
     try {
       await adminDeleteArticle(deleteModal.id);
@@ -289,9 +288,8 @@ function ArticlesTab() {
         >
           {/* Status indicator */}
           <div
-            className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              article.status === 'published' ? 'bg-emerald-500' : 'bg-text-muted'
-            }`}
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${article.status === 'published' ? 'bg-emerald-500' : 'bg-text-muted'
+              }`}
           />
 
           {/* Info */}
@@ -366,11 +364,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${
-        active
-          ? 'border-accent text-text-primary'
-          : 'border-transparent text-text-muted hover:text-text-secondary'
-      }`}
+      className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
+        ? 'border-accent text-text-primary'
+        : 'border-transparent text-text-muted hover:text-text-secondary'
+        }`}
     >
       {icon}
       {label}

@@ -6,7 +6,7 @@ import { getComments, addComment, deleteComment } from '@/services/articleServic
 import { useAuth } from '@/contexts/AuthContext';
 import { relativeTime } from '@/utils/date';
 import type { User } from '@supabase/supabase-js';
-import { Avatar } from '../ui/Avatar';
+import { Avatar } from '@/components/ui/Avatar';
 
 type CommentSectionProps = {
   articleId: string;
@@ -122,7 +122,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
       {user ? (
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="flex gap-3">
-            <Avatar src={profile?.avatar_url} name={profile?.display_name} size="md" />
+            <Avatar src={profile?.avatar_url} name={profile?.display_name ?? user.email ?? 'U'} className="h-9 w-9" />
             <div className="flex-1">
               <textarea
                 value={content}
@@ -185,10 +185,6 @@ function CommentItem({
   const [submitting, setSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- MODERATION LOGIC ---
-  // Replace with your actual UUID from Supabase Auth dashboard
-  // const ADMIN_UUID = 'YOUR-AUTH-UUID-HERE'; 
-  // const isAdmin = user?.id === ADMIN_UUID;
   const isOwner = user?.id === comment.authorId;
   const canDelete = isOwner // || isAdmin;
 
@@ -266,7 +262,7 @@ function CommentItem({
               </button>
             )}
           </div>
-          
+
           {/* Comment Content */}
           <p className="text-sm text-text-secondary leading-relaxed">
             {comment.content}
@@ -287,7 +283,7 @@ function CommentItem({
                 placeholder="Write a reply..."
                 rows={2}
                 maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none" 
+                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none"
                 disabled={submitting}
                 autoFocus
               />
@@ -308,7 +304,7 @@ function CommentItem({
                 <CommentItem
                   key={reply.id}
                   comment={reply}
-                  replies={[]} 
+                  replies={[]}
                   articleId={articleId}
                   user={user}
                   onReplyAdded={onReplyAdded}

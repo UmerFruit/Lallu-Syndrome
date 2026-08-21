@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Avatar } from '@/components/ui/Avatar';
 
 type UserMenuProps = {
   onNavigate?: () => void;
@@ -66,17 +67,7 @@ export function UserMenu({ onNavigate }: Readonly<UserMenuProps>) {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        {profile?.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt={displayName}
-            className="h-7 w-7 rounded-full object-cover"
-          />
-        ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
-            {initial}
-          </span>
-        )}
+        <Avatar src={profile?.avatar_url} name={displayName} className="h-7 w-7" fallbackClassName="bg-accent/10 text-xs font-semibold text-accent" />
 
         <span className="hidden sm:inline">{displayName}</span>
       </button>

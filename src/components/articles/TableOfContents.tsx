@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { slugify, slugifyHeading } from '@/utils/slugify';
+import { slugifyHeading } from '@/utils/slugify';
+import { observe } from 'react-intersection-observer';
 
 type Heading = {
   id: string;
@@ -29,26 +30,21 @@ type TableOfContentsProps = {
 export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
   const [activeId, setActiveId] = useState<string>('');
 
+
   useEffect(() => {
-    if (headings.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveId(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
-    );
-
-    for (const h of headings) {
-      const el = document.getElementById(h.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
+    const unobserveAll = headings
+      .map((h) => document.getElementById(h.id))
+      .filter((el): el is HTMLElement => el !== null)
+      .map((el) =>
+        observe(
+          el,
+          (inView) => {
+            if (inView) setActiveId(el.id);
+          },
+          { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+        )
+      );
+    return () => unobserveAll.forEach((unobserve) => unobserve());
   }, [headings]);
 
   if (headings.length < 3) return null;
@@ -63,13 +59,11 @@ export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
           <li key={h.id}>
             <a
               href={`#${h.id}`}
-              className={`block py-1 text-sm transition-colors duration-200 ${
-                h.level === 3 ? 'pl-6' : 'pl-3'
-              } ${
-                activeId === h.id
+              className={`block py-1 text-sm transition-colors duration-200 ${h.level === 3 ? 'pl-6' : 'pl-3'
+                } ${activeId === h.id
                   ? 'text-accent border-l-2 border-accent -ml-px'
                   : 'text-text-muted hover:text-text-secondary'
-              }`}
+                }`}
             >
               {h.text}
             </a>
