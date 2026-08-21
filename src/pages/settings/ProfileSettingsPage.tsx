@@ -175,6 +175,7 @@ export function ProfileSettingsPage() {
             toast.success('Profile saved.');
             queryClient.invalidateQueries({ queryKey: ['profile'] });
         } catch (error) {
+            toast.error(getErrorMessage(error));
             setError('root', { message: getErrorMessage(error) });
         }
     };
@@ -182,15 +183,19 @@ export function ProfileSettingsPage() {
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             <section className="rounded-lg border border-border-subtle bg-bg p-6">
-                <div>
-                    <h2 className="font-serif text-lg font-semibold text-text-primary">
-                        Public profile
-                    </h2>
-                    <p className="mt-1 text-sm text-text-secondary">
-                        This information may be displayed alongside your articles and public profile.
-                    </p>
+                <div className="mb-6 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 className="font-serif text-lg font-semibold text-text-primary">
+                            Public profile
+                        </h2>
+                        <p className="mt-1 text-sm text-text-secondary">
+                            This information may be displayed alongside your articles and public profile.
+                        </p>
+                    </div>
+                <Button type="submit" loading={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save changes'}
+                </Button>
                 </div>
-
                 <div className="mt-6 grid gap-6 md:grid-cols-2">
                     <Input
                         id="display_name"
@@ -304,9 +309,9 @@ export function ProfileSettingsPage() {
                         <p className="text-xs text-text-secondary">{bioText.length}/500</p>
                     </div>
                 </div>
-            </section>
+                {/* add a little padding between logical sections */}
+                <div className="mt-6 mb-6 border-t border-border-subtle" />
 
-            <section className="rounded-lg border border-border-subtle bg-bg p-6">
                 <div>
                     <h2 className="font-serif text-lg font-semibold text-text-primary">Links</h2>
                     <p className="mt-1 text-sm text-text-secondary">
@@ -343,16 +348,6 @@ export function ProfileSettingsPage() {
                     />
                 </div>
             </section>
-
-            <div className="flex items-center gap-3">
-                <Button type="submit" loading={isSubmitting}>
-                    {isSubmitting ? 'Saving...' : 'Save changes'}
-                </Button>
-            </div>
-
-            {errors.root?.message && (
-                <p className="text-sm text-red-500">{errors.root.message}</p>
-            )}
         </form>
     );
 }

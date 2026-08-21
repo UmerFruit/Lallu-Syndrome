@@ -33,9 +33,12 @@ export function PasswordSettingsPage() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
       <section className="rounded-lg border border-border-subtle bg-bg p-6">
-        <div>
-          <h2 className="font-serif text-lg font-semibold text-text-primary">Change Password</h2>
-          <p className="mt-1 text-sm text-text-secondary">Ensure your account is using a strong, unique password.</p>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-lg font-semibold text-text-primary">Change Password</h2>
+            <p className="mt-1 text-sm text-text-secondary">Ensure your account is using a strong, unique password.</p>
+          </div>
+          <Button type="submit" loading={isSubmitting}>Update Password</Button>
         </div>
         {errors.root && (
           <div className="mt-4 rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
@@ -47,7 +50,7 @@ export function PasswordSettingsPage() {
           <Input label="Confirm New Password" isPassword placeholder="••••••••" autoComplete="new-password" {...register('confirmPassword')} error={errors.confirmPassword?.message} />
         </div>
       </section>
-      <Button type="submit" loading={isSubmitting}>Update Password</Button>
+
     </form>
   );
 }

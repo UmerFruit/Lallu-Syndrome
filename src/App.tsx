@@ -29,7 +29,7 @@ import { PageSpinner } from './components/ui/Skeleton';
 import { Toaster } from "sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
-
+import { UsernameSetupPage, USERNAME_SETUP_SKIP_KEY } from '@/pages/auth/UsernameSetupPage';
 function AppToaster() {
   const { theme } = useTheme();
   return <Toaster theme={theme} position="bottom-right" richColors closeButton />;
@@ -45,11 +45,39 @@ function ScrollToTop() {
 }
 
 function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
+  const { user, profile, isLoading, isProfileLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading || isProfileLoading) {
     return <PageSpinner />;
   }
-  if (!user) return <Navigate to="/login" replace />;
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const skippedUsernameSetup =
+    localStorage.getItem(USERNAME_SETUP_SKIP_KEY) === '1';
+
+  const isExemptFromUsernamePrompt =
+    location.pathname.startsWith('/setup/username') ||
+    location.pathname.startsWith('/settings');
+
+  if (
+    profile &&
+    !profile.username &&
+    !skippedUsernameSetup &&
+    !isExemptFromUsernamePrompt
+  ) {
+    return (
+      <Navigate
+        to="/setup/username"
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
+  }
+
   return <>{children}</>;
 }
 
@@ -117,7 +145,16 @@ function AppRoutes() {
         <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardPage /></AppLayout></ProtectedRoute>} />
         <Route path="/dashboard/articles/new" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
         <Route path="/dashboard/articles/:id/edit" element={<ProtectedRoute><EditorLayout><ArticleEditorPage /></EditorLayout></ProtectedRoute>} />
-        <Route path="/dashboard/publications" element={<ProtectedRoute>  <AppLayout> <PublicationsPage />  </AppLayout></ProtectedRoute>}
+        <Route path="/dashboard/publications" element={<ProtectedRoute>  <AppLayout> <PublicationsPage />  </AppLayout></ProtectedRoute>} />
+        <Route
+          path="/setup/username"
+          element={
+            <ProtectedRoute>
+              <AuthLayoutShell>
+                <UsernameSetupPage />
+              </AuthLayoutShell>
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/settings"

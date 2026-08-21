@@ -11,7 +11,7 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { user,profile } = useAuth();
   const [tab, setTab] = useState<'published' | 'drafts'>('published');
 
   // Modal State
@@ -135,6 +135,15 @@ export function DashboardPage() {
           </Link>
         </div>
       </div>
+      {!profile?.username && (
+        <div className="mb-6 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-text-secondary">
+          <span className="font-medium text-text-primary">No username set.</span>{' '}
+          Readers won’t be able to find more articles by you without one.{' '}
+          <Link to="/settings/profile" className="text-accent hover:text-accent-hover underline underline-offset-2">
+            Set your username
+          </Link>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border mb-6">
