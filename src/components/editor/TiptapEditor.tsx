@@ -357,9 +357,9 @@ export function TiptapEditor({
         options={{ placement: 'top', offset: 8 }}
       >
         <div
-          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
-          onMouseDown={(e) => e.preventDefault()}
-        >
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg" 
+          onMouseDown={(e) => e.preventDefault()}> 
+
           {textToolbarButtons.map(({ key, icon: Icon, title, isActive, run }) => (
             <button
               key={key}
