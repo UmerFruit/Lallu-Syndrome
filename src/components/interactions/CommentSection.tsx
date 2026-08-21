@@ -104,14 +104,14 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
           <div className="flex gap-3">
             <Avatar src={profile?.avatar_url} name={profile?.display_name ?? user.email ?? 'U'} className="h-9 w-9" />
             <div className="flex-1">
-              <Textarea value={content} onChange={(e) => setContent(e.target.value)} 
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  e.currentTarget.form?.requestSubmit();
-                }
-              }}
-               placeholder="Write a comment..." rows={3} maxLength={1000} aria-label="Write a comment" disabled={topFormSubmitting} />
+              <Textarea value={content} onChange={(e) => setContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Write a comment..." rows={3} maxLength={1000} aria-label="Write a comment" disabled={topFormSubmitting} />
 
               <div className="flex justify-end mt-2">
                 <button
@@ -204,7 +204,7 @@ function CommentItem({
               <span className="font-mono text-xs text-text-muted">
                 {relativeTime(comment.createdAt)}
               </span>
-              {user && (
+              {user && comment.parentId === null && (
                 <button
                   type="button"
                   onClick={() => setIsReplying(!isReplying)}
