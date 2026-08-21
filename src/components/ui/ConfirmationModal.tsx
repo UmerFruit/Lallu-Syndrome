@@ -25,7 +25,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open && !isLoading) onClose(); }}>
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in" />
-      <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-elevated p-6 shadow-xl animate-slide-up">
+      <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-elevated p-6 shadow-xl">
         <Dialog.Title className="text-lg font-semibold text-text-primary">{title}</Dialog.Title>
         <Dialog.Description className="mt-2 text-sm text-text-secondary">{message}</Dialog.Description>
         <div className="mt-6 flex justify-end gap-3">
