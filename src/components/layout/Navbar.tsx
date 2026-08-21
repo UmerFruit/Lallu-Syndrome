@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sun, Moon } from 'lucide-react';
+import { Menu, X, Sun, Moon, Search } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserMenu } from '@/components/layout/UserMenu';
@@ -42,8 +42,8 @@ export function Navbar() {
               key={link.to}
               to={link.to}
               className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${isActive(link.to)
-                  ? 'text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary'
+                ? 'text-text-primary'
+                : 'text-text-secondary hover:text-text-primary'
                 }`}
             >
               {link.label}
@@ -60,7 +60,13 @@ export function Navbar() {
               Sign in
             </Link>
           )}
-
+          <Link
+            to="/search"
+            className="p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors"
+            aria-label="Search"
+          >
+            <Search size={18} />
+          </Link>
           <button
             type="button"
             onClick={toggleTheme}
@@ -110,7 +116,14 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-
+            <Link
+              to="/search"
+              className="flex items-center gap-2 px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Search size={16} />
+              Search
+            </Link>
             {!user && (
               <Link
                 to="/login"
