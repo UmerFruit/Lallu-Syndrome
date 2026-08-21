@@ -5,7 +5,7 @@ import { getArticlesByCategory } from '@/services/articleService';
 import { getCategoryBySlug } from '@/services/categoryService';
 
 import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
 
 export function CategoryPage() {
@@ -50,13 +50,7 @@ export function CategoryPage() {
       return <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
     }
 
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {articles.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-    );
+    return <ArticleGrid articles={articles} />;
   };
 
   return (

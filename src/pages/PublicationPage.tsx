@@ -5,7 +5,7 @@ import type { Article, Publication } from '@/types';
 import { getPublicationBySlug } from '@/services/publicationService';
 import { getArticlesByPublication } from '@/services/articleService';
 import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
 
 export function PublicationPage() {
@@ -131,11 +131,7 @@ export function PublicationPage() {
           No published articles yet.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
+        <ArticleGrid articles={articles} />
       )}
     </PageContainer>
   );

@@ -17,16 +17,13 @@ import {
 } from '@/services/adminService';
 import type { Profile } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 type Tab = 'users' | 'comments' | 'articles';
 
 export function AdminPage() {
   const { profile } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
-
-  // Only admins can access this page (enforced by AdminRoute)
-    if (!profile?.is_admin) return null; 
-
 
   return (
     <PageContainer className="py-8 md:py-12">
@@ -158,7 +155,11 @@ function UsersTab() {
 function CommentsTab() {
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; isDeleting: boolean }>({
+    isOpen: false,
+    id: null,
+    isDeleting: false,
+  });
 
   useEffect(() => {
     getAllComments()
@@ -167,16 +168,17 @@ function CommentsTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDelete = async (commentId: string) => {
-    if (!confirm('Delete this comment permanently?')) return;
-    setDeletingId(commentId);
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.id) return;
+    
+    setDeleteModal(prev => ({ ...prev, isDeleting: true }));
     try {
-      await adminDeleteComment(commentId);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      await adminDeleteComment(deleteModal.id);
+      setComments((prev) => prev.filter((c) => c.id !== deleteModal.id));
+      setDeleteModal({ isOpen: false, id: null, isDeleting: false });
     } catch (error) {
       console.error('Failed to delete comment:', error);
-    } finally {
-      setDeletingId(null);
+      setDeleteModal(prev => ({ ...prev, isDeleting: false }));
     }
   };
 
@@ -193,18 +195,8 @@ function CommentsTab() {
           key={comment.id}
           className="flex items-start gap-4 p-4 rounded border border-border-subtle bg-surface"
         >
-          {/* Avatar */}
-          {comment.author_avatar ? (
-            <img
-              src={comment.author_avatar}
-              alt={comment.author_name}
-              className="w-8 h-8 rounded-full object-cover border border-border-subtle mt-0.5"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-elevated flex items-center justify-center text-xs font-medium text-text-secondary mt-0.5">
-              {comment.author_name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          {/* Avatar Component Cleanup */}
+          <Avatar src={comment.author_avatar} name={comment.author_name} size="sm" className="mt-0.5" />
 
           {/* Content */}
           <div className="flex-1 min-w-0">
@@ -230,15 +222,23 @@ function CommentsTab() {
           {/* Delete */}
           <button
             type="button"
-            onClick={() => handleDelete(comment.id)}
-            disabled={deletingId === comment.id}
-            className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors disabled:opacity-50"
+            onClick={() => setDeleteModal({ isOpen: true, id: comment.id, isDeleting: false })}
+            className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
             aria-label="Delete comment"
           >
             <Trash2 size={16} />
           </button>
         </div>
       ))}
+
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        title="Delete Comment"
+        message="Delete this comment permanently?"
+        isLoading={deleteModal.isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteModal({ isOpen: false, id: null, isDeleting: false })}
+      />
     </div>
   );
 }
@@ -247,7 +247,11 @@ function CommentsTab() {
 function ArticlesTab() {
   const [articles, setArticles] = useState<AdminArticle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; isDeleting: boolean }>({
+    isOpen: false,
+    id: null,
+    isDeleting: false,
+  });
 
   useEffect(() => {
     getAllArticlesAdmin()
@@ -256,16 +260,17 @@ function ArticlesTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDelete = async (articleId: string) => {
-    if (!confirm('Delete this article permanently? This cannot be undone.')) return;
-    setDeletingId(articleId);
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.id) return;
+    
+    setDeleteModal(prev => ({ ...prev, isDeleting: true }));
     try {
-      await adminDeleteArticle(articleId);
-      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+      await adminDeleteArticle(deleteModal.id);
+      setArticles((prev) => prev.filter((a) => a.id !== deleteModal.id));
+      setDeleteModal({ isOpen: false, id: null, isDeleting: false });
     } catch (error) {
       console.error('Failed to delete article:', error);
-    } finally {
-      setDeletingId(null);
+      setDeleteModal(prev => ({ ...prev, isDeleting: false }));
     }
   };
 
@@ -324,15 +329,23 @@ function ArticlesTab() {
           {/* Delete */}
           <button
             type="button"
-            onClick={() => handleDelete(article.id)}
-            disabled={deletingId === article.id}
-            className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors disabled:opacity-50"
+            onClick={() => setDeleteModal({ isOpen: true, id: article.id, isDeleting: false })}
+            className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
             aria-label="Delete article"
           >
             <Trash2 size={16} />
           </button>
         </div>
       ))}
+
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        title="Delete Article"
+        message="Delete this article permanently? This cannot be undone."
+        isLoading={deleteModal.isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteModal({ isOpen: false, id: null, isDeleting: false })}
+      />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { getProfileByUsername } from '@/services/profileService';
 import { getPublishedArticlesByAuthor } from '@/services/articleService';
 import { getMyPublications } from '@/services/publicationService';
 import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton, PageSpinner } from '@/components/ui/Skeleton';
 
 export function WriterProfilePage() {
@@ -251,11 +251,7 @@ export function WriterProfilePage() {
               No published articles yet.
             </p>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {latestArticles.map((article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
-            </div>
+            <ArticleGrid articles={latestArticles} />
           )}
         </section>
       </PageContainer>
