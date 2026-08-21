@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Navigate,useNavigate } from 'react-router-dom';
 import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
-
+import { useAuth } from '@/contexts/AuthContext';
 const signupSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters.'),
   email: z.string().trim().min(1, 'Email is required.').pipe(z.email({ message: 'Please enter a valid email address.' })),
@@ -23,6 +23,10 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 
 export function SignupPage() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) { return null; } 
+  if (user) { return <Navigate to="/dashboard" replace />; } 
+
   const navigate = useNavigate();
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [sentEmail, setSentEmail] = useState('');

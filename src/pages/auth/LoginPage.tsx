@@ -1,4 +1,4 @@
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,6 +6,7 @@ import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { login } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, 'Email is required.').pipe(z.email({ message: 'Please enter a valid email address.' })),
@@ -15,6 +16,10 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) {return null; } // Prevents flash of login form while checking session
+  if (user) { return <Navigate to="/dashboard" replace />; } // if logged in, redirect to dashboard
+
   const navigate = useNavigate();
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
