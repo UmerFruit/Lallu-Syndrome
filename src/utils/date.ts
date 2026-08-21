@@ -1,32 +1,22 @@
+import dayjs from 'dayjs';
+
 export function formatDate(date: string): string {
-  const d = new Date(date);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-  });
+  return dayjs(date).format('MMM DD, YYYY');
 }
 
 export function formatDateLong(date: string): string {
-  const d = new Date(date);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  return dayjs(date).format('MMMM D, YYYY');
 }
 
 export function relativeTime(date: string): string {
-  const now = new Date();
-  const then = new Date(date);
-  const diffMs = now.getTime() - then.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffMin < 1) return 'just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
+  const then = dayjs(date);
+  const now = dayjs();
+  const minutes = now.diff(then, 'minute');
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = now.diff(then, 'hour');
+  if (hours < 24) return `${hours}h ago`;
+  const days = now.diff(then, 'day');
+  if (days < 7) return `${days}d ago`;
   return formatDate(date);
 }
