@@ -16,10 +16,8 @@ import {
   Bold,
   Italic,
   Strikethrough,
-  Link as LinkIcon,
   Quote,
   Code,
-  Eraser,
   Heading1,
   Heading2,
   Heading3,
@@ -325,24 +323,6 @@ export function TiptapEditor({
       },
     },
   });
-
-
-  const setLink = () => {
-    if (!editor) return;
-
-    const previousUrl = editor.getAttributes('link').href;
-
-    const url = window.prompt('Enter URL', previousUrl);
-
-    if (url === null) return;
-
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  };
 
   if (!editor) {
     return null;

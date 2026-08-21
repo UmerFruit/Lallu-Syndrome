@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
-import type { Article, ArticleStatus, Category } from '@/types';
+import type { Article, ArticleStatus, Category, Publication} from '@/types';
 import { getArticleById, createArticle, updateArticle, calculateReadingTime, generateSlug } from '@/services/articleService';
 import { getCategories } from '@/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,6 @@ import {
 import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
-import type { Publication } from '@/types';
 import { PageSpinner } from '@/components/ui/Skeleton';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));

@@ -27,7 +27,8 @@ import { PublicationPage } from '@/pages/PublicationPage';
 import { PublicationsPage } from '@/pages/PublicationsPage';
 import { PageSpinner } from './components/ui/Skeleton';
 import { Toaster } from "sonner";
-
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 
 function AppToaster() {
   const { theme } = useTheme();
@@ -143,11 +144,13 @@ function App() {
     <ThemeProvider>
       <AppToaster />
       <AuthProvider>
-        <BrowserRouter>
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
-        </BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
+          </BrowserRouter>
+        </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>
   );

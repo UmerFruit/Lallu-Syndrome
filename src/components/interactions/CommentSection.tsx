@@ -1,5 +1,4 @@
-// src/components/interactions/CommentSection.tsx
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Send, Trash2 } from 'lucide-react';
 import type { Comment } from '@/types';
 import { getComments, addComment, deleteComment } from '@/services/articleService';
@@ -7,62 +6,42 @@ import { useAuth } from '@/contexts/AuthContext';
 import { relativeTime } from '@/utils/date';
 import type { User } from '@supabase/supabase-js';
 import { Avatar } from '@/components/ui/Avatar';
+import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
-type CommentSectionProps = {
-  articleId: string;
-};
+type AddCommentInput = { text: string; parentId: string | null };
+type AddCommentMutation = UseMutationResult<Comment, Error, AddCommentInput>;
+
+type CommentSectionProps = { articleId: string; };
 
 export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let mounted = true;
-    const loadComments = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await getComments(articleId);
-        if (mounted) setComments(result);
-      } catch {
-        if (mounted) setError('Unable to load comments.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    loadComments();
-    return () => { mounted = false; };
-  }, [articleId]);
+  const { data: comments = [], isLoading: loading, isError } = useQuery({
+    queryKey: ['comments', articleId],
+    queryFn: () => getComments(articleId),
+  });
 
-  // Helper to add a new comment/reply to the local state
-  const handleAddComment = (newComment: Comment) => {
-    setComments((prev) => [...prev, newComment]);
-  };
+  const addMutation = useMutation({
+    mutationFn: ({ text, parentId }: AddCommentInput) => addComment(articleId, text, parentId),
+    onSuccess: (newComment) => {
+      queryClient.setQueryData<Comment[]>(['comments', articleId], (prev) => [
+        ...(prev ?? []),
+        newComment,
+      ]);
+    },
+  });
 
-  // Helper to remove a deleted comment (and its nested replies) from local state
-  const handleDeleteComment = (commentId: string) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
-  };
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const topFormSubmitting = addMutation.isPending && addMutation.variables?.parentId === null;
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const trimmedContent = content.trim();
-    if (!trimmedContent || !user || submitting) return;
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      const newComment = await addComment(articleId, trimmedContent);
-      handleAddComment(newComment);
-      setContent('');
-    } catch {
-      setError('Unable to post your comment. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    const trimmed = content.trim();
+    if (!trimmed || !user || topFormSubmitting) return;
+    addMutation.mutate({ text: trimmed, parentId: null }, {
+      onSuccess: () => setContent(''),
+    });
   };
 
   const topLevel = comments.filter((comment) => comment.parentId === null);
@@ -86,8 +65,8 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
         ))}
       </div>
     );
-  } else if (error && comments.length === 0) {
-    commentsContent = <p className="text-sm text-text-muted">{error}</p>;
+  } else if (isError && comments.length === 0) {
+    commentsContent = <p className="text-sm text-text-muted">Unable to load comments.</p>;
   } else if (topLevel.length === 0) {
     commentsContent = (
       <p className="text-sm text-text-muted">
@@ -104,8 +83,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
             replies={getReplies(comment.id)}
             articleId={articleId}
             user={user}
-            onReplyAdded={handleAddComment}
-            onDelete={handleDeleteComment} // <-- ADD THIS
+            addMutation={addMutation}
           />
         ))}
       </div>
@@ -137,21 +115,23 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
                 rows={3}
                 maxLength={1000}
                 className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
-                disabled={submitting}
+                disabled={topFormSubmitting}
               />
               <div className="flex justify-end mt-2">
                 <button
                   type="submit"
-                  disabled={!content.trim() || submitting}
+                  disabled={!content.trim() || topFormSubmitting}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 >
                   <Send size={14} />
-                  {submitting ? 'Posting...' : 'Comment'}
+                  {topFormSubmitting ? 'Posting...' : 'Comment'}
                 </button>
               </div>
             </div>
           </div>
-          {error && <p className="mt-3 text-sm text-accent">{error}</p>}
+          {addMutation.isError && (
+            <p className="mt-3 text-sm text-accent">Unable to post your comment. Please try again.</p>
+          )}
         </form>
       ) : (
         <div className="mb-8 p-4 rounded border border-border-subtle bg-surface text-sm text-text-muted text-center">
@@ -170,52 +150,47 @@ function CommentItem({
   replies,
   articleId,
   user,
-  onReplyAdded,
-  onDelete,
+  addMutation,
 }: Readonly<{
   comment: Comment;
   replies: Comment[];
   articleId: string;
   user: User | null;
-  onReplyAdded: (newComment: Comment) => void;
-  onDelete: (commentId: string) => void;
+  addMutation: AddCommentMutation;
 }>) {
+  const queryClient = useQueryClient();
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteComment(comment.id),
+    onSuccess: () => {
+      queryClient.setQueryData<Comment[]>(['comments', articleId], (prev) =>
+        (prev ?? []).filter((c) => c.id !== comment.id && c.parentId !== comment.id)
+      );
+    },
+    onError: (error) => console.error('Failed to delete comment:', error),
+  });
 
   const isOwner = user?.id === comment.authorId;
-  const canDelete = isOwner // || isAdmin;
+  const canDelete = isOwner; // || isAdmin
+  const submittingReply = addMutation.isPending && addMutation.variables?.parentId === comment.id;
 
   const handleDelete = async () => {
     if (!confirm('Delete this comment?')) return;
-    setIsDeleting(true);
-    try {
-      await deleteComment(comment.id);
-      onDelete(comment.id);
-    } catch (error) {
-      console.error('Failed to delete comment:', error);
-    } finally {
-      setIsDeleting(false);
-    }
+    deleteMutation.mutate();
   };
 
-  const handleReplySubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleReplySubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmed = replyContent.trim();
-    if (!trimmed || !user || submitting) return;
-    try {
-      setSubmitting(true);
-      const newComment = await addComment(articleId, trimmed, comment.id);
-      onReplyAdded(newComment);
-      setReplyContent('');
-      setIsReplying(false);
-    } catch (error) {
-      console.error('Failed to post reply:', error);
-    } finally {
-      setSubmitting(false);
-    }
+    if (!trimmed || !user || submittingReply) return;
+    addMutation.mutate({ text: trimmed, parentId: comment.id }, {
+      onSuccess: () => {
+        setReplyContent('');
+        setIsReplying(false);
+      },
+    });
   };
 
   return (
@@ -254,11 +229,11 @@ function CommentItem({
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={isDeleting}
+                disabled={deleteMutation.isPending}
                 className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
                 aria-label="Delete comment"
               >
-                {isDeleting ? '...' : <Trash2 size={14} />}
+                {deleteMutation.isPending ? '...' : <Trash2 size={14} />}
               </button>
             )}
           </div>
@@ -284,12 +259,12 @@ function CommentItem({
                 rows={2}
                 maxLength={1000}
                 className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none"
-                disabled={submitting}
+                disabled={submittingReply}
                 autoFocus
               />
               <button
                 type="submit"
-                disabled={!replyContent.trim() || submitting}
+                disabled={!replyContent.trim() || submittingReply}
                 className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Send size={14} />
@@ -307,8 +282,7 @@ function CommentItem({
                   replies={[]}
                   articleId={articleId}
                   user={user}
-                  onReplyAdded={onReplyAdded}
-                  onDelete={onDelete}
+                  addMutation={addMutation}
                 />
               ))}
             </div>

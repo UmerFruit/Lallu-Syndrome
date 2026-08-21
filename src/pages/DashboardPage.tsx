@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getMyArticles, deleteArticle } from '@/services/articleService';
@@ -8,44 +8,34 @@ import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
 import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'published' | 'drafts'>('published');
 
   // Modal State
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
+  const queryClient = useQueryClient();
+  const { data: articles = [], isLoading: loading } = useQuery({
+    queryKey: ['my-articles', user?.id],
+    queryFn: () => getMyArticles(user!.id),
+    enabled: Boolean(user),
+  });
 
-    getMyArticles(user.id).then((a) => {
-      setArticles(a);
-      setLoading(false);
-    });
-  }, [user]);
+  const deleteMutation = useMutation({
+    mutationFn: deleteArticle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+      setArticleToDelete(null);
+    },
+    onError: (error) => console.error('Failed to delete article:', error),
+  });
 
   const published = articles.filter((a) => a.status === 'published');
   const drafts = articles.filter((a) => a.status === 'draft');
   const displayed = tab === 'published' ? published : drafts;
-
-  const handleConfirmDelete = async () => {
-    if (!articleToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      await deleteArticle(articleToDelete.id);
-      setArticles((prev) => prev.filter((a) => a.id !== articleToDelete.id));
-      setArticleToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete article:', error);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const articleListContent = (() => {
     if (loading) {
@@ -168,9 +158,9 @@ export function DashboardPage() {
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={Boolean(articleToDelete)}
-        isLoading={isDeleting}
+        isLoading={deleteMutation.isPending}
         onClose={() => setArticleToDelete(null)}
-        onConfirm={handleConfirmDelete}
+        onConfirm={() => articleToDelete && deleteMutation.mutate(articleToDelete.id)}
         title="Delete Article"
         message={`Are you sure you want to delete "${articleToDelete?.title}"? This action cannot be undone.`}
       />

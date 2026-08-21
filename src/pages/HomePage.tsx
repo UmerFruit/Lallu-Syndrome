@@ -1,5 +1,5 @@
 import { useEffect, useState, Suspense, lazy } from 'react';
-import type { Article, Category } from '@/types';
+import { useQuery } from '@tanstack/react-query';
 import { getArticles } from '@/services/articleService';
 import { PageContainer } from '@/components/layout/Navbar';
 import { FeaturedArticle } from '@/components/articles/FeaturedArticle';
@@ -25,36 +25,22 @@ function useMediaQuery(query: string): boolean {
 }
 
 export function HomePage() {
-  const [featured, setFeatured] = useState<Article | null>(null);
-  const [latest, setLatest] = useState<Article[]>([]);
-  const [all, setAll] = useState<Article[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
   const isMobile = useMediaQuery('(max-width: 767px)');
   const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
-  useEffect(() => {
-    async function loadHome() {
-      try {
-        const [allArts, categoryResults] = await Promise.all([
-          getArticles(),
-          getCategories(),
-        ]);
+  const { data: all = [], isLoading: loading } = useQuery({
+    queryKey: ['articles'],
+    queryFn: getArticles,
+  });
 
-        setFeatured(allArts[0] ?? null);
-        setLatest(allArts.slice(1, 4));
-        setAll(allArts);
-        setCategories(categoryResults);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
 
-    loadHome();
-  }, []);
+  const featured = all[0] ?? null;
+  const latest = all.slice(1, 4);
 
   const filtered = activeCategory === 'all'
     ? all
@@ -92,7 +78,6 @@ export function HomePage() {
 
   return (
     <PageContainer className="py-8 md:py-12">
-
       <div className="w-full h-[220px] sm:h-[300px] md:h-[360px] bg-bg">
         {prefersReducedMotion ? (
           <div className="flex h-full items-center justify-center px-4">
@@ -133,7 +118,7 @@ export function HomePage() {
       </section>
 
       {/* Latest Posts */}
-      {latest.length > 0 && (
+      {(loading || latest.length > 0) && (
         <section className="mb-16 md:mb-20">
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-mono text-xs uppercase tracking-wider text-text-muted">

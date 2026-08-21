@@ -44,9 +44,7 @@ export function UserMenu({ onNavigate }: Readonly<UserMenuProps>) {
     profile?.display_name ||
     user.email ||
     'Account';
-
-  const initial = displayName.charAt(0).toUpperCase();
-
+    
   const closeAndNavigate = () => {
     setOpen(false);
     onNavigate?.();

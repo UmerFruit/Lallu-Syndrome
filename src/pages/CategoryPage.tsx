@@ -1,32 +1,40 @@
-import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Article, Category } from '@/types';
 import { getArticlesByCategory } from '@/services/articleService';
 import { getCategoryBySlug } from '@/services/categoryService';
 
 import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+import { ArticleGrid } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
 
 export function CategoryPage() {
   const { category } = useParams<{ category: string }>();
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [cat, setCat] = useState<Category | undefined>(undefined);
 
+  const { data: articles = [], isLoading: articlesLoading } = useQuery({
+    queryKey: ['articles', 'category', category],
+    queryFn: () => getArticlesByCategory(category!),
+    enabled: Boolean(category),
+  });
 
-  useEffect(() => {
-    if (!category) return;
-    Promise.all([
-      getArticlesByCategory(category),
-      getCategoryBySlug(category),
-    ]).then(([articlesResults, categoryResult]) => {
-      setArticles(articlesResults);
-      setCat(categoryResult);
-      setLoading(false);
-    }).catch(console.error);
+  const { data: cat, isLoading: catLoading } = useQuery({
+    queryKey: ['category', category],
+    queryFn: () => getCategoryBySlug(category!),
+    enabled: Boolean(category),
+    retry: false,
+  });
 
-  }, [category]);
+  if (articlesLoading || catLoading) {
+    return (
+      <PageContainer className="py-8 md:py-12">
+        <div className="mb-8">
+          <Skeleton className="h-9 w-40" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+        </div>
+      </PageContainer>
+    );
+  }
 
   if (!cat) {
     return (
@@ -38,14 +46,6 @@ export function CategoryPage() {
   }
 
   const renderArticles = () => {
-    if (loading) {
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-        </div>
-      );
-    }
-
     if (articles.length === 0) {
       return <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
     }

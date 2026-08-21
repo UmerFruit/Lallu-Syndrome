@@ -1,68 +1,28 @@
-import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import type { Article, Publication } from '@/types';
 import { getPublicationBySlug } from '@/services/publicationService';
 import { getArticlesByPublication } from '@/services/articleService';
 import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
+import { ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
 
 export function PublicationPage() {
   const { slug } = useParams<{ slug: string }>();
 
-  const [publication, setPublication] = useState<Publication | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const { data: publication, isLoading: publicationLoading } = useQuery({
+    queryKey: ['publication', slug],
+    queryFn: () => getPublicationBySlug(slug!),
+    enabled: Boolean(slug),
+  });
 
-  useEffect(() => {
-    if (!slug) return;
+  const { data: articles = [], isLoading: articlesLoading } = useQuery({
+    queryKey: ['articles', 'publication', publication?.slug],
+    queryFn: () => getArticlesByPublication(publication!.slug),
+    enabled: Boolean(publication),
+  });
 
-    let mounted = true;
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        setNotFound(false);
-
-        const pub = await getPublicationBySlug(slug);
-
-        if (!mounted) return;
-
-        if (!pub) {
-          setNotFound(true);
-          return;
-        }
-
-        setPublication(pub);
-
-        const publicationArticles = await getArticlesByPublication(pub.slug);
-
-        if (!mounted) return;
-
-        setArticles(publicationArticles);
-      } catch (error) {
-        console.error('Failed to load publication:', error);
-
-        if (mounted) {
-          setNotFound(true);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      mounted = false;
-    };
-  }, [slug]);
-
-  if (loading) {
+  if (publicationLoading || (publication && articlesLoading)) {
     return (
       <PageContainer className="py-12">
         <div className="mb-10 space-y-3">
@@ -80,7 +40,7 @@ export function PublicationPage() {
     );
   }
 
-  if (notFound || !publication) {
+  if (!publication) {
     return (
       <PageContainer className="py-24 text-center">
         <p className="mb-4 font-mono text-sm uppercase tracking-[0.25em] text-text-muted">
@@ -123,7 +83,7 @@ export function PublicationPage() {
           </p>
         )}
 
-       
+
       </header>
 
       {articles.length === 0 ? (

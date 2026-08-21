@@ -1,73 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
-import type { Article, Publication,Profile } from '@/types';
+import type {  Publication } from '@/types';
 import { getProfileByUsername } from '@/services/profileService';
 import { getPublishedArticlesByAuthor } from '@/services/articleService';
 import { getMyPublications } from '@/services/publicationService';
 import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard, ArticleGrid } from '@/components/articles/ArticleCard';
+import { ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton, PageSpinner } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
 
 export function WriterProfilePage() {
   const { username } = useParams<{ username: string }>();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [publications, setPublications] = useState<Publication[]>([]);
-  const [loadingArticles, setLoadingArticles] = useState(true);
-  const [status, setStatus] = useState<'loading' | 'found' | 'not-found'>('loading');
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile', username?.toLowerCase()],
+    queryFn: () => getProfileByUsername(username!.toLowerCase()),
+    enabled: Boolean(username),
+    retry: false,
+  });
+  const { data: articles = [], isLoading: loadingArticles } = useQuery({
+    queryKey: ['articles', 'author', profile?.id],
+    queryFn: () => getPublishedArticlesByAuthor(profile!.id),
+    enabled: Boolean(profile),
+  });
+  const { data: publications = [] } = useQuery({
+    queryKey: ['my-publications', profile?.id],
+    queryFn: () => getMyPublications(profile!.id).catch((): Publication[] => []),
+    enabled: Boolean(profile),
+  });
 
-  useEffect(() => {
-    if (!username) return;
-
-    let mounted = true;
-
-    setStatus('loading');
-    setProfile(null);
-    setArticles([]);
-    setPublications([]);
-    setLoadingArticles(true);
-
-    (async () => {
-      try {
-        const found = await getProfileByUsername(username.toLowerCase());
-
-        if (!mounted) return;
-
-        if (!found) {
-          setStatus('not-found');
-          setLoadingArticles(false);
-          return;
-        }
-
-        setProfile(found);
-        setStatus('found');
-
-        const [writerArticles, writerPublications] = await Promise.all([
-          getPublishedArticlesByAuthor(found.id),
-          getMyPublications(found.id).catch(() => [] as Publication[]),
-        ]);
-
-        if (!mounted) return;
-
-        setArticles(writerArticles);
-        setPublications(writerPublications);
-      } catch (error) {
-        console.error('Failed to load writer profile:', error);
-
-        if (!mounted) return;
-
-        setStatus('not-found');
-      } finally {
-        if (mounted) setLoadingArticles(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [username]);
+  const status: 'loading' | 'found' | 'not-found' =
+    profileLoading ? 'loading' : profile ? 'found' : 'not-found'; // NOSONAR
 
   const externalLinks = useMemo(() => {
     if (!profile) return [];
@@ -85,6 +49,26 @@ export function WriterProfilePage() {
   );
 
   const latestArticles = articles.slice(0, 3);
+
+  let latestArticlesContent;
+
+  if (loadingArticles) {
+    latestArticlesContent = (
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <ArticleCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  } else if (latestArticles.length === 0) {
+    latestArticlesContent = (
+      <p className="py-12 text-center text-text-muted">
+        No published articles yet.
+      </p>
+    );
+  } else {
+    latestArticlesContent = <ArticleGrid articles={latestArticles} />;
+  }
 
   if (status === 'loading') {
     return <PageSpinner />;
@@ -240,19 +224,7 @@ export function WriterProfilePage() {
             Latest writing
           </h2>
 
-          {loadingArticles ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <ArticleCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : latestArticles.length === 0 ? (
-            <p className="py-12 text-center text-text-muted">
-              No published articles yet.
-            </p>
-          ) : (
-            <ArticleGrid articles={latestArticles} />
-          )}
+          {latestArticlesContent}
         </section>
       </PageContainer>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import type { Article } from '@/types';
 import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
 import { formatDateLong } from '@/utils/date';
@@ -59,52 +60,32 @@ function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
 
 export function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
-  const [article, setArticle] = useState<Article | null>(null);
-  const [related, setRelated] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [liked, setLiked] = useState(false);
   const { user } = useAuth();
-
+  
   const [coverImgError, setCoverImgError] = useState(false);
 
-  // 1. Data Fetching Effect
+  // 1. Data Fetching Queries
+  const { data: article, isLoading: loading } = useQuery({
+    queryKey: ['article', slug],
+    queryFn: () => getArticleBySlug(slug!),
+    enabled: Boolean(slug),
+  });
+
+  const { data: related = [] } = useQuery({
+    queryKey: ['articles', 'related', article?.id],
+    queryFn: () => getRelatedArticles(article!, 3),
+    enabled: Boolean(article),
+  });
+
+  const { data: liked = false } = useQuery({
+    queryKey: ['liked', article?.id, user?.id],
+    queryFn: () => isLiked(article!.id, user!.id),
+    enabled: Boolean(article) && Boolean(user),
+  });
+
   useEffect(() => {
-    async function loadArticle() {
-      if (!slug) return;
-      try {
-        setLoading(true);
-        setError(false);
-        setArticle(null);
-        setRelated([]);
-        setLiked(false);
-        setCoverImgError(false); // Reset image error when navigating to a new article
-
-        const articleData = await getArticleBySlug(slug);
-
-        if (!articleData) {
-          setError(true);
-          return;
-        }
-
-        setArticle(articleData);
-
-        const [relatedData, likedData] = await Promise.all([
-          getRelatedArticles(articleData, 3),
-          isLiked(articleData.id, user?.id),
-        ]);
-
-        setRelated(relatedData);
-        setLiked(likedData);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadArticle();
-  }, [slug, user?.id]); // Added user?.id to deps so likes update if auth resolves late
+    setCoverImgError(false);
+  }, [slug]);
 
   // 3. Memoized Headings (MUST be before conditional returns)
   const headings = useMemo(
@@ -132,7 +113,7 @@ export function ArticlePage() {
     );
   }
 
-  if (error || !article) {
+  if (!article) {
     return (
       <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
         <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />

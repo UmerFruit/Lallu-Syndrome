@@ -1,28 +1,22 @@
-import { useEffect, useState } from 'react';
-import type { Article, Category } from '@/types';
+import { useState } from 'react';
 import { getArticles } from '@/services/articleService';
 import { getCategories } from '@/services/categoryService';
 import { CategoryButton } from '@/components/ui/CategoryButton';
 import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
 
 export function ArticlesPage() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    Promise.all([
-      getArticles(),
-      getCategories(),
-    ]).then(([articlesResults, categoriesResults]) => {
-      setArticles(articlesResults);
-      setCategories(categoriesResults);
-      setLoading(false);
-    });
-  }, []);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const { data: articles = [], isLoading: loading } = useQuery({
+    queryKey: ['articles'],
+    queryFn: getArticles,
+  });
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
 
   const filtered = activeCategory === 'all'
     ? articles

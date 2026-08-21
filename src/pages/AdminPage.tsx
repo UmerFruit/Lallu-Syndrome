@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2, Shield, MessageSquare, FileText, Users, ArrowLeft } from 'lucide-react';
 import { PageContainer } from '@/components/layout/Navbar';
-import { useAuth } from '@/contexts/AuthContext';
 import { formatDate, relativeTime } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
 import {
@@ -15,14 +14,13 @@ import {
   type AdminComment,
   type AdminArticle,
 } from '@/services/adminService';
-import type { Profile } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type Tab = 'users' | 'comments' | 'articles';
 
 export function AdminPage() {
-  const { profile } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
 
   return (
@@ -83,104 +81,88 @@ export function AdminPage() {
 
 // ─── Users Tab ───────────────────────────────────────────────
 function UsersTab() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    getAllProfiles()
-      .then(setProfiles)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: profiles = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-profiles'],
+    queryFn: getAllProfiles,
+  });
 
-  const handleAdminToggle = async (userId: string, isAdmin: boolean) => {
-    setUpdatingId(userId);
-    try {
-      await updateUserAdminStatus(userId, isAdmin);
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === userId ? { ...p, is_admin: isAdmin } : p))
-      );
-    } catch (error) {
-      console.error('Failed to update admin status:', error);
-    } finally {
-      setUpdatingId(null);
-    }
-  };
+  const toggleMutation = useMutation({
+    mutationFn: ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) =>
+      updateUserAdminStatus(userId, isAdmin),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+    },
+    onError: (error) => console.error('Failed to update admin status:', error),
+  });
 
   if (loading) return <LoadingSkeleton rows={5} />;
 
   return (
     <div className="space-y-2">
-      {profiles.map((p) => (
-        <div
-          key={p.id}
-          className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
-        >
-          {/* Avatar */}
-          <Avatar src={p.avatar_url} name={p.display_name} className="h-9 w-9 border border-border-subtle" />
+      {profiles.map((p) => {
+        const isUpdating = toggleMutation.isPending && toggleMutation.variables?.userId === p.id;
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-text-primary truncate">
-              {p.display_name}
-            </p>
-            <p className="text-xs text-text-muted truncate">
-              {p.username ? `@${p.username}` : p.id.slice(0, 8)}
-              {' · '}Joined {formatDate(p.created_at)}
-            </p>
-          </div>
-
-          {/* Role Selector */}
-          <select
-            value={p.is_admin ? 'admin' : 'user'}
-            onChange={(e) => handleAdminToggle(p.id, e.target.value === 'admin')}
-            disabled={updatingId === p.id}
-            className="rounded border border-border bg-bg px-2.5 py-1.5 text-xs font-mono text-text-secondary focus:border-accent focus:outline-none disabled:opacity-50"
+        return (
+          <div
+            key={p.id}
+            className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
           >
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-          </select>
+            {/* Avatar */}
+            <Avatar src={p.avatar_url} name={p.display_name} className="h-9 w-9 border border-border-subtle" />
 
-          {/* Role Badge */}
-          <Badge variant={p.is_admin ? 'accent' : 'muted'}>
-            {p.is_admin ? 'admin' : 'user'}
-          </Badge>
-        </div>
-      ))}
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">
+                {p.display_name}
+              </p>
+              <p className="text-xs text-text-muted truncate">
+                {p.username ? `@${p.username}` : p.id.slice(0, 8)}
+                {' · '}Joined {formatDate(p.created_at)}
+              </p>
+            </div>
+
+            {/* Role Selector */}
+            <select
+              value={p.is_admin ? 'admin' : 'user'}
+              onChange={(e) => toggleMutation.mutate({ userId: p.id, isAdmin: e.target.value === 'admin' })}
+              disabled={isUpdating}
+              className="rounded border border-border bg-bg px-2.5 py-1.5 text-xs font-mono text-text-secondary focus:border-accent focus:outline-none disabled:opacity-50"
+            >
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+
+            {/* Role Badge */}
+            <Badge variant={p.is_admin ? 'accent' : 'muted'}>
+              {p.is_admin ? 'admin' : 'user'}
+            </Badge>
+          </div>
+        );
+      })}
     </div>
   );
 }
+
 // ─── Comments Tab ────────────────────────────────────────────
 function CommentsTab() {
-  const [comments, setComments] = useState<AdminComment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; isDeleting: boolean }>({
-    isOpen: false,
-    id: null,
-    isDeleting: false,
+  const queryClient = useQueryClient();
+  const [commentToDelete, setCommentToDelete] = useState<AdminComment | null>(null);
+
+  const { data: comments = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-comments'],
+    queryFn: getAllComments,
   });
 
-  useEffect(() => {
-    getAllComments()
-      .then(setComments)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleConfirmDelete = async () => {
-    if (!deleteModal.id) return;
-
-    setDeleteModal(prev => ({ ...prev, isDeleting: true }));
-    try {
-      await adminDeleteComment(deleteModal.id);
-      setComments((prev) => prev.filter((c) => c.id !== deleteModal.id));
-      setDeleteModal({ isOpen: false, id: null, isDeleting: false });
-    } catch (error) {
-      console.error('Failed to delete comment:', error);
-      setDeleteModal(prev => ({ ...prev, isDeleting: false }));
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: adminDeleteComment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-comments'] });
+      setCommentToDelete(null);
+    },
+    onError: (error) => console.error('Failed to delete comment:', error),
+  });
 
   if (loading) return <LoadingSkeleton rows={5} />;
 
@@ -197,6 +179,7 @@ function CommentsTab() {
         >
           {/* Avatar Component Cleanup */}
           <Avatar src={comment.author_avatar} name={comment.author_name} className="mt-0.5 h-8 w-8 border border-border-subtle" fallbackClassName="text-xs" />
+
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -221,7 +204,7 @@ function CommentsTab() {
           {/* Delete */}
           <button
             type="button"
-            onClick={() => setDeleteModal({ isOpen: true, id: comment.id, isDeleting: false })}
+            onClick={() => setCommentToDelete(comment)}
             className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
             aria-label="Delete comment"
           >
@@ -231,12 +214,12 @@ function CommentsTab() {
       ))}
 
       <ConfirmationModal
-        isOpen={deleteModal.isOpen}
-        title="Delete Comment"
-        message="Delete this comment permanently?"
-        isLoading={deleteModal.isDeleting}
-        onConfirm={handleConfirmDelete}
-        onClose={() => setDeleteModal({ isOpen: false, id: null, isDeleting: false })}
+        isOpen={Boolean(commentToDelete)}
+        title="Delete comment"
+        message={`Permanently delete this comment by ${commentToDelete?.author_name ?? 'unknown'}? This cannot be undone.`}
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => commentToDelete && deleteMutation.mutate(commentToDelete.id)}
+        onClose={() => setCommentToDelete(null)}
       />
     </div>
   );
@@ -244,34 +227,22 @@ function CommentsTab() {
 
 // ─── Articles Tab ────────────────────────────────────────────
 function ArticlesTab() {
-  const [articles, setArticles] = useState<AdminArticle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; isDeleting: boolean }>({
-    isOpen: false,
-    id: null,
-    isDeleting: false,
+  const queryClient = useQueryClient();
+  const [articleToDelete, setArticleToDelete] = useState<AdminArticle | null>(null);
+
+  const { data: articles = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-articles'],
+    queryFn: getAllArticlesAdmin,
   });
 
-  useEffect(() => {
-    getAllArticlesAdmin()
-      .then(setArticles)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleConfirmDelete = async () => {
-    if (!deleteModal.id) return;
-
-    setDeleteModal(prev => ({ ...prev, isDeleting: true }));
-    try {
-      await adminDeleteArticle(deleteModal.id);
-      setArticles((prev) => prev.filter((a) => a.id !== deleteModal.id));
-      setDeleteModal({ isOpen: false, id: null, isDeleting: false });
-    } catch (error) {
-      console.error('Failed to delete article:', error);
-      setDeleteModal(prev => ({ ...prev, isDeleting: false }));
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: adminDeleteArticle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-articles'] });
+      setArticleToDelete(null);
+    },
+    onError: (error) => console.error('Failed to delete article:', error),
+  });
 
   if (loading) return <LoadingSkeleton rows={5} />;
 
@@ -327,7 +298,7 @@ function ArticlesTab() {
           {/* Delete */}
           <button
             type="button"
-            onClick={() => setDeleteModal({ isOpen: true, id: article.id, isDeleting: false })}
+            onClick={() => setArticleToDelete(article)}
             className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
             aria-label="Delete article"
           >
@@ -337,12 +308,12 @@ function ArticlesTab() {
       ))}
 
       <ConfirmationModal
-        isOpen={deleteModal.isOpen}
+        isOpen={Boolean(articleToDelete)}
         title="Delete Article"
-        message="Delete this article permanently? This cannot be undone."
-        isLoading={deleteModal.isDeleting}
-        onConfirm={handleConfirmDelete}
-        onClose={() => setDeleteModal({ isOpen: false, id: null, isDeleting: false })}
+        message={`Permanently delete the article "${articleToDelete?.title}"? This cannot be undone.`}
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => articleToDelete && deleteMutation.mutate(articleToDelete.id)}
+        onClose={() => setArticleToDelete(null)}
       />
     </div>
   );
