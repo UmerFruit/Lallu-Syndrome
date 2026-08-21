@@ -370,7 +370,10 @@
     text-wrap: pretty;
   }
 }
-
+.group:hover .link-underline::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
 /* Oval portrait — the house avatar shape (4:5, egg-framed) */
 .avatar {
   aspect-ratio: 4 / 5;

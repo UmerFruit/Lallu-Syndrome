@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { Article } from '@/types';
 import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
@@ -17,24 +17,43 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getFallbackImage } from '@/utils/image';
 
 function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
-  return (
-    <div className="rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5">
+  const cardClass =
+    'block rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5';
+  const inner = (
+    <>
       <div className="flex flex-col items-center gap-3">
         {author.avatar && (
-          <img src={author.avatar} alt={author.name} className="avatar shrink-0 border border-border-subtle bg-elevated" />
+          <img
+            src={author.avatar}
+            alt={author.name}
+            className="avatar shrink-0 border border-border-subtle bg-elevated"
+          />
         )}
-        {author.username ? (
-          <Link to={`/writers/${author.username}`} className="link-underline text-center text-sm font-medium text-text-primary transition-colors hover:text-accent">
-            {author.name}
-          </Link>
-        ) : (
-          <span className="text-center text-sm font-medium text-text-primary">{author.name}</span>
-        )}
+        <span
+          className={`text-center text-sm font-medium text-text-primary transition-colors ${
+            author.username ? 'link-underline group-hover:text-accent' : ''
+          }`}
+        >
+          {author.name}
+        </span>
       </div>
       {author.bio && (
-        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">{author.bio}</p>
+        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">
+          {author.bio}
+        </p>
       )}
-    </div>
+    </>
+  );
+  if (!author.username) {
+    return <div className={cardClass}>{inner}</div>;
+  }
+  return (
+    <Link
+      to={`/writers/${author.username}`}
+      className={`${cardClass} group transition-transform duration-200 hover:-translate-y-0.5`}
+    >
+      {inner}
+    </Link>
   );
 }
 
@@ -47,8 +66,6 @@ export function ArticlePage() {
   const [liked, setLiked] = useState(false);
   const { user } = useAuth();
 
-  const authorCardRef = useRef<HTMLDivElement>(null);
-  const [isAuthorCardVisible, setIsAuthorCardVisible] = useState(false);
   const [coverImgError, setCoverImgError] = useState(false);
 
   // 1. Data Fetching Effect
@@ -89,31 +106,21 @@ export function ArticlePage() {
     loadArticle();
   }, [slug, user?.id]); // Added user?.id to deps so likes update if auth resolves late
 
-  // 2. Scroll Effect
-  useEffect(() => {
-    const handleScroll = () => {
-      const card = authorCardRef.current;
-      if (!card) return;
-
-      const rect = card.getBoundingClientRect();
-      const isVisible = rect.top < window.innerHeight * 0.9;
-
-      if (isVisible && !isAuthorCardVisible) {
-        setIsAuthorCardVisible(true);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isAuthorCardVisible]);
-
   // 3. Memoized Headings (MUST be before conditional returns)
   const headings = useMemo(
     () => extractHeadings(article?.content ?? ''),
     [article?.content]
   );
+
+  // Helper to bypass React Router hijacking anchor links on the mobile TOC
+  const handleMobileTocClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.pushState(null, '', `#${id}`);
+    }
+  };
 
   // --- Conditional Returns (Early Exits) ---
   if (loading) {
@@ -205,6 +212,7 @@ export function ArticlePage() {
                   <li key={h.id}>
                     <a
                       href={`#${h.id}`}
+                      onClick={(e) => handleMobileTocClick(e, h.id)}
                       className={`block py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary ${h.level === 3 ? 'pl-4' : ''}`}
                     >
                       {h.text}
