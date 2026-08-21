@@ -1,28 +1,25 @@
 import { useEffect, useState } from 'react';
-import { slugify } from '@/utils/slugify';
+import { slugify, slugifyHeading } from '@/utils/slugify';
 
 type Heading = {
   id: string;
   text: string;
   level: number;
 };
-
 export function extractHeadings(html: string): Heading[] {
   const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
-
-  const headings = Array.from(
-    parsedDoc.querySelectorAll('h1, h2, h3')
-  );
-
-  return headings.map((heading) => {
-    const text = heading.textContent?.trim() ?? '';
-
-    return {
-      id: slugify(text),
-      text,
-      level: Number(heading.tagName.substring(1)),
-    };
-  });
+  const headings = Array.from(parsedDoc.querySelectorAll('h1, h2, h3'));
+  const usedIds = new Set<string>();
+  return headings
+    .map((heading) => {
+      const text = heading.textContent?.trim() ?? '';
+      return {
+        id: text ? slugifyHeading(text, usedIds) : '',
+        text,
+        level: Number(heading.tagName.substring(1)),
+      };
+    })
+    .filter((heading) => heading.id !== '');
 }
 
 type TableOfContentsProps = {

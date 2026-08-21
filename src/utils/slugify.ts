@@ -19,3 +19,14 @@ export function slugify(text: string, appendRandomSuffix = true): string {
 	const suffix = randomSlugSuffix();
 	return baseSlug ? `${baseSlug}-${suffix}` : suffix;
 }
+
+export function slugifyHeading(text: string, usedIds: Set<string>): string {
+  const baseId = slugify(text, false);
+  let id = baseId;
+  let counter = 2;
+  while (usedIds.has(id)) {
+    id = `${baseId}-${counter++}`;
+  }
+  usedIds.add(id);
+  return id;
+}

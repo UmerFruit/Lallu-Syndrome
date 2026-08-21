@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import DOMPurify from 'dompurify';
-import { slugify } from '@/utils/slugify';
+import { slugify, slugifyHeading } from '@/utils/slugify';
 
 type ArticleContentProps = {
   content: string;
@@ -37,22 +37,12 @@ export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
     parsedDoc.querySelectorAll('h1, h2, h3').forEach((heading) => {
       const text = heading.textContent?.trim() ?? '';
       if (!text) return;
-
-      const baseId = slugify(text);
-      let id = baseId;
-      let counter = 2;
-
-      while (usedIds.has(id)) {
-        id = `${baseId}-${counter++}`;
-      }
-
-      usedIds.add(id);
-      heading.id = id;
+      heading.id = slugifyHeading(text, usedIds);
       heading.classList.add('scroll-mt-20');
     });
-
+   
     return parsedDoc.body.innerHTML;
-  }, [content]); // <--- Only re-runs if the 'content' string changes
+  }, [content]); 
 
   return (
     <div
