@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
-import type { Article, ArticleStatus, Category, Publication} from '@/types';
+import type { Article, ArticleStatus } from '@/types';
 import { getArticleById, createArticle, updateArticle, calculateReadingTime, generateSlug } from '@/services/articleService';
 import { getCategories } from '@/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +18,8 @@ import { TableOfContents, extractHeadings } from '@/components/articles/TableOfC
 import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -27,7 +29,6 @@ export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const [categories, setCategories] = useState<Category[]>([]);
   const isNew = !id || id === 'new';
   const [formData, setFormData] = useState({
     title: '',
@@ -38,9 +39,7 @@ export function ArticleEditorPage() {
     status: 'draft' as ArticleStatus,
     publishedAt: ''
   });
-  const [publications, setPublications] = useState<Publication[]>([]);
   const [publicationId, setPublicationId] = useState<string>('');
-  const [loading, setLoading] = useState(!isNew);
   const [preview, setPreview] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -57,50 +56,42 @@ export function ArticleEditorPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitRequestedRef = useRef(false);
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
+  const { data: publications = [] } = useQuery({
+    queryKey: ['my-publications', user?.id],
+    queryFn: () => getMyPublications(user!.id),
+    enabled: Boolean(user),
+  });
+  const { data: article, isLoading: isArticleLoading } = useQuery({
+    queryKey: ['article', id],
+    queryFn: () => getArticleById(id!),
+    enabled: !isNew && Boolean(id),
+  });
+  const loading = !isNew && isArticleLoading;
   useEffect(() => {
-    getCategories()
-      .then(setCategories)
-      .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    getMyPublications(user.id)
-      .then((pubs) => {
-        setPublications(pubs);
-
-        setPublicationId((current) => {
-          if (current) return current;
-
-          const fallback = pubs.find((p) => p.isDefault) ?? pubs[0];
-          return fallback?.id ?? '';
-        });
-      })
-      .catch(console.error);
-  }, [user]);
-
-  useEffect(() => {
-    if (!isNew && id) {
-      getArticleById(id).then((a) => {
-        if (a) {
-          articleRef.current = a;
-          setFormData({
-            title: a.title,
-            content: a.content,
-            category: a.category,
-            slug: a.slug,
-            coverImage: a.coverImage,
-            status: a.status,
-            publishedAt: a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 16) : ''
-          });
-          setPublicationId(a.publicationId)
-        }
-        setLoading(false);
+    if (article) {
+      articleRef.current = article;
+      setFormData({
+        title: article.title,
+        content: article.content,
+        category: article.category,
+        slug: article.slug,
+        coverImage: article.coverImage,
+        status: article.status,
+        publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString().slice(0, 16) : ''
       });
+      setPublicationId(article.publicationId);
     }
-  }, [id, isNew]);
-
+  }, [article]);
+  useEffect(() => {
+    if (publications.length > 0 && !publicationId) {
+      const fallback = publications.find((p) => p.isDefault) ?? publications[0];
+      setPublicationId(fallback?.id ?? '');
+    }
+  }, [publications, publicationId]);
   const readingTime = useMemo(() => calculateReadingTime(formData.content), [formData.content]);
   const headings = useMemo(
     () => extractHeadings(formData.content), [formData.content]
@@ -126,6 +117,8 @@ export function ArticleEditorPage() {
       if (isNew && !articleRef.current?.id) {
         const created = await createArticle(data);
         articleRef.current = created;
+        queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+        queryClient.invalidateQueries({ queryKey: ['articles'] });
         if (!publicationId) { setPublicationId(created.publicationId); }
         navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } else {
@@ -211,7 +204,8 @@ export function ArticleEditorPage() {
           console.error('Failed to clean up article media:', error);
         }
       }
-
+      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
       navigate('/dashboard');
     } catch (error) {
       console.error('Failed to publish article:', error);
@@ -239,6 +233,8 @@ export function ArticleEditorPage() {
     }
     try {
       await saveArticle();
+      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
       navigate('/dashboard');
     } catch (error) {
       console.error('Failed to save article:', error);
@@ -258,6 +254,7 @@ export function ArticleEditorPage() {
         const created = await createArticle(data);
         articleRef.current = created;
         articleId = created.id;
+        queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
         navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } catch (error) {
         console.error('Failed to auto-save article:', error);
