@@ -153,7 +153,7 @@ export function ArticlePage() {
     <>
       <ArticleProgress />
 
-      <article id="article-content" className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
+      <article className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
           {article.publication && (

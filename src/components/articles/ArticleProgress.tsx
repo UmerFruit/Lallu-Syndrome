@@ -5,15 +5,12 @@ export function ArticleProgress() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const article = document.getElementById('article-content');
-      if (!article) return;
-
-      const rect = article.getBoundingClientRect();
-      const articleTop = rect.top + window.scrollY;
-      const articleHeight = rect.height;
-      const scrollPos = window.scrollY - articleTop;
-      const progressVal = Math.max(0, Math.min(100, (scrollPos / articleHeight) * 100));
-      setProgress(progressVal);
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0) {
+        setProgress(0);
+        return;
+      }
+      setProgress(Math.max(0, Math.min(100, (window.scrollY / maxScroll) * 100)));
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -30,3 +27,4 @@ export function ArticleProgress() {
     </div>
   );
 }
+
