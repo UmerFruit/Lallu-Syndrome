@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
-
+import { Input } from '@/components/ui/Input';
 const passwordSchema = z.object({
   newPassword: z.string().min(1, 'Password is required.').min(6, 'Password must be at least 6 characters long.'),
   confirmPassword: z.string().min(1, 'Please confirm your password.'),
@@ -43,18 +43,8 @@ export function PasswordSettingsPage() {
           </div>
         )}
         <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <div>
-            <label htmlFor="newPassword" className="block text-sm font-medium text-text-primary mb-1.5">New Password</label>
-            <input id="newPassword" type="password" placeholder="••••••••" {...register('newPassword')}
-              className="w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none" />
-            {errors.newPassword && <p className="mt-1.5 text-sm text-red-500">{errors.newPassword.message}</p>}
-          </div>
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-primary mb-1.5">Confirm New Password</label>
-            <input id="confirmPassword" type="password" placeholder="••••••••" {...register('confirmPassword')}
-              className="w-full rounded border border-border-subtle bg-bg px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none" />
-            {errors.confirmPassword && <p className="mt-1.5 text-sm text-red-500">{errors.confirmPassword.message}</p>}
-          </div>
+          <Input label="New Password" isPassword placeholder="••••••••" autoComplete="new-password" {...register('newPassword')} error={errors.newPassword?.message} />
+          <Input label="Confirm New Password" isPassword placeholder="••••••••" autoComplete="new-password" {...register('confirmPassword')} error={errors.confirmPassword?.message} />
         </div>
       </section>
       <Button type="submit" loading={isSubmitting}>Update Password</Button>

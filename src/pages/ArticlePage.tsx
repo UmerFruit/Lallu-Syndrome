@@ -13,6 +13,7 @@ import { ShareButton } from '@/components/interactions/ShareButton';
 import { CommentSection } from '@/components/interactions/CommentSection';
 import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
+import { Avatar } from '@/components/ui/Avatar';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFallbackImage } from '@/utils/image';
@@ -23,17 +24,15 @@ function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
   const inner = (
     <>
       <div className="flex flex-col items-center gap-3">
-        {author.avatar && (
-          <img
-            src={author.avatar}
-            alt={author.name}
-            className="avatar shrink-0 border border-border-subtle bg-elevated"
-          />
-        )}
+        <Avatar
+          src={author.avatar ?? undefined}
+          name={author.name}
+          className="h-16 w-16 border border-border-subtle bg-elevated"
+          fallbackClassName="text-xs font-semibold text-text-primary"
+        />
         <span
-          className={`text-center text-sm font-medium text-text-primary transition-colors ${
-            author.username ? 'link-underline group-hover:text-accent' : ''
-          }`}
+          className={`text-center text-sm font-medium text-text-primary transition-colors ${author.username ? 'link-underline group-hover:text-accent' : ''
+            }`}
         >
           {author.name}
         </span>
@@ -48,10 +47,12 @@ function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
   if (!author.username) {
     return <div className={cardClass}>{inner}</div>;
   }
+
   return (
     <Link
       to={`/writers/${author.username}`}
       className={`${cardClass} group transition-transform duration-200 hover:-translate-y-0.5`}
+      aria-label={`View profile of ${author.name}`}
     >
       {inner}
     </Link>
@@ -61,7 +62,7 @@ function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
 export function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
-  
+
   const [coverImgError, setCoverImgError] = useState(false);
 
   // 1. Data Fetching Queries

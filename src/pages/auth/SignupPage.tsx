@@ -1,58 +1,37 @@
-import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthLayout, AuthLink } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { signup } from '@/services/authService';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const signupSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters.'),
+  email: z.string().trim().min(1, 'Email is required.').pipe(z.email({ message: 'Please enter a valid email address.' })),
+  password: z.string().min(6, 'Password must be at least 6 characters.'),
+  confirmPassword: z.string().min(1, 'Please confirm your password.'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match.',
+  path: ['confirmPassword'],
+});
+
+type SignupForm = z.infer<typeof signupSchema>;
+
 
 export function SignupPage() {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    captcha?: string;
-    form?: string;
-  }>({});
-  const [loading, setLoading] = useState(false);
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<SignupForm>({
+    resolver: zodResolver(signupSchema),
+  });
 
-  const validate = (): boolean => {
-    const e: typeof errors = {};
-    if (!name) e.name = 'Name is required.';
-    else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
-    if (!email) e.email = 'Email is required.';
-    else if (!email.includes('@')) e.email = 'Please enter a valid email address.';
-    if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!confirmPassword) e.confirmPassword = 'Please confirm your password.';
-    else if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    // if (!captchaToken) e.captcha = 'Please complete the captcha verification.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    console.log("I got called 1")
-    if (!validate()) return;
-    setLoading(true);
-    console.log("I got called 2")
+  const onSubmit = async (data: SignupForm) => {
     try {
-      await signup(name, email, password, captchaToken ?? undefined);
+      await signup(data.name, data.email, data.password);
       navigate('/dashboard');
-      console.log("I got called 3")
     } catch (err) {
-      setErrors({ form: err instanceof Error ? err.message : 'Something went wrong.' });
-      console.log("I got called 4")
-    } finally {
-      setLoading(false);
-      console.log("I got called 5")
+      setError('root', { message: err instanceof Error ? err.message : 'Something went wrong.' });
     }
   };
 
@@ -60,64 +39,19 @@ export function SignupPage() {
     <AuthLayout
       title="Create account"
       subtitle="Start writing and publishing on Lallu Syndrome."
-      footer={
-        <>
-          Already have an account? <AuthLink to="/login">Sign in</AuthLink>
-        </>
-      }
+      footer={<>Already have an account? <AuthLink to="/login">Sign in</AuthLink></>}
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {errors.form && (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {errors.root && (
           <div className="rounded border border-accent/30 bg-accent/5 px-3.5 py-2.5 text-sm text-accent">
-            {errors.form}
+            {errors.root.message}
           </div>
         )}
-        <Input
-          label="Name"
-          type="text"
-          name="name"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={errors.name}
-          autoComplete="name"
-          required
-        />
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          autoComplete="email"
-          required
-        />
-        <Input
-          label="Password"
-          isPassword
-          name="password"
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-          required
-        />
-        <Input
-          label="Confirm password"
-          isPassword
-          name="confirmPassword"
-          placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          error={errors.confirmPassword}
-          autoComplete="new-password"
-          required
-        />
-
-        <Button type="submit" className="w-full" loading={loading}>
+        <Input label="Name" type="text" placeholder="Your name" autoComplete="name" {...register('name')} error={errors.name?.message} />
+        <Input label="Email" type="email" placeholder="you@example.com" autoComplete="email" {...register('email')} error={errors.email?.message} />
+        <Input label="Password" isPassword placeholder="At least 6 characters" autoComplete="new-password" {...register('password')} error={errors.password?.message} />
+        <Input label="Confirm password" isPassword placeholder="Re-enter your password" autoComplete="new-password" {...register('confirmPassword')} error={errors.confirmPassword?.message} />
+        <Button type="submit" className="w-full" loading={isSubmitting}>
           Create account
         </Button>
       </form>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, UserX } from 'lucide-react';
-import type {  Publication } from '@/types';
+import type { Publication } from '@/types';
 import { getProfileByUsername } from '@/services/profileService';
 import { getPublishedArticlesByAuthor } from '@/services/articleService';
 import { getMyPublications } from '@/services/publicationService';
@@ -9,6 +9,7 @@ import { PageContainer } from '@/components/layout/Navbar';
 import { ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton, PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
+import { Avatar } from '@/components/ui/Avatar';
 
 export function WriterProfilePage() {
   const { username } = useParams<{ username: string }>();
@@ -98,8 +99,6 @@ export function WriterProfilePage() {
     );
   }
 
-  const initial = profile.display_name.charAt(0).toUpperCase();
-
   return (
     <div className="grain">
       <PageContainer className="py-12 md:py-20">
@@ -116,17 +115,12 @@ export function WriterProfilePage() {
             className="anim-fade-up mt-8 flex justify-center"
             style={{ animationDelay: '0.2s' }}
           >
-            {profile.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name}
-                className="h-32 w-32 rounded-full border-2 border-border bg-elevated object-cover md:h-36 md:w-36"
-              />
-            ) : (
-              <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-border bg-elevated font-serif text-4xl font-medium text-text-muted md:h-36 md:w-36">
-                {initial}
-              </div>
-            )}
+            <Avatar
+              src={profile.avatar_url}
+              name={profile.display_name}
+              className="h-32 w-32 border-2 border-border bg-elevated md:h-36 md:w-36"
+              fallbackClassName="font-serif text-4xl font-medium text-text-muted"
+            />
           </div>
 
           <h1

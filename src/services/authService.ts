@@ -30,13 +30,12 @@ export async function login(email: string, password: string) {
   return data.user;
 }
 
-export async function signup(name: string, email: string, password: string, captchaToken?: string) {
+export async function signup(name: string, email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { name },
-      captchaToken,
     },
   });
   if (error) { throw new Error(error.message); }

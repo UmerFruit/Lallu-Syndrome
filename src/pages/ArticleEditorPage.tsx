@@ -18,7 +18,7 @@ import { TableOfContents, extractHeadings } from '@/components/articles/TableOfC
 import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
@@ -29,6 +29,7 @@ export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
   const isNew = !id || id === 'new';
   const [formData, setFormData] = useState({
     title: '',
@@ -181,6 +182,8 @@ export function ArticleEditorPage() {
       if (isNew && !articleRef.current?.id) {
         const created = await createArticle(data);
         articleRef.current = created;
+        queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+
         navigate('/dashboard');
         return;
       }

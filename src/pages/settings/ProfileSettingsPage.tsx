@@ -7,6 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { uploadAvatar } from '@/services/profileService';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { PageSpinner } from '@/components/ui/Skeleton';
+import { Textarea } from '@/components/ui/Textarea';
+import { useQueryClient } from '@tanstack/react-query';
+import { Avatar } from '@/components/ui/Avatar';
 
 const optionalUrl = z.string().refine(
     (value) => {
@@ -70,6 +74,7 @@ function getErrorMessage(error: unknown): string {
 
 export function ProfileSettingsPage() {
     const { user, profile, isLoading, isProfileLoading, updateProfile } = useAuth();
+    const queryClient = useQueryClient();
     const [uploading, setUploading] = useState(false);
 
     const {
@@ -126,11 +131,7 @@ export function ProfileSettingsPage() {
     const avatarUrl = watch('avatar_url') ?? '';
 
     if (isLoading || isProfileLoading) {
-        return (
-            <div className="flex min-h-[40vh] items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-            </div>
-        );
+        return <PageSpinner />;
     }
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,6 +173,7 @@ export function ProfileSettingsPage() {
                 linkedin_url: normalizeUrl(data.linkedin_url) || null,
             });
             toast.success('Profile saved.');
+            queryClient.invalidateQueries({ queryKey: ['profile'] });
         } catch (error) {
             setError('root', { message: getErrorMessage(error) });
         }
@@ -218,19 +220,12 @@ export function ProfileSettingsPage() {
                     <p className="mb-1.5 block text-sm font-medium text-text-primary">Avatar</p>
 
                     <div className="mt-3 flex flex-col items-start gap-6 sm:flex-row">
-                        {/* Avatar preview */}
-                        {avatarUrl.trim() ? (
-                            <img
-                                src={normalizeUrl(avatarUrl)}
-                                alt="Avatar preview"
-                                className="h-28 w-28 shrink-0 rounded-full border border-border-subtle bg-elevated object-cover sm:h-36 sm:w-36"
-                            />
-                        ) : (
-                            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated text-sm text-text-muted sm:h-36 sm:w-36">
-                                No image
-                            </div>
-                        )}
-
+                        <Avatar
+                            src={avatarUrl.trim() ? normalizeUrl(avatarUrl) : undefined}
+                            name={profile?.display_name ?? 'User'}
+                            className="h-28 w-28 shrink-0 border border-border-subtle bg-elevated sm:h-36 sm:w-36"
+                            fallbackClassName="text-sm text-text-muted"
+                        />
                         {/* Controls */}
                         <div className="flex min-w-0 flex-1 flex-col gap-4">
                             {/* Avatar URL */}
@@ -258,9 +253,8 @@ export function ProfileSettingsPage() {
 
                                     <label
                                         htmlFor="avatar-upload"
-                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${
-                                            uploading ? 'pointer-events-none opacity-50' : ''
-                                        }`}
+                                        className={`inline-flex shrink-0 cursor-pointer items-center rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary transition-colors duration-200 hover:bg-elevated hover:text-accent ${uploading ? 'pointer-events-none opacity-50' : ''
+                                            }`}
                                     >
                                         {uploading ? 'Uploading...' : 'Choose image'}
                                     </label>
@@ -291,25 +285,17 @@ export function ProfileSettingsPage() {
                 </div>
 
                 <div className="mt-6">
-                    <label
-                        htmlFor="bio"
-                        className="mb-1.5 block text-sm font-medium text-text-primary"
-                    >
-                        Bio
-                    </label>
-
-                    <textarea
+                    <Textarea
                         id="bio"
+                        label="Bio"
                         {...register('bio')}
                         placeholder="Write a short bio..."
                         rows={5}
-                        className="w-full resize-y rounded border border-border-subtle bg-bg px-3 py-2 text-base text-text-primary placeholder:text-text-secondary/70 focus:border-accent focus:outline-none sm:text-sm"
+                        error={errors.bio?.message}
                     />
 
                     <div className="mt-1.5 flex items-center justify-between">
-                        {errors.bio?.message ? (
-                            <p className="text-sm text-red-500">{errors.bio.message}</p>
-                        ) : (
+                        {!errors.bio?.message && (
                             <p className="text-xs text-text-secondary">
                                 A short description shown on your profile and articles.
                             </p>

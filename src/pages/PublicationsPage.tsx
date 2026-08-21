@@ -18,7 +18,7 @@ import type { Publication } from '@/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-
+import { Textarea } from '@/components/ui/Textarea';
 
 const publicationSchema = z.object({
     name: z.string().min(1, 'Publication name is required.'),
@@ -168,8 +168,13 @@ export function PublicationsPage() {
                     <Input label="Name" placeholder="My Tech Blog" {...register('name')} error={formErrors.name?.message} />
                     <div>
                         <label htmlFor="publication-description" className="mb-1.5 block text-sm font-medium text-text-secondary">Description</label>
-                        <textarea id="publication-description" placeholder="Optional description" rows={3} {...register('description')}
-                            className="w-full resize-y rounded border border-border bg-surface px-3.5 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none sm:text-sm" />
+                        <Textarea
+                            id="publication-description"
+                            label="Description"
+                            placeholder="Optional description"
+                            rows={3}
+                            {...register('description')}
+                        />
                     </div>
                     <Button type="submit" loading={createMutation.isPending}>
                         <Plus size={16} />

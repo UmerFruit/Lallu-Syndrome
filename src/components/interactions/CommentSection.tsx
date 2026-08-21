@@ -7,6 +7,8 @@ import { relativeTime } from '@/utils/date';
 import type { User } from '@supabase/supabase-js';
 import { Avatar } from '@/components/ui/Avatar';
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { Textarea } from '../ui/Textarea';
 
 type AddCommentInput = { text: string; parentId: string | null };
 type AddCommentMutation = UseMutationResult<Comment, Error, AddCommentInput>;
@@ -102,21 +104,15 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
           <div className="flex gap-3">
             <Avatar src={profile?.avatar_url} name={profile?.display_name ?? user.email ?? 'U'} className="h-9 w-9" />
             <div className="flex-1">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                placeholder="Write a comment..."
-                rows={3}
-                maxLength={1000}
-                className="w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y transition-colors focus:border-accent focus:outline-none" aria-label="Write a comment"
-                disabled={topFormSubmitting}
-              />
+              <Textarea value={content} onChange={(e) => setContent(e.target.value)} 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
+               placeholder="Write a comment..." rows={3} maxLength={1000} aria-label="Write a comment" disabled={topFormSubmitting} />
+
               <div className="flex justify-end mt-2">
                 <button
                   type="submit"
@@ -161,6 +157,7 @@ function CommentItem({
   const queryClient = useQueryClient();
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteComment(comment.id),
@@ -168,6 +165,7 @@ function CommentItem({
       queryClient.setQueryData<Comment[]>(['comments', articleId], (prev) =>
         (prev ?? []).filter((c) => c.id !== comment.id && c.parentId !== comment.id)
       );
+      setShowDeleteModal(false);
     },
     onError: (error) => console.error('Failed to delete comment:', error),
   });
@@ -177,8 +175,7 @@ function CommentItem({
   const submittingReply = addMutation.isPending && addMutation.variables?.parentId === comment.id;
 
   const handleDelete = async () => {
-    if (!confirm('Delete this comment?')) return;
-    deleteMutation.mutate();
+    setShowDeleteModal(true);
   };
 
   const handleReplySubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -194,101 +191,101 @@ function CommentItem({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-3">
-        {comment.avatar ? (
-          <img
-            src={comment.avatar}
-            alt={comment.author}
-            className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-            {comment.author.charAt(0).toUpperCase()}
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          {/* Header with Reply & Delete buttons */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-sm font-medium text-text-primary">
-              {comment.author}
-            </span>
-            <span className="font-mono text-xs text-text-muted">
-              {relativeTime(comment.createdAt)}
-            </span>
-            {user && (
-              <button
-                type="button"
-                onClick={() => setIsReplying(!isReplying)}
-                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
-                {isReplying ? 'Cancel' : 'Reply'}
-              </button>
-            )}
-            {/* DELETE BUTTON */}
-            {canDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
-                aria-label="Delete comment"
-              >
-                {deleteMutation.isPending ? '...' : <Trash2 size={14} />}
-              </button>
-            )}
-          </div>
-
-          {/* Comment Content */}
-          <p className="text-sm text-text-secondary leading-relaxed">
-            {comment.content}
-          </p>
-
-          {/* Inline Reply Form */}
-          {isReplying && (
-            <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
-              <textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                placeholder="Write a reply..."
-                rows={2}
-                maxLength={1000}
-                className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none"
-                disabled={submittingReply}
-                autoFocus
-              />
-              <button
-                type="submit"
-                disabled={!replyContent.trim() || submittingReply}
-                className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send size={14} />
-              </button>
-            </form>
-          )}
-
-          {/* Nested Replies */}
-          {replies.length > 0 && (
-            <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
-              {replies.map((reply) => (
-                <CommentItem
-                  key={reply.id}
-                  comment={reply}
-                  replies={[]}
-                  articleId={articleId}
-                  user={user}
-                  addMutation={addMutation}
-                />
-              ))}
+    <>
+      <div className="space-y-4">
+        <div className="flex gap-3">
+          <Avatar src={comment.avatar} name={comment.author} className="h-9 w-9 shrink-0" fallbackClassName="text-xs" />
+          <div className="flex-1 min-w-0">
+            {/* Header with Reply & Delete buttons */}
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-sm font-medium text-text-primary">
+                {comment.author}
+              </span>
+              <span className="font-mono text-xs text-text-muted">
+                {relativeTime(comment.createdAt)}
+              </span>
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => setIsReplying(!isReplying)}
+                  className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-secondary">
+                  {isReplying ? 'Cancel' : 'Reply'}
+                </button>
+              )}
+              {/* DELETE BUTTON */}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                  className="-my-1 rounded px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                  aria-label="Delete comment"
+                >
+                  {deleteMutation.isPending ? '...' : <Trash2 size={14} />}
+                </button>
+              )}
             </div>
-          )}
+
+            {/* Comment Content */}
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {comment.content}
+            </p>
+
+            {/* Inline Reply Form */}
+            {isReplying && (
+              <form onSubmit={handleReplySubmit} className="mt-3 flex gap-2">
+                <Textarea
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  placeholder="Write a reply..."
+                  rows={2}
+                  maxLength={1000}
+                  className="flex-1 rounded bg-surface border border-border px-3 py-2 text-text-primary placeholder:text-text-muted text-base sm:text-sm resize-y focus:border-accent focus:outline-none"
+                  disabled={submittingReply}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={!replyContent.trim() || submittingReply}
+                  className="inline-flex items-center justify-center p-2 rounded bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send size={14} />
+                </button>
+              </form>
+            )}
+
+            {/* Nested Replies */}
+            {replies.length > 0 && (
+              <div className="mt-4 pl-4 border-l border-border-subtle space-y-4">
+                {replies.map((reply) => (
+                  <CommentItem
+                    key={reply.id}
+                    comment={reply}
+                    replies={[]}
+                    articleId={articleId}
+                    user={user}
+                    addMutation={addMutation}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        title="Delete comment"
+        message="Are you sure you want to delete this comment? This action cannot be undone."
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        onClose={() => setShowDeleteModal(false)}
+      />
+    </>
   );
 }

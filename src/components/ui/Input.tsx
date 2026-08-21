@@ -1,5 +1,6 @@
 import { type InputHTMLAttributes, forwardRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { cn } from '@/utils/cn';
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
@@ -30,7 +31,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             type={inputType}
-            className={`w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm transition-colors duration-200 focus:border-accent focus:outline-none ${error ? 'border-accent' : ''} ${className ?? ''}`} aria-invalid={!!error}
+            className={cn(
+              'w-full rounded bg-surface border border-border px-3.5 py-2.5 text-text-primary placeholder:text-text-muted text-base sm:text-sm transition-colors duration-200 focus:border-accent focus:outline-none',
+              error && 'border-accent',
+              className
+            )}
             aria-describedby={error ? `${inputId}-error` : undefined}
             {...props}
           />
