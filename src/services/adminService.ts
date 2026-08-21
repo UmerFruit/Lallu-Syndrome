@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
+import { deleteArticleMedia } from '@/services/storageService';
 
 export type AdminComment = {
   id: string;
@@ -130,6 +131,19 @@ export async function getAllArticlesAdmin(): Promise<AdminArticle[]> {
 }
 
 export async function adminDeleteArticle(articleId: string): Promise<void> {
+  const { data: article, error: fetchError } = await supabase
+    .from('articles')
+    .select('content, cover_image')
+    .eq('id', articleId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  try {
+    await deleteArticleMedia(article.content, article.cover_image);
+  } catch (error) {
+    console.error('Failed to clean up article media:', error);
+  }
+
   const { error } = await supabase
     .from('articles')
     .delete()

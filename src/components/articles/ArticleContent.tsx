@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
 import DOMPurify from 'dompurify';
-import { slugify, slugifyHeading } from '@/utils/slugify';
+import { slugifyHeading } from '@/utils/slugify';
 
 type ArticleContentProps = {
   content: string;
 };
-
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+   if (data.attrName === 'style' && node.nodeName !== 'IMG') {
+     data.keepAttr = false;
+   }
+ });
 export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
   const finalHtml = useMemo(() => {
     if (!content) return '';

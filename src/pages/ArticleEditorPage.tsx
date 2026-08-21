@@ -19,7 +19,6 @@ import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -55,6 +54,8 @@ export function ArticleEditorPage() {
 
   const articleRef = useRef<Article | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
+
   const exitRequestedRef = useRef(false);
 
   const { data: categories = [] } = useQuery({
@@ -107,35 +108,46 @@ export function ArticleEditorPage() {
   }), [formData, readingTime, publicationId]);
 
   const saveArticle = useCallback(async () => {
-    const data = buildArticleData();
-    const isEmpty = !data.title?.trim() && !data.content?.trim();
-    if (isNew && isEmpty) {
-      setSaveState('idle');
-      return;
-    }
-    setSaveState('saving');
-    try {
-      if (isNew && !articleRef.current?.id) {
-        const created = await createArticle(data);
-        articleRef.current = created;
-        queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
-        queryClient.invalidateQueries({ queryKey: ['articles'] });
-        if (!publicationId) { setPublicationId(created.publicationId); }
-        navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
-      } else {
-        const articleId = articleRef.current?.id ?? id;
-        if (articleId) {
-          const updated = await updateArticle(articleId, data);
-          if (updated) articleRef.current = updated;
-        }
+    if (savePromiseRef.current) return savePromiseRef.current;
+
+    const run = (async () => {
+      const data = buildArticleData();
+      const isEmpty = !data.title?.trim() && !data.content?.trim();
+      if (isNew && isEmpty) {
+        setSaveState('idle');
+        return;
       }
-      setSavedTime(
-        new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-      );
-      setSaveState('saved');
-    } catch (error) {
-      console.error('Failed to save article:', error);
-      setSaveState('idle');
+      setSaveState('saving');
+      try {
+        if (isNew && !articleRef.current?.id) {
+          const created = await createArticle(data);
+          articleRef.current = created;
+          queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+          queryClient.invalidateQueries({ queryKey: ['articles'] });
+          if (!publicationId) { setPublicationId(created.publicationId); }
+          navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
+        } else {
+          const articleId = articleRef.current?.id ?? id;
+          if (articleId) {
+            const updated = await updateArticle(articleId, data);
+            if (updated) articleRef.current = updated;
+          }
+        }
+        setSavedTime(
+          new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        );
+        setSaveState('saved');
+      } catch (error) {
+        console.error('Failed to save article:', error);
+        setSaveState('idle');
+      }
+    })();
+
+    savePromiseRef.current = run;
+    try {
+      await run;
+    } finally {
+      savePromiseRef.current = null;
     }
   }, [buildArticleData, isNew, id, navigate]);
 
@@ -170,6 +182,9 @@ export function ArticleEditorPage() {
       saveTimer.current = null;
     }
 
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+    }
     const data = {
       ...buildArticleData(),
       status: 'published' as ArticleStatus,
@@ -251,6 +266,9 @@ export function ArticleEditorPage() {
     if (!file) return;
     e.target.value = '';
     let articleId = articleRef.current?.id ?? id;
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+    }
     if (isNew && !articleRef.current?.id) {
       try {
         const data = buildArticleData();
