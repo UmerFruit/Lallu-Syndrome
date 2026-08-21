@@ -4,6 +4,7 @@ import type { Article } from '@/types';
 import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
 import { getFallbackImage } from '@/utils/image';
+import { Avatar } from '../ui/Avatar';
 
 type ArticleCardProps = {
   article: Article;
@@ -44,17 +45,7 @@ export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
       
       {/* Author & Date Row */}
       <div className="flex items-center gap-2.5 pt-1">
-        {article.author.avatar ? (
-          <img 
-            src={article.author.avatar} 
-            alt="" 
-            className="w-6 h-6 rounded-full object-cover border border-border-subtle bg-elevated shrink-0" 
-          />
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-elevated border border-border-subtle flex items-center justify-center text-[10px] font-semibold text-text-secondary shrink-0">
-            {article.author.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <Avatar src={article.author.avatar} name={article.author.name} size="md" />
         <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono min-w-0">
           <span className="text-text-secondary font-medium truncate">{article.author.name}</span>
           <span>•</span>

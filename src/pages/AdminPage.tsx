@@ -12,10 +12,11 @@ import {
   adminDeleteComment,
   getAllArticlesAdmin,
   adminDeleteArticle,
-  type AdminProfile,
   type AdminComment,
   type AdminArticle,
 } from '@/services/adminService';
+import type { Profile } from '@/types';
+import { Avatar } from '@/components/ui/Avatar';
 
 type Tab = 'users' | 'comments' | 'articles';
 
@@ -85,7 +86,7 @@ export function AdminPage() {
 
 // ─── Users Tab ───────────────────────────────────────────────
 function UsersTab() {
-  const [profiles, setProfiles] = useState<AdminProfile[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -120,17 +121,7 @@ function UsersTab() {
           className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
         >
           {/* Avatar */}
-          {p.avatar_url ? (
-            <img
-              src={p.avatar_url}
-              alt={p.display_name}
-              className="w-9 h-9 rounded-full object-cover border border-border-subtle"
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary">
-              {p.display_name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <Avatar src={p.avatar_url} name={p.display_name} size="md" />
 
           {/* Info */}
           <div className="flex-1 min-w-0">

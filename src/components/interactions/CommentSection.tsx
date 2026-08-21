@@ -6,6 +6,7 @@ import { getComments, addComment, deleteComment } from '@/services/articleServic
 import { useAuth } from '@/contexts/AuthContext';
 import { relativeTime } from '@/utils/date';
 import type { User } from '@supabase/supabase-js';
+import { Avatar } from '../ui/Avatar';
 
 type CommentSectionProps = {
   articleId: string;
@@ -121,17 +122,7 @@ export function CommentSection({ articleId }: Readonly<CommentSectionProps>) {
       {user ? (
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="flex gap-3">
-            {profile?.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name ?? 'User'}
-                className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-elevated flex items-center justify-center text-sm font-medium text-text-secondary flex-shrink-0">
-                {(profile?.display_name ?? user.email ?? 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
+            <Avatar src={profile?.avatar_url} name={profile?.display_name} size="md" />
             <div className="flex-1">
               <textarea
                 value={content}
