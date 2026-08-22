@@ -101,6 +101,19 @@ const getItems = ({
             },
         },
         {
+            title: 'YouTube Video',
+            description: 'Embed a YouTube video',
+            keywords: ['youtube', 'video', 'embed', 'watch'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .insertContent({ type: 'youtube' })
+                    .run();
+            },
+        },
+        {
             title: 'Bullet List',
             description: 'Create a bulleted list',
             keywords: ['bullet', 'list', 'ul'],

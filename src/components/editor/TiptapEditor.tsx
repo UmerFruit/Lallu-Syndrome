@@ -11,6 +11,7 @@ import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
 import { toast } from 'sonner';
+import { YouTube } from './YouTube';
 
 import {
   Bold,
@@ -135,6 +136,7 @@ export function TiptapEditor({
       }),
       AlignedImage,
       CodeBlock,
+      YouTube,
     ],
 
 

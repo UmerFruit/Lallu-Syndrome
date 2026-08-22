@@ -242,6 +242,9 @@
     opacity: 0;
   }
 }
+.article-prose iframe.youtube-embed {
+  @apply my-6 block w-full aspect-video rounded-card border border-border-subtle;
+}
 
 .anim-blink {
   animation: blink 1.1s steps(1) infinite;

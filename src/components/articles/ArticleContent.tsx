@@ -5,18 +5,30 @@ import { slugifyHeading } from '@/utils/slugify';
 type ArticleContentProps = {
   content: string;
 };
-DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
-   if (data.attrName === 'style' && node.nodeName !== 'IMG') {
-     data.keepAttr = false;
-   }
- });
+
 export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
   const finalHtml = useMemo(() => {
     if (!content) return '';
 
     const sanitized = DOMPurify.sanitize(content, {
       USE_PROFILES: { html: true },
-      ADD_ATTR: ['target', 'rel', 'class', 'style', 'data-width', 'data-alignment'],
+      ADD_TAGS: ['iframe'],
+      ADD_ATTR: [
+        'target', 'rel', 'class', 'style', 'data-width', 'data-alignment',
+        'src', 'frameborder', 'allow', 'allowfullscreen', 'title', 'loading', 'referrerpolicy',
+      ],
+    });  
+
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+      if (node.tagName === 'IFRAME') {
+        const src = node.getAttribute('src') || '';
+        const isYouTube = /^https:\/\/(www\.)?(youtube\.com|youtube-nocookie\.com)\/embed\/[a-zA-Z0-9_-]+/.test(src);
+        if (!isYouTube) {
+          node.remove();
+        } else {
+          node.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        }
+      }
     });
 
     const parsedDoc = new DOMParser().parseFromString(sanitized, 'text/html');
@@ -44,9 +56,9 @@ export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
       heading.id = slugifyHeading(text, usedIds);
       heading.classList.add('scroll-mt-20');
     });
-   
+
     return parsedDoc.body.innerHTML;
-  }, [content]); 
+  }, [content]);
 
   return (
     <div
