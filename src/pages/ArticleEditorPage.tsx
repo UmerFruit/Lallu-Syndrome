@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense, Component } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import type { Article, ArticleStatus } from '@/types';
@@ -22,6 +22,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
+class StrandsErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() { return this.state.hasError ? null : this.props.children; }
+}
+
 type SaveState = 'idle' | 'saving' | 'saved';
 
 export function ArticleEditorPage() {
@@ -29,7 +35,9 @@ export function ArticleEditorPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
-  const isNew = !id || id === 'new';
+  const initialId = id && id !== 'new' ? id : null;
+  const [articleId, setArticleId] = useState<string | null>(initialId);
+  const isNew = !articleId;
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -49,6 +57,7 @@ export function ArticleEditorPage() {
 
   type FormField = keyof typeof formData;
   const handleChange = (field: FormField, value: string) => {
+    isDirtyRef.current = true;
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -57,6 +66,9 @@ export function ArticleEditorPage() {
   const savePromiseRef = useRef<Promise<void> | null>(null);
 
   const exitRequestedRef = useRef(false);
+  const hydratedIdRef = useRef<string | null>(null);
+  const isDirtyRef = useRef(false);
+  const [isHydrated, setIsHydrated] = useState(!initialId);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -68,26 +80,44 @@ export function ArticleEditorPage() {
     enabled: Boolean(user),
   });
   const { data: article, isLoading: isArticleLoading } = useQuery({
-    queryKey: ['article', id],
-    queryFn: () => getArticleById(id!),
-    enabled: !isNew && Boolean(id),
+    queryKey: ['article', initialId],
+    queryFn: () => getArticleById(initialId!),
+    enabled: Boolean(initialId),
   });
-  const loading = !isNew && isArticleLoading;
+  const loading = Boolean(initialId) && isArticleLoading;
   useEffect(() => {
-    if (article) {
-      articleRef.current = article;
-      setFormData({
-        title: article.title,
-        content: article.content,
-        category: article.category,
-        slug: article.slug,
-        coverImage: article.coverImage,
-        status: article.status,
-        publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString().slice(0, 16) : ''
-      });
-      setPublicationId(article.publicationId);
+    if (article && initialId) {
+      if (hydratedIdRef.current !== initialId) {
+        hydratedIdRef.current = initialId;
+        articleRef.current = article;
+        setFormData({
+          title: article.title,
+          content: article.content,
+          category: article.category,
+          slug: article.slug,
+          coverImage: article.coverImage,
+          status: article.status,
+          publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString().slice(0, 16) : ''
+        });
+        setPublicationId(article.publicationId);
+        setIsHydrated(true);
+      } else if (!isDirtyRef.current) {
+        if (article.content !== formData.content || article.title !== formData.title) {
+          articleRef.current = article;
+          setFormData({
+            title: article.title,
+            content: article.content,
+            category: article.category,
+            slug: article.slug,
+            coverImage: article.coverImage,
+            status: article.status,
+            publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString().slice(0, 16) : ''
+          });
+          setPublicationId(article.publicationId);
+        }
+      }
     }
-  }, [article]);
+  }, [article, initialId]);
   useEffect(() => {
     if (publications.length > 0 && !publicationId) {
       const fallback = publications.find((p) => p.isDefault) ?? publications[0];
@@ -122,17 +152,25 @@ export function ArticleEditorPage() {
         if (isNew && !articleRef.current?.id) {
           const created = await createArticle(data);
           articleRef.current = created;
+          setArticleId(created.id);
+          navigate(`/dashboard/articles/${created.id}`, { replace: true });
+          queryClient.setQueryData(['article', created.id], created);
           queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
           queryClient.invalidateQueries({ queryKey: ['articles'] });
           if (!publicationId) { setPublicationId(created.publicationId); }
-          navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
+
         } else {
-          const articleId = articleRef.current?.id ?? id;
-          if (articleId) {
-            const updated = await updateArticle(articleId, data);
-            if (updated) articleRef.current = updated;
+          const currentId = articleRef.current?.id ?? articleId;
+          if (currentId) {
+            const updated = await updateArticle(currentId, data);
+            if (updated) {
+              articleRef.current = updated;
+              queryClient.setQueryData(['article', currentId], updated);
+              queryClient.invalidateQueries({ queryKey: ['article', currentId] });
+            }
           }
         }
+        isDirtyRef.current = false;
         setSavedTime(
           new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         );
@@ -162,6 +200,16 @@ export function ArticleEditorPage() {
       }
     };
   }, [formData, saveArticle, loading]);
+  // Add this new useEffect right after the autosave useEffect
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
 
   const handlePublish = async () => {
     if (publishingRef.current) return;
@@ -197,6 +245,8 @@ export function ArticleEditorPage() {
       if (isNew && !articleRef.current?.id) {
         const created = await createArticle(data);
         articleRef.current = created;
+        setArticleId(created.id);
+        queryClient.setQueryData(['article', created.id], created);
         queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
 
         navigate('/dashboard');
@@ -251,6 +301,10 @@ export function ArticleEditorPage() {
     }
     try {
       await saveArticle();
+      const targetId = articleRef.current?.id ?? articleId;
+      if (targetId) {
+        queryClient.invalidateQueries({ queryKey: ['article', targetId] });
+      }
       queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['articles'] });
       navigate('/dashboard');
@@ -274,9 +328,11 @@ export function ArticleEditorPage() {
         const data = buildArticleData();
         const created = await createArticle(data);
         articleRef.current = created;
+        setArticleId(created.id);
         articleId = created.id;
+        navigate(`/dashboard/articles/${created.id}`, { replace: true });
+        queryClient.setQueryData(['article', created.id], created);
         queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
-        navigate(`/dashboard/articles/${created.id}/edit`, { replace: true });
       } catch (error) {
         console.error('Failed to auto-save article:', error);
         toast.error('Failed to save article. Please try again.');
@@ -325,7 +381,7 @@ export function ArticleEditorPage() {
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   const maxDateTime = now.toISOString().slice(0, 16);
 
-  if (loading) {
+  if (loading || (initialId && !isHydrated)) {
     return <PageSpinner />;
   }
 
@@ -341,26 +397,28 @@ export function ArticleEditorPage() {
         >
           <div className="relative w-full h-[600px]">
             <Suspense fallback={null}>
-              <Strands
-                colors={["#ff0000", "#000000", "#4500ff"]}
-                count={3}
-                speed={0.7}
-                amplitude={0.5}
-                waviness={1.6}
-                thickness={3}
-                glow={0.8}
-                taper={4.4}
-                spread={1}
-                intensity={0.1}
-                saturation={1.75}
-                opacity={1}
-                scale={0.6}
-                glass={false}
-                refraction={1}
-                dispersion={1}
-                glassSize={1}
-                hueShift={0}
-              />
+              <StrandsErrorBoundary>
+                <Strands
+                  colors={["#ff0000", "#000000", "#4500ff"]}
+                  count={3}
+                  speed={0.7}
+                  amplitude={0.5}
+                  waviness={1.6}
+                  thickness={3}
+                  glow={0.8}
+                  taper={4.4}
+                  spread={1}
+                  intensity={0.1}
+                  saturation={1.75}
+                  opacity={1}
+                  scale={0.6}
+                  glass={false}
+                  refraction={1}
+                  dispersion={1}
+                  glassSize={1}
+                  hueShift={0}
+                />
+              </StrandsErrorBoundary>
             </Suspense>
           </div>
         </div>

@@ -86,7 +86,7 @@ export function DashboardPage() {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <Link
-                to={`/dashboard/articles/${article.id}/edit`}
+                to={`/dashboard/articles/${article.id}`}
                 className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
                 aria-label="Edit article"
               >
