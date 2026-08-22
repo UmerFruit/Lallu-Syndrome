@@ -7,18 +7,17 @@ import { getCategories } from '@/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import { ArticleContent } from '@/components/articles/ArticleContent';
 import { upload, cleanupArticleContentMedia, deleteCoverImage } from '@/services/storageService';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   X, Check, ImagePlus,
 } from 'lucide-react';
-import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArticleView } from '@/components/articles/ArticleView'; // ⬅️ NEW IMPORT
+
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -125,9 +124,6 @@ export function ArticleEditorPage() {
     }
   }, [publications, publicationId]);
   const readingTime = useMemo(() => calculateReadingTime(formData.content), [formData.content]);
-  const headings = useMemo(
-    () => extractHeadings(formData.content), [formData.content]
-  );
 
   const buildArticleData = useCallback((): Partial<Article> => ({
     ...formData,
@@ -347,10 +343,10 @@ export function ArticleEditorPage() {
       }
       const result = await upload(articleId, file, 'cover');
       handleChange('coverImage', result.publicUrl);
-    } catch (error : any) {
+    } catch (error: any) {
       console.error('Failed to upload cover image:', error);
       toast.error(error.message || 'Failed to upload cover image. Please try again.');
-      
+
     } finally {
       setSaveState('idle');
     }
@@ -383,6 +379,29 @@ export function ArticleEditorPage() {
   if (loading || (initialId && !isHydrated)) {
     return <PageSpinner />;
   }
+  const previewArticle = {
+    id: articleId || 'preview',
+    title: formData.title || 'Untitled',
+    content: formData.content || '',
+    category: formData.category,
+    coverImage: formData.coverImage,
+    readingTime,
+    publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    author: {
+      id: user?.id || '',
+      name: profile?.display_name || 'Author',
+      username: profile?.username || '',
+      avatar: profile?.avatar_url || '',
+      bio: profile?.bio || ''
+    },
+    publication: publications.find(p => p.id === publicationId) || undefined,
+    likes: 0,
+    comments: 0,
+    status: formData.status,
+    slug: formData.slug,
+    publicationId: publicationId || undefined
+  } as unknown as Article;
 
   return (
     <div>
@@ -571,48 +590,13 @@ export function ArticleEditorPage() {
 
       {/* Main Content */}
       {preview ? (
-        <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
-          <div className="flex items-center gap-3 mb-4">
-            <Badge variant="accent">{formData.category}</Badge>
-            <span className="font-mono text-xs text-text-muted">
-              {readingTime} min read
-            </span>
-          </div>
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
-            {formData.title || 'Untitled'}
-          </h1>
-          <div className="flex items-center gap-3 mb-8">
-            {profile?.avatar_url && (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name ?? 'Author'}
-                className="w-9 h-9 rounded-full"
-              />
-            )}
-            <span className="text-sm font-medium text-text-primary">
-              {profile?.display_name ?? 'Author'}
-            </span>
-          </div>
-          {formData.coverImage && (
-            <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
-              <img
-                src={formData.coverImage}
-                alt={formData.title}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            </div>
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px] gap-12">
-            <article className="min-w-0">
-              <ArticleContent
-                content={formData.content || 'Nothing written yet.'}
-              />
-            </article>
-            <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-              <TableOfContents headings={headings} />
-            </div>
-          </div>
-        </div>
+        // ⬇️ REPLACED PREVIEW BLOCK WITH SHARED COMPONENT
+        <ArticleView
+          article={previewArticle}
+          showInteractions={false}
+          showRelated={false}
+          showBackLink={false}
+        />
       ) : (
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">
