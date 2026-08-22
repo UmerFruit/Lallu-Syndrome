@@ -82,15 +82,14 @@ export function CreatorPage() {
           </div>
 
           {/* Statement */}
-          <div className="anim-fade-up mt-14 md:mt-20" style={{ animationDelay: '1.55s' }}>
-            <p className="font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
+          <div className="anim-fade-up mt-14 md:mt-20 text-center"  style={{ animationDelay: '1.55s' }}>
+            <p className="font-serif text-xl leading-relaxed  text-text-primary md:text-2xl">
               I build in public<span className="text-accent">.</span>
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-text-secondary">
+            <p className="mt-4 text-sm leading-relaxed text-text-secondary ">
               Lallu Syndrome is my personal diary as much as it is a publication.
-              The database schema, the editor, and the animations on this page
-              are all handcrafted. It is a personal project, not affiliated
-              with any company or organization.
+              It is a personal project, not affiliated with any company or organization.
+              Hope you like it and contribute to it in any way you can. I am always open to feedback and suggestions.
             </p>
             <Link
               to="/about"
@@ -100,16 +99,6 @@ export function CreatorPage() {
               <ArrowRight size={13} className="anim-arrow" />
             </Link>
           </div>
-
-          {/* Colophon */}
-          <footer
-            className="anim-fade-up mt-16 md:mt-24 border-t border-border-subtle pt-6"
-            style={{ animationDelay: '1.7s' }}
-          >
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
-              React · TypeScript · Tailwind · Supabase
-            </p>
-          </footer>
         </div>
       </PageContainer>
     </div>

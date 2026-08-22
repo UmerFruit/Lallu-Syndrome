@@ -1,6 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 import { deleteArticleMedia } from '@/services/storageService';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
+export type AdminProfile = Profile & {
+  last_sign_in_at: string | null;
+};
 
 export type AdminComment = {
   id: string;
@@ -27,14 +32,21 @@ export type AdminArticle = {
 };
 
 // ─── Users ───────────────────────────────────────────────────
-export async function getAllProfiles(): Promise<Profile[]> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data as Profile[];
+export async function getAllProfiles(): Promise<AdminProfile[]> {
+  const { data, error } = await supabase.functions.invoke('get-users-admin');
+  if (error) {
+    let message = 'Failed to fetch users.';
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch {
+        console.error('Failed to parse error response from get-users-admin function:', error);
+      }
+    }
+    throw new Error(message);
+  }
+  return (data?.users ?? []) as AdminProfile[];
 }
 
 export async function updateUserAdminStatus(
@@ -150,4 +162,22 @@ export async function adminDeleteArticle(articleId: string): Promise<void> {
     .eq('id', articleId);
 
   if (error) throw error;
+}
+// ─── Delete User ─────────────────────────────────────────
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-user', {
+    body: { userId },
+  });
+  if (error) {
+    let message = 'Failed to delete user.';
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch {
+        console.error('Failed to parse error response from delete-user function:', error);
+      }
+    }
+    throw new Error(message);
+  }
 }

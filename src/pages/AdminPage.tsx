@@ -4,6 +4,10 @@ import { Trash2, Shield, MessageSquare, FileText, Users, ArrowLeft } from 'lucid
 import { PageContainer } from '@/components/layout/Navbar';
 import { formatDate, relativeTime } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Profile } from '@/types';
+import { toast } from 'sonner';
+
 import {
   getAllProfiles,
   updateUserAdminStatus,
@@ -13,6 +17,7 @@ import {
   adminDeleteArticle,
   type AdminComment,
   type AdminArticle,
+  adminDeleteUser,
 } from '@/services/adminService';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
@@ -82,6 +87,8 @@ export function AdminPage() {
 // ─── Users Tab ───────────────────────────────────────────────
 function UsersTab() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const [userToDelete, setUserToDelete] = useState<Profile | null>(null);
 
   const { data: profiles = [], isLoading: loading } = useQuery({
     queryKey: ['admin-profiles'],
@@ -97,33 +104,52 @@ function UsersTab() {
     onError: (error) => console.error('Failed to update admin status:', error),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: adminDeleteUser,
+    onSuccess: () => {
+      // Deleting a user also removes their articles, comments, and likes
+      queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-articles'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-comments'] });
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
+      setUserToDelete(null);
+      toast.success('User deleted.');
+    },
+    onError: (error) => {
+      console.error('Failed to delete user:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete user.');
+    },
+  });
+
   if (loading) return <LoadingSkeleton rows={5} />;
 
   return (
     <div className="space-y-2">
       {profiles.map((p) => {
         const isUpdating = toggleMutation.isPending && toggleMutation.variables?.userId === p.id;
-
+        const isSelf = p.id === currentUser?.id;
         return (
           <div
             key={p.id}
             className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface"
           >
-            {/* Avatar */}
             <Avatar src={p.avatar_url} name={p.display_name} className="h-9 w-9 border border-border-subtle" />
 
-            {/* Info */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text-primary truncate">
                 {p.display_name}
+                {isSelf && <span className="ml-2 font-mono text-xs text-text-muted">(you)</span>}
               </p>
               <p className="text-xs text-text-muted truncate">
                 {p.username ? `@${p.username}` : p.id.slice(0, 8)}
                 {' · '}Joined {formatDate(p.created_at)}
+                {' · '}
+                {p.last_sign_in_at
+                  ? `Last seen ${relativeTime(p.last_sign_in_at)}`
+                  : 'Never signed in'}
               </p>
             </div>
 
-            {/* Role Selector */}
             <select
               value={p.is_admin ? 'admin' : 'user'}
               onChange={(e) => toggleMutation.mutate({ userId: p.id, isAdmin: e.target.value === 'admin' })}
@@ -134,13 +160,31 @@ function UsersTab() {
               <option value="admin">admin</option>
             </select>
 
-            {/* Role Badge */}
             <Badge variant={p.is_admin ? 'accent' : 'muted'}>
               {p.is_admin ? 'admin' : 'user'}
             </Badge>
+
+            <button
+              type="button"
+              onClick={() => setUserToDelete(p)}
+              disabled={isSelf || deleteMutation.isPending}
+              className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label={`Delete user ${p.display_name}`}
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
         );
       })}
+
+      <ConfirmationModal
+        isOpen={Boolean(userToDelete)}
+        title="Delete User"
+        message={`Permanently delete "${userToDelete?.display_name}" and all of their articles? This cannot be undone.`}
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => userToDelete && deleteMutation.mutate(userToDelete.id)}
+        onClose={() => setUserToDelete(null)}
+      />
     </div>
   );
 }
