@@ -42,8 +42,12 @@ export function ArticleCard({ article }: Readonly<ArticleCardProps>) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="accent">{article.category}</Badge>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted truncate max-w-[120px]" title={article.publication.name}>
+          {article.publication.name}
+        </span>
+
         <span className="font-mono text-xs text-text-muted">{article.readingTime} min read</span>
       </div>
 

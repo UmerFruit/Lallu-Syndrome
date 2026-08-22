@@ -6,12 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer } from '@/components/layout/Navbar';
 import { formatDate } from '@/utils/date';
 import { Badge } from '@/components/ui/Badge';
-import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, EyeIcon } from 'lucide-react';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export function DashboardPage() {
-  const { user,profile } = useAuth();
+  const { user, profile } = useAuth();
   const [tab, setTab] = useState<'published' | 'drafts'>('published');
 
   // Modal State
@@ -68,13 +68,16 @@ export function DashboardPage() {
           >
             <div className="flex-1 min-w-0">
               <Link
-                to={`/articles/${article.slug}`}
+                to={`/dashboard/articles/${article.id}`}
                 className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1"
               >
                 {article.title}
               </Link>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Badge variant="muted">{article.category}</Badge>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted truncate max-w-[120px]" title={article.publication.name}>
+                  {article.publication.name}
+                </span>
                 <span className="font-mono text-xs text-text-muted">
                   {article.publishedAt && formatDate(article.publishedAt)}
                 </span>
@@ -86,11 +89,12 @@ export function DashboardPage() {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <Link
-                to={`/dashboard/articles/${article.id}`}
+
+                to={`/articles/${article.slug}`}
                 className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
-                aria-label="Edit article"
+                aria-label="Preview article"
               >
-                <Pencil size={16} />
+                <EyeIcon size={16} />
               </Link>
               <button
                 type="button"

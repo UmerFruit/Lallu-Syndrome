@@ -112,6 +112,7 @@ Deno.serve(async (req: Request) => {
         excerpt: createExcerpt(fullArticle.content),
         category: category?.name ?? "Uncategorized",
         author: author?.display_name ?? "Unknown",
+        authorAvatar: author?.avatar_url ?? null,
         publishedAt: fullArticle.published_at,
         readingTime: fullArticle.reading_time,
       };
@@ -166,6 +167,7 @@ async function reindexAll() {
       excerpt: createExcerpt(article.content),
       category: category?.name ?? "Uncategorized",
       author: author?.display_name ?? "Unknown",
+      authorAvatar: author?.avatar_url ?? null,
       publishedAt: article.published_at,
       readingTime: article.reading_time,
     };

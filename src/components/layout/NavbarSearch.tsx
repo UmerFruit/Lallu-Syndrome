@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { liteClient as algoliasearch } from 'algoliasearch/lite';
+import { Avatar } from '@/components/ui/Avatar';
 import {
   Configure,
   Highlight,
@@ -19,6 +20,7 @@ type ArticleSearchHit = BaseHit & {
   excerpt: string;
   category: string;
   author: string;
+  authorAvatar?: string | null;
   readingTime: number;
   publishedAt: string;
 };
@@ -105,9 +107,15 @@ function SearchModal({
             <Highlight hit={hit} attribute="excerpt" />
           </span>
         ) : null}
-        <span className="mt-2 block font-mono text-[10px] uppercase tracking-wider text-text-muted">
-          {hit.category} · {hit.readingTime} min read
-        </span>
+
+        <div className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+          <Avatar src={hit.authorAvatar ?? undefined} name={hit.author} className="h-4 w-4 shrink-0" fallbackClassName="text-[8px]" />
+          <span className="normal-case tracking-normal text-text-secondary text-xs truncate max-w-[100px]">{hit.author}</span>
+          <span className="shrink-0">·</span>
+          <span className="truncate">{hit.category}</span>
+          <span className="shrink-0">·</span>
+          <span className="shrink-0">{hit.readingTime} min read</span>
+        </div>
       </button>
     ));
   };
@@ -122,7 +130,7 @@ function SearchModal({
         onClick={onClose}
         aria-hidden="true"
       />
-      
+
       {/* Modal */}
       <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl animate-slide-up">
         {/* Search Input Area */}
@@ -193,7 +201,7 @@ export function NavbarSearch() {
       >
         <Search size={18} />
       </button>
-      
+
       <InstantSearch
         searchClient={searchClient}
         indexName="articles"

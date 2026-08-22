@@ -6,8 +6,8 @@
   "ignore": {
     "customPatterns": [
       "supabase/.temp/**",
-      "components/ui/Strands.tsx",
-      "components/ui/ParticleText.tsx",
+      "src/components/ui/Strands.tsx",
+      "src/components/ui/ParticleText.tsx",
       ".bolt/**",
       ".env",
       "package-lock.json"
