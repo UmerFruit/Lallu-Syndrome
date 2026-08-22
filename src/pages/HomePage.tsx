@@ -88,7 +88,7 @@ export function HomePage() {
         ) : (
           <Suspense fallback={null}>
             <ParticleText
-              text="Lallu Syndrome DEV MODE"
+              text="Lallu Syndrome"
               particleSize={isMobile ? 1 : 2.3}
               density={isMobile ? 2 : 4}
               scatter={isMobile ? 100 : 190}
