@@ -64,12 +64,12 @@ export function DashboardPage() {
         {displayed.map((article) => (
           <div
             key={article.id}
-            className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface hover:border-border transition-colors duration-200 group"
+            className="relative flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface hover:border-border transition-colors duration-200 group"
           >
             <div className="flex-1 min-w-0">
               <Link
                 to={`/dashboard/articles/${article.id}`}
-                className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1"
+                className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1 before:absolute before:inset-0"
               >
                 {article.title}
               </Link>
@@ -87,9 +87,9 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            {/* ADDED: `relative z-10` so buttons stay clickable on top of the stretched link */}
+            <div className="relative z-10 flex items-center gap-2 flex-shrink-0">
               <Link
-
                 to={`/articles/${article.slug}`}
                 className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
                 aria-label="Preview article"
