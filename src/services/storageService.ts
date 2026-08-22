@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-
+import {optimizeForUpload} from '@/utils/compression';
 const BUCKET = 'media';
 
 export interface StorageUploadResult {
@@ -52,7 +52,7 @@ export async function cleanupArticleContentMedia(
   }
 }
 export async function upload(articleId: string, file: File, type: 'cover' | 'content'): Promise<StorageUploadResult> {
-
+  file = await optimizeForUpload(file); 
   const MAX_CONTENT_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 

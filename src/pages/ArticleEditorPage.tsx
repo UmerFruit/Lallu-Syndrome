@@ -347,9 +347,10 @@ export function ArticleEditorPage() {
       }
       const result = await upload(articleId, file, 'cover');
       handleChange('coverImage', result.publicUrl);
-    } catch (error) {
+    } catch (error : any) {
       console.error('Failed to upload cover image:', error);
-      toast.error('Failed to upload cover image. Please try again.');
+      toast.error(error.message || 'Failed to upload cover image. Please try again.');
+      
     } finally {
       setSaveState('idle');
     }
@@ -370,8 +371,6 @@ export function ArticleEditorPage() {
       return result.publicUrl;
     } catch (error: any) {
       console.error('Content image upload failed:', error);
-      // If your service throws "Image must be under 5 MB.", it will be printed right here!
-      toast.error(error.message || 'Failed to upload image. Please try again.');
       throw error;
     }
   };

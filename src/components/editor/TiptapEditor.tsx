@@ -90,9 +90,9 @@ export function TiptapEditor({
             alt: file.name,
           })
           .run();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to upload image:', error);
-        toast.error('Failed to upload image. Please try again.');
+        toast.error(error.message || 'Failed to upload image. Please try again.');
       } finally {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -192,9 +192,9 @@ export function TiptapEditor({
                   },
                 })
                 .run();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Failed to upload pasted image:', error);
-              toast.error('Failed to upload image. Please try again.');
+              toast.error(error.message || 'Failed to upload pasted image. Please try again.'); // ✅ FIXED
             }
           })();
 
@@ -359,8 +359,8 @@ export function TiptapEditor({
         options={{ placement: 'top', offset: 8 }}
       >
         <div
-          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg" 
-          onMouseDown={(e) => e.preventDefault()}> 
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}>
 
           {textToolbarButtons.map(({ key, icon: Icon, title, isActive, run }) => (
             <button
