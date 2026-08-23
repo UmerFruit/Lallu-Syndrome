@@ -53,6 +53,7 @@ type TiptapEditorProps = {
   value: string;
   onChange: (html: string) => void;
   onImageUpload: (file: File) => Promise<string>;
+  articleId?: string | null;
 };
 function isDirectImageUrl(value: string): boolean {
   try {
@@ -66,7 +67,8 @@ function isDirectImageUrl(value: string): boolean {
 export function TiptapEditor({
   value,
   onChange,
-  onImageUpload
+  onImageUpload,
+  articleId = null
 }: Readonly<TiptapEditorProps>) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -248,24 +250,31 @@ export function TiptapEditor({
           if (!editor) return true;
 
           // Process HTML synchronously to get the content and the list of images
-          const { html: processedHtml, images } = processPastedHtml(pastedHtml);
+          const { html: processedHtml, images } = processPastedHtml(pastedHtml, articleId);
 
           // FIX: Let Tiptap parse the HTML string directly. 
           // This safely handles the schema and replaces active text selections.
           editor.chain().focus().insertContent(processedHtml).run();
 
           void (async () => {
+            const uploadedUrls = new Map<string, string>();
             for (const img of images) {
               try {
-                const response = await fetch(img.originalSrc);
-                if (!response.ok) continue;
-                const blob = await response.blob();
-                if (!blob.type.startsWith('image/')) continue;
+                let url = uploadedUrls.get(img.originalSrc);
 
-                const extension = blob.type.split('/')[1]?.split('+')[0] || 'png';
-                const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
-                const url = await onImageUpload(file);
+                if (!url) {
+                  const response = await fetch(img.originalSrc);
+                  if (!response.ok) continue;
 
+                  const blob = await response.blob();
+                  if (!blob.type.startsWith('image/')) continue;
+
+                  const extension = blob.type.split('/')[1]?.split('')[0] || 'png';
+                  const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+
+                  url = await onImageUpload(file);
+                  uploadedUrls.set(img.originalSrc, url);
+                }
                 // Find the image node by its original src and update it
                 editor.chain().command(({ tr }) => {
                   let updated = false;
@@ -279,7 +288,7 @@ export function TiptapEditor({
                   return updated;
                 }).run();
               } catch (error) {
-                console.error(`Failed to process pasted image:`, error);
+                console.error('Failed to process pasted image:', error);
                 toast.error('Failed to process pasted image. Please try again.');
               }
             }

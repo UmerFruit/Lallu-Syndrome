@@ -19,23 +19,36 @@ export type PastedImage = {
   originalSrc: string;
 };
 
-export function processPastedHtml(html: string): { html: string; images: PastedImage[] } {
+export function processPastedHtml(
+  html: string,
+  currentArticleId?: string | null
+): { html: string; images: PastedImage[] } {
   const normalizedHtml = normalizeHtml(html);
   const parsedDoc = new DOMParser().parseFromString(normalizedHtml, 'text/html');
   const images = Array.from(parsedDoc.querySelectorAll('img'));
   const imagesToUpload: PastedImage[] = [];
+  const mediaPrefix = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media/`;
 
   images.forEach((image) => {
     const src = image.getAttribute('src');
     if (!src) { return; }
 
-    // if already stored in our Supabase bucket. Don't re-upload.
-    if (src.includes('/storage/v1/object/public/media/')) { return; }
-
-    imagesToUpload.push({ originalSrc: src });
     image.removeAttribute('srcset');
     image.removeAttribute('sizes');
 
+    if (src.includes('/storage/v1/object/public/media/')) {
+      if (src.startsWith(mediaPrefix)) {
+        const path = src.slice(mediaPrefix.length).split('?')[0];
+        const parts = path.split('/');
+
+        if (parts[0] === 'articles') {
+          if (currentArticleId && parts[1] === currentArticleId) { return; }
+          imagesToUpload.push({ originalSrc: src });
+        }
+      }
+      return;
+    }
+  imagesToUpload.push({ originalSrc: src });
   })
   return { html: parsedDoc.body.innerHTML, images: imagesToUpload };
 }

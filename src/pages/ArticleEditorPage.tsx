@@ -68,6 +68,7 @@ export function ArticleEditorPage() {
   const exitRequestedRef = useRef(false);
   const hydratedIdRef = useRef<string | null>(null);
   const isDirtyRef = useRef(false);
+  const ensureArticlePromiseRef = useRef<Promise<string> | null>(null);
   const formDataVersionRef = useRef(0);
   const saveArticleRef = useRef<(() => Promise<void>) | null>(null);
   const [isHydrated, setIsHydrated] = useState(!initialId);
@@ -139,7 +140,55 @@ export function ArticleEditorPage() {
     publicationId: publicationId || undefined,
     publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
   }), [formData, readingTime, publicationId]);
+  const ensureArticleId = useCallback(async (): Promise<string> => {
+    const existing = articleRef.current?.id ?? (articleId && articleId !== 'new' ? articleId : null);
 
+    if (existing) {
+      return existing;
+    }
+
+    if (ensureArticlePromiseRef.current) {
+      return ensureArticlePromiseRef.current;
+    }
+
+    const promise = (async () => {
+      if (savePromiseRef.current) {
+        await savePromiseRef.current.catch(() => { });
+      }
+
+      const recheck = articleRef.current?.id ?? (articleId && articleId !== 'new' ? articleId : null);
+
+      if (recheck) {
+        return recheck;
+      }
+
+      const data = buildArticleData();
+      const created = await createArticle(data);
+
+      articleRef.current = created;
+      hydratedIdRef.current = created.id;
+
+      setArticleId(created.id);
+      navigate(`/dashboard/articles/${created.id}`, { replace: true });
+
+      queryClient.setQueryData(['article', created.id], created);
+      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+
+      if (!publicationId) {
+        setPublicationId(created.publicationId);
+      }
+
+      return created.id;
+    })();
+
+    ensureArticlePromiseRef.current = promise;
+
+    try {
+      return await promise;
+    } finally {
+      ensureArticlePromiseRef.current = null;
+    }
+  }, [articleId, buildArticleData, navigate, publicationId, queryClient, user?.id]);
   const saveArticle = useCallback(async () => {
     if (savePromiseRef.current) return savePromiseRef.current;
 
@@ -194,14 +243,6 @@ export function ArticleEditorPage() {
       await run;
     } finally {
       savePromiseRef.current = null;
-      if (!exitRequestedRef.current && isDirtyRef.current) {
-        if (saveTimer.current) {
-          clearTimeout(saveTimer.current);
-        }
-        saveTimer.current = setTimeout(() => {
-          void saveArticleRef.current?.();
-        }, 500);
-      }
     }
   }, [buildArticleData, isNew, id, navigate]);
   useEffect(() => {
@@ -403,17 +444,10 @@ export function ArticleEditorPage() {
   };
 
   const uploadContentImage = async (file: File): Promise<string> => {
-    const articleId = articleRef.current?.id ?? id;
-
-    if (!articleId || articleId === 'new') {
-      const errorMsg = 'Please type something to auto-save the article before inserting an image.';
-      toast.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
+    const targetArticleId = await ensureArticleId();
     try {
       // The service handles the size/type checks and the actual upload
-      const result = await upload(articleId, file, 'content');
+      const result = await upload(targetArticleId, file, 'content');
       return result.publicUrl;
     } catch (error: any) {
       console.error('Content image upload failed:', error);
@@ -706,6 +740,7 @@ export function ArticleEditorPage() {
               handleChange('content', val);
             }}
             onImageUpload={uploadContentImage}
+            articleId={articleId}
           />
         </div>
       )}

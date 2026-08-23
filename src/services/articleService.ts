@@ -303,7 +303,7 @@ export async function createArticle(data: Partial<ArticleInput>): Promise<Articl
     publicationId = defaultPublication.id;
   }
 
-  const title = data.title ?? 'Untitled';
+  const title = data.title?.trim() || 'Untitled';
   const content = data.content ?? '';
 
   const { data: article, error } = await supabase
@@ -343,7 +343,7 @@ export async function updateArticle(id: string, data: Partial<ArticleInput>): Pr
   const updateData: Database['public']['Tables']['articles']['Update'] = {};
 
   if (data.title !== undefined) {
-    updateData.title = data.title;
+    updateData.title = data.title.trim() || 'Untitled';
   }
 
   if (data.slug !== undefined) {
