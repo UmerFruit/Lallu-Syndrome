@@ -49,6 +49,7 @@ src/
       ArticleCard.tsx
       ArticleContent.tsx
       ArticleProgress.tsx
+      ArticleView.tsx
       FeaturedArticle.tsx
       RelatedArticles.tsx
       TableOfContents.tsx
@@ -60,6 +61,8 @@ src/
       SlashCommand.tsx
       SlashCommandMenu.tsx
       TiptapEditor.tsx
+      YouTube.ts
+      YouTubeComponent.tsx
     interactions/
       CommentSection.tsx
       LikeButton.tsx
@@ -125,6 +128,7 @@ src/
     index.ts
   utils/
     cn.ts
+    compression.ts
     date.ts
     image.ts
     slugify.ts
@@ -174,250 +178,218 @@ vite.config.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="supabase/functions/delete-user/.npmrc">
-# Configuration for private npm package dependencies
-# For more information on using private registries with Edge Functions, see:
-# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
-</file>
-
-<file path="supabase/functions/delete-user/deno.json">
-{
-  "imports": {
-    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
-    "@supabase/server": "npm:@supabase/server@^1"
-  }
-}
-</file>
-
-<file path="supabase/functions/delete-user/index.ts">
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-async function deleteArticleMedia(articleId: string): Promise<void> {
-  const { data: contentFiles } = await supabaseAdmin.storage
-    .from("media")
-    .list(`articles/${articleId}/content`, { limit: 1000 });
-
-  if (contentFiles && contentFiles.length > 0) {
-    await supabaseAdmin.storage.from("media").remove(
-      contentFiles.map((f) => `articles/${articleId}/content/${f.name}`)
-    );
-  }
-
-  const coverExtensions = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
-  await supabaseAdmin.storage.from("media").remove(
-    coverExtensions.map((ext) => `articles/${articleId}/cover.${ext}`)
-  );
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  try {
-    // 1. Authenticate the caller
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Missing authorization header" }, 401);
-    }
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user: caller }, error: authError } =
-      await supabaseAdmin.auth.getUser(token);
-    if (authError || !caller) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-
-    // 2. Parse the target user
-    const { userId } = await req.json().catch(() => ({ userId: null }));
-    if (!userId || typeof userId !== "string") {
-      return jsonResponse({ error: "userId is required" }, 400);
-    }
-
-    // 3. Permissions: anyone may delete their OWN account; deleting
-    //    someone else requires admin.
-    const isSelfDelete = userId === caller.id;
-    if (!isSelfDelete) {
-      const { data: callerProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", caller.id)
-        .maybeSingle();
-      if (!callerProfile?.is_admin) {
-        return jsonResponse({ error: "Admin access required" }, 403);
-      }
-    }
-
-    // 4. Delete the user's article media, then their articles
-    const { data: articles, error: articlesError } = await supabaseAdmin
-      .from("articles")
-      .select("id")
-      .eq("author_id", userId);
-    if (articlesError) throw articlesError;
-
-    for (const article of articles ?? []) {
-      await deleteArticleMedia(article.id);
-    }
-
-    if (articles && articles.length > 0) {
-      const { error: deleteArticlesError } = await supabaseAdmin
-        .from("articles")
-        .delete()
-        .in("id", articles.map((a) => a.id));
-      if (deleteArticlesError) throw deleteArticlesError;
-    }
-
-    // 5. Delete their avatar folder
-    const { data: avatarFiles } = await supabaseAdmin.storage
-      .from("avatars")
-      .list(userId, { limit: 100 });
-    if (avatarFiles && avatarFiles.length > 0) {
-      await supabaseAdmin.storage
-        .from("avatars")
-        .remove(avatarFiles.map((f) => `${userId}/${f.name}`));
-    }
-
-    // 6. Delete the auth user — profile, publications, comments and likes cascade
-    const { error: deleteUserError } =
-      await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (deleteUserError) throw deleteUserError;
-
-    return jsonResponse({ success: true }, 200);
-  } catch (error) {
-    console.error("delete-user error:", error);
-    return jsonResponse({ error: "Failed to delete user" }, 500);
-  }
-});
-</file>
-
-<file path="supabase/functions/get-users-admin/.npmrc">
-# Configuration for private npm package dependencies
-# For more information on using private registries with Edge Functions, see:
-# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
-</file>
-
-<file path="supabase/functions/get-users-admin/deno.json">
-{
-  "imports": {
-    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
-    "@supabase/server": "npm:@supabase/server@^1"
-  }
-}
-</file>
-
-<file path="supabase/functions/get-users-admin/index.ts">
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  try {
-    // 1. Authenticate the caller
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Missing authorization header" }, 401);
-    }
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user: caller }, error: authError } =
-      await supabaseAdmin.auth.getUser(token);
-    if (authError || !caller) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-
-    // 2. Caller must be an admin
-    const { data: callerProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", caller.id)
-      .maybeSingle();
-    if (!callerProfile?.is_admin) {
-      return jsonResponse({ error: "Admin access required" }, 403);
-    }
-
-    // 3. Fetch all profiles (service role bypasses RLS)
-    const { data: profiles, error: profilesError } = await supabaseAdmin
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (profilesError) throw profilesError;
-
-    // 4. Fetch auth users (paginated) to build a last_sign_in_at map
-    const lastSignInMap = new Map<string, string | null>();
-    let page = 1;
-    const perPage = 1000;
-    // deno-lint-ignore no-constant-condition
-    while (true) {
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-      if (error) throw error;
-      const authUsers = data.users ?? [];
-      for (const u of authUsers) {
-        lastSignInMap.set(u.id, u.last_sign_in_at ?? null);
-      }
-      if (authUsers.length < perPage) break;
-      page += 1;
-    }
-
-    // 5. Merge profile data with last_sign_in_at
-    const users = (profiles ?? []).map((p) => ({
-      ...p,
-      last_sign_in_at: lastSignInMap.get(p.id) ?? null,
-    }));
-
-    return jsonResponse({ users }, 200);
-  } catch (error) {
-    console.error("get-users-admin error:", error);
-    return jsonResponse({ error: "Failed to fetch users" }, 500);
-  }
-});
-</file>
-
 <file path="public/favicon.svg">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="6" fill="#090909"/>
   <text x="16" y="22" font-family="Georgia, serif" font-size="16" font-weight="600" fill="#F4F4F4" text-anchor="middle">LS</text>
 </svg>
+</file>
+
+<file path="src/components/articles/ArticleView.tsx">
+import { useMemo, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import type { Article } from '@/types';
+import { formatDateLong } from '@/utils/date';
+import { ArticleContent } from '@/components/articles/ArticleContent';
+import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
+import { RelatedArticles } from '@/components/articles/RelatedArticles';
+import { LikeButton } from '@/components/interactions/LikeButton';
+import { ShareButton } from '@/components/interactions/ShareButton';
+import { CommentSection } from '@/components/interactions/CommentSection';
+import { Badge } from '@/components/ui/Badge';
+import { Avatar } from '@/components/ui/Avatar';
+import { ArrowLeft } from 'lucide-react';
+import { getFallbackImage } from '@/utils/image';
+
+function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
+  const cardClass =
+    'block rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5';
+  const inner = (
+    <>
+      <div className="flex flex-col items-center gap-3">
+        <Avatar
+          src={author.avatar ?? undefined}
+          name={author.name}
+          className="border border-border-subtle bg-elevated"
+          fallbackClassName="text-xs font-semibold text-text-primary"
+        />
+        <span
+          className={`text-center text-sm font-medium text-text-primary transition-colors ${author.username ? 'link-underline group-hover:text-accent' : ''
+            }`}
+        >
+          {author.name}
+        </span>
+      </div>
+      {author.bio && (
+        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">
+          {author.bio}
+        </p>
+      )}
+    </>
+  );
+  if (!author.username) {
+    return <div className={cardClass}>{inner}</div>;
+  }
+
+  return (
+    <Link
+      to={`/writers/${author.username}`}
+      className={`${cardClass} group transition-transform duration-200 hover:-translate-y-0.5`}
+      aria-label={`View profile of ${author.name}`}
+    >
+      {inner}
+    </Link>
+  );
+}
+
+export interface ArticleViewProps {
+  article: Article;
+  related?: Article[];
+  liked?: boolean;
+  showInteractions?: boolean;
+  showRelated?: boolean;
+  showBackLink?: boolean;
+}
+
+export function ArticleView({ 
+  article, 
+  related = [], 
+  liked = false, 
+  showInteractions = true,
+  showRelated = true,
+  showBackLink = true
+}: Readonly<ArticleViewProps>) {
+  const [coverImgError, setCoverImgError] = useState(false);
+
+  // Reset error state when article changes
+  useEffect(() => {
+    setCoverImgError(false);
+  }, [article.id]);
+
+  const headings = useMemo(
+    () => extractHeadings(article?.content ?? ''),
+    [article?.content]
+  );
+
+  const handleMobileTocClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.pushState(null, '', `#${id}`);
+    }
+  };
+
+  const coverFallback = getFallbackImage(article.id);
+  const coverSrc = coverImgError || !article.coverImage ? coverFallback : article.coverImage;
+  const articleUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  return (
+    <>
+      <article className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
+        {/* Header */}
+        <header className="mb-6">
+          {article.publication && (
+            <div className="mb-3 flex justify-center">
+              <Link
+                to={`/p/${article.publication.slug}`}
+                className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
+              >
+                {article.publication.name}
+              </Link>
+            </div>
+          )}
+          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
+            {article.title}
+          </h1>
+
+          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
+            <span>
+              <Badge variant="accent">{article.category}</Badge>
+            </span>
+            <span>•</span>
+            {formatDateLong(article.publishedAt ?? article.createdAt)}
+            <span>•</span>
+            <span>{article.readingTime} min read</span>
+          </div>
+        </header>
+
+        {/* Cover Image */}
+        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
+          <img
+            src={coverSrc}
+            alt=""
+            onError={() => setCoverImgError(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </div>
+      </article>
+
+      {/* Content + TOC */}
+      <div className="max-w-content mx-auto px-4 sm:px-6 mt-10 grid grid-cols-1 gap-8 lg:mt-12 lg:grid-cols-[1fr_220px] lg:gap-12">
+        <div className="max-w-article lg:col-start-1 lg:row-start-1 lg:max-w-none">
+          {headings.length >= 3 && (
+            <details className="mb-8 rounded-card border border-border-subtle bg-surface lg:hidden">
+              <summary className="cursor-pointer list-none px-4 py-3 font-mono text-xs uppercase tracking-wider text-text-muted">
+                On this page
+              </summary>
+              <ul className="space-y-1 border-t border-border-subtle px-4 py-3">
+                {headings.map((h) => (
+                  <li key={h.id}>
+                    <a
+                      href={`#${h.id}`}
+                      onClick={(e) => handleMobileTocClick(e, h.id)}
+                      className={`block py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary ${h.level === 3 ? 'pl-4' : ''}`}
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          
+          <ArticleContent content={article.content} />
+
+          <div className="mt-10 lg:hidden">
+            <AuthorCard author={article.author} />
+          </div>
+
+          {showInteractions && (
+            <div className="mt-10 flex items-center gap-3 border-t border-border-subtle pt-8">
+              <LikeButton articleId={article.id} initialLikes={article.likes} initiallyLiked={liked} />
+              <ShareButton url={articleUrl} title={article.title} />
+            </div>
+          )}
+
+          {showInteractions && <CommentSection articleId={article.id} />}
+          {showRelated && <RelatedArticles articles={related} />}
+        </div>
+
+        <div className="hidden lg:col-start-2 lg:row-start-1 lg:block">
+          <div className="mb-8">
+            <AuthorCard author={article.author} />
+          </div>
+          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            <TableOfContents headings={headings} />
+          </div>
+        </div>
+      </div>
+
+      {showBackLink && (
+        <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
+          <Link
+            to="/articles"
+            className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <ArrowLeft size={16} />
+            All articles
+          </Link>
+        </div>
+      )}
+    </>
+  );
+}
 </file>
 
 <file path="src/components/editor/CodeBlock.tsx">
@@ -523,6 +495,135 @@ export const SlashCommandMenu = forwardRef<
 });
 
 SlashCommandMenu.displayName = 'SlashCommandMenu';
+</file>
+
+<file path="src/components/editor/YouTube.ts">
+import { Node, mergeAttributes } from '@tiptap/core';
+import { ReactNodeViewRenderer } from '@tiptap/react';
+import YouTubeComponent from './YouTubeComponent';
+
+export const YouTube = Node.create({
+  name: 'youtube',
+  group: 'block',
+  atom: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('src'),
+        renderHTML: (attributes) => (attributes.src ? { src: attributes.src } : {}),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'iframe' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'iframe',
+      mergeAttributes(HTMLAttributes, {
+        class: 'youtube-embed',
+        frameborder: '0',
+        allowfullscreen: 'true',
+        allow:
+          'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+        title: 'YouTube video',
+        loading: 'lazy',
+      }),
+    ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(YouTubeComponent);
+  },
+});
+</file>
+
+<file path="src/components/editor/YouTubeComponent.tsx">
+import { useState } from 'react';
+import { NodeViewWrapper } from '@tiptap/react';
+import type { NodeViewProps } from '@tiptap/react';
+import { Trash2 } from 'lucide-react';
+
+export default function YouTubeComponent({
+  node,
+  updateAttributes,
+  deleteNode,
+}: Readonly<NodeViewProps>) {
+  const [inputValue, setInputValue] = useState('');
+  const src = node.attrs.src as string | null;
+
+  const extractVideoId = (input: string): string | null => {
+    const patterns = [
+      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+      /^([a-zA-Z0-9_-]{11})$/,
+    ];
+    for (const p of patterns) {
+      const m = new RegExp(p).exec(input);
+      if (m) return m[1];
+    }
+    return null;
+  };
+
+  const handleAdd = () => {
+    const videoId = extractVideoId(inputValue.trim());
+    if (videoId) {
+      updateAttributes({ src: `https://www.youtube.com/embed/${videoId}` });
+    }
+  };
+
+  return (
+    <NodeViewWrapper className="my-6">
+      {src ? (
+        <div className="group relative" contentEditable={false}>
+          <iframe
+            src={src}
+            title="YouTube video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="aspect-video w-full rounded-card border border-border-subtle pointer-events-none"
+          />
+          <button
+            type="button"
+            onClick={deleteNode}
+            className="absolute right-2 top-2 rounded bg-bg/80 p-1.5 text-text-secondary transition-colors hover:text-accent opacity-0 group-hover:opacity-100"
+            aria-label="Delete video"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ) : (
+        <div
+          className="flex gap-2 rounded-card border border-border-subtle bg-surface p-4"
+          contentEditable={false}
+        >
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') handleAdd();
+            }}
+            placeholder="Paste a YouTube URL..."
+            className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          >
+            Embed
+          </button>
+        </div>
+      )}
+    </NodeViewWrapper>
+  );
+}
 </file>
 
 <file path="src/components/interactions/ShareButton.tsx">
@@ -937,6 +1038,112 @@ export function cn(...inputs: ClassValue[]) {
 }
 </file>
 
+<file path="src/utils/compression.ts">
+// ─── Image optimization settings ────────────────────────────────────────
+// Tweak these to change compression behavior across all uploads.
+// Nothing in this block has side effects — just configuration.
+
+/**
+ * MIME types we will attempt to re-encode.
+ * GIF is excluded on purpose (can't preserve animation through canvas).
+ * WebP/AVIF uploads are excluded — they're already modern formats.
+ */
+const OPTIMIZABLE_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
+
+/*
+ * Largest dimension (in pixels) the output image is allowed to have.
+ * Images larger than this on either axis are downscaled to fit.
+ * 2000px ≈ 2× retina for a 1000px-wide content column.
+ */
+const MAX_OUTPUT_EDGE_PX = 2000;
+
+/*
+ * Files already smaller than this (in bytes) AND not being resized are left alone
+ * re-encoding tiny files wastes CPU and risks growing them.
+ */
+const MIN_SIZE_BEFORE_COMPRESS_BYTES = 200 * 1024; // 200 KB
+
+// Quality for WebP output (0.0 = smallest/lossiest, 1.0 = largest/lossless).
+const WEBP_QUALITY = 0.80;
+
+/** Extension appended to the optimized filename. */
+const OUTPUT_EXTENSION = 'webp';
+
+/** MIME type requested from the canvas encoder. */
+const OUTPUT_MIME_TYPE = 'image/webp';
+
+/** Regex used to strip the existing extension before appending the new one. */
+const EXTENSION_STRIP_REGEX = /\.[^.]+$/;
+// ────────────────────────────────────────────────────────────────────────
+
+export async function optimizeForUpload(file: File): Promise<File> {
+  if (!OPTIMIZABLE_MIME_TYPES.includes(file.type as typeof OPTIMIZABLE_MIME_TYPES[number])) {
+    return file;
+  }
+
+  try {
+    let width: number;
+    let height: number;
+    let source: CanvasImageSource;
+    let bitmapToClose: ImageBitmap | null = null; // ✅ Track for cleanup
+
+
+    // Try createImageBitmap first (no options — Firefox-safe)
+    try {
+      const bitmap = await createImageBitmap(file);
+      width = bitmap.width;
+      height = bitmap.height;
+      source = bitmap;
+      bitmapToClose = bitmap;
+    } catch {
+      // Fallback: Image element (works in every browser back to IE11)
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => {
+          URL.revokeObjectURL(i.src);
+          resolve(i);
+        };
+        i.onerror = () => {
+          URL.revokeObjectURL(i.src);
+          reject(new Error('Image load failed'));
+        };
+        i.src = URL.createObjectURL(file);
+      });
+      width = img.naturalWidth;
+      height = img.naturalHeight;
+      source = img;
+    }
+
+    if (width === 0 || height === 0) { return file; }
+    const scale = Math.min(1, MAX_OUTPUT_EDGE_PX / Math.max(width, height));
+    const alreadySmall = scale === 1 && file.size <= MIN_SIZE_BEFORE_COMPRESS_BYTES;
+    if (alreadySmall) return file;
+
+    const w = Math.round(width * scale);
+    const h = Math.round(height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(source, 0, 0, w, h);
+    if (bitmapToClose) { bitmapToClose.close(); }
+    const blob: Blob | null = await new Promise((resolve) => {
+      canvas.toBlob(resolve, OUTPUT_MIME_TYPE, WEBP_QUALITY);
+    });
+
+    // Never store something larger than what the user gave us.
+    if (!blob || blob.size >= file.size) return file;
+
+    const baseName = file.name.replace(EXTENSION_STRIP_REGEX, '');
+    return new File([blob], `${baseName}.${OUTPUT_EXTENSION}`, { type: blob.type });
+  } catch {
+    // Optimization must never break uploads.
+    return file;
+  }
+}
+</file>
+
 <file path="src/utils/image.ts">
 import { getPublicUrl } from '@/services/storageService';
 const FALLBACK_COUNT = 8;
@@ -972,6 +1179,245 @@ createRoot(document.getElementById('root')!).render(
 
 <file path="src/vite-env.d.ts">
 /// <reference types="vite/client" />
+</file>
+
+<file path="supabase/functions/delete-user/.npmrc">
+# Configuration for private npm package dependencies
+# For more information on using private registries with Edge Functions, see:
+# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
+</file>
+
+<file path="supabase/functions/delete-user/deno.json">
+{
+  "imports": {
+    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
+    "@supabase/server": "npm:@supabase/server@^1"
+  }
+}
+</file>
+
+<file path="supabase/functions/delete-user/index.ts">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function deleteArticleMedia(articleId: string): Promise<void> {
+  const { data: contentFiles } = await supabaseAdmin.storage
+    .from("media")
+    .list(`articles/${articleId}/content`, { limit: 1000 });
+
+  if (contentFiles && contentFiles.length > 0) {
+    await supabaseAdmin.storage.from("media").remove(
+      contentFiles.map((f) => `articles/${articleId}/content/${f.name}`)
+    );
+  }
+
+  const coverExtensions = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
+  await supabaseAdmin.storage.from("media").remove(
+    coverExtensions.map((ext) => `articles/${articleId}/cover.${ext}`)
+  );
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    // 1. Authenticate the caller
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing authorization header" }, 401);
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authError } =
+      await supabaseAdmin.auth.getUser(token);
+    if (authError || !caller) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    // 2. Parse the target user
+    const { userId } = await req.json().catch(() => ({ userId: null }));
+    if (!userId || typeof userId !== "string") {
+      return jsonResponse({ error: "userId is required" }, 400);
+    }
+
+    // 3. Permissions: anyone may delete their OWN account; deleting
+    //    someone else requires admin.
+    const isSelfDelete = userId === caller.id;
+    if (!isSelfDelete) {
+      const { data: callerProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", caller.id)
+        .maybeSingle();
+      if (!callerProfile?.is_admin) {
+        return jsonResponse({ error: "Admin access required" }, 403);
+      }
+    }
+
+    // 4. Delete the user's article media, then their articles
+    const { data: articles, error: articlesError } = await supabaseAdmin
+      .from("articles")
+      .select("id")
+      .eq("author_id", userId);
+    if (articlesError) throw articlesError;
+
+    for (const article of articles ?? []) {
+      await deleteArticleMedia(article.id);
+    }
+
+    if (articles && articles.length > 0) {
+      const { error: deleteArticlesError } = await supabaseAdmin
+        .from("articles")
+        .delete()
+        .in("id", articles.map((a) => a.id));
+      if (deleteArticlesError) throw deleteArticlesError;
+    }
+
+    // 5. Delete their avatar folder
+    const { data: avatarFiles } = await supabaseAdmin.storage
+      .from("avatars")
+      .list(userId, { limit: 100 });
+    if (avatarFiles && avatarFiles.length > 0) {
+      await supabaseAdmin.storage
+        .from("avatars")
+        .remove(avatarFiles.map((f) => `${userId}/${f.name}`));
+    }
+
+    // 6. Delete the auth user — profile, publications, comments and likes cascade
+    const { error: deleteUserError } =
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (deleteUserError) throw deleteUserError;
+
+    return jsonResponse({ success: true }, 200);
+  } catch (error) {
+    console.error("delete-user error:", error);
+    return jsonResponse({ error: "Failed to delete user" }, 500);
+  }
+});
+</file>
+
+<file path="supabase/functions/get-users-admin/.npmrc">
+# Configuration for private npm package dependencies
+# For more information on using private registries with Edge Functions, see:
+# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
+</file>
+
+<file path="supabase/functions/get-users-admin/deno.json">
+{
+  "imports": {
+    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
+    "@supabase/server": "npm:@supabase/server@^1"
+  }
+}
+</file>
+
+<file path="supabase/functions/get-users-admin/index.ts">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    // 1. Authenticate the caller
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing authorization header" }, 401);
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authError } =
+      await supabaseAdmin.auth.getUser(token);
+    if (authError || !caller) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    // 2. Caller must be an admin
+    const { data: callerProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", caller.id)
+      .maybeSingle();
+    if (!callerProfile?.is_admin) {
+      return jsonResponse({ error: "Admin access required" }, 403);
+    }
+
+    // 3. Fetch all profiles (service role bypasses RLS)
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (profilesError) throw profilesError;
+
+    // 4. Fetch auth users (paginated) to build a last_sign_in_at map
+    const lastSignInMap = new Map<string, string | null>();
+    let page = 1;
+    const perPage = 1000;
+    // deno-lint-ignore no-constant-condition
+    while (true) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      if (error) throw error;
+      const authUsers = data.users ?? [];
+      for (const u of authUsers) {
+        lastSignInMap.set(u.id, u.last_sign_in_at ?? null);
+      }
+      if (authUsers.length < perPage) break;
+      page += 1;
+    }
+
+    // 5. Merge profile data with last_sign_in_at
+    const users = (profiles ?? []).map((p) => ({
+      ...p,
+      last_sign_in_at: lastSignInMap.get(p.id) ?? null,
+    }));
+
+    return jsonResponse({ users }, 200);
+  } catch (error) {
+    console.error("get-users-admin error:", error);
+    return jsonResponse({ error: "Failed to fetch users" }, 500);
+  }
+});
 </file>
 
 <file path="supabase/functions/sync-to-algolia/.npmrc">
@@ -1614,41 +2060,6 @@ with check (
       and p.owner_id = auth.uid()
   )
 );
-</file>
-
-<file path="supabase/config.toml">
-[functions.sync-to-algolia]
-enabled = true
-verify_jwt = false
-import_map = "./functions/sync-to-algolia/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/sync-to-algolia/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/sync-to-algolia/*.html" ]
-
-[functions.delete-user]
-enabled = true
-verify_jwt = false
-import_map = "./functions/delete-user/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/delete-user/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/delete-user/*.html" ]
-
-[functions.get-users-admin]
-enabled = true
-verify_jwt = false
-import_map = "./functions/get-users-admin/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/get-users-admin/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/get-users-admin/*.html" ]
 </file>
 
 <file path="eslint.config.js">
@@ -2914,6 +3325,41 @@ on public.comments for delete to authenticated
 using (public.is_admin(auth.uid()));
 </file>
 
+<file path="supabase/config.toml">
+[functions.sync-to-algolia]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-to-algolia/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/sync-to-algolia/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/sync-to-algolia/*.html" ]
+
+[functions.delete-user]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-user/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/delete-user/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/delete-user/*.html" ]
+
+[functions.get-users-admin]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-users-admin/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/get-users-admin/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/get-users-admin/*.html" ]
+</file>
+
 <file path=".gitignore">
 logs
 *.log
@@ -2939,6 +3385,9 @@ dist-ssr
 *.sw?
 .env
 package-lock.json
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
 </file>
 
 <file path="src/components/editor/AlignedImage.ts">
@@ -3068,298 +3517,6 @@ export function processPastedHtml(html: string): { html: string; images: PastedI
   })
   return { html: parsedDoc.body.innerHTML, images: imagesToUpload };
 }
-</file>
-
-<file path="src/components/editor/SlashCommand.tsx">
-import { Extension } from '@tiptap/core';
-import type { Editor } from '@tiptap/core';
-import Suggestion, {
-    type SuggestionOptions,
-} from '@tiptap/suggestion';
-import { ReactRenderer } from '@tiptap/react';
-import tippy from 'tippy.js';
-import type { Instance as TippyInstance } from 'tippy.js';
-
-import {
-    SlashCommandMenu,
-    type SlashCommandMenuRef,
-} from './SlashCommandMenu';
-
-const getReferenceClientRect = (
-    clientRect: (() => DOMRect | null) | null
-) => {
-    return () =>
-        clientRect?.() ??
-        new DOMRect(0, 0, 0, 0);
-};
-
-type SlashCommandOptions = {
-    onImageUpload?: (editor: Editor) => void;
-};
-
-type CommandProps = {
-    editor: Editor;
-    range: {
-        from: number;
-        to: number;
-    };
-};
-
-export type SlashCommandItem = {
-    title: string;
-    description: string;
-    keywords: string[];
-    command: (props: CommandProps) => void;
-};
-
-const getItems = ({
-    query,
-    onImageUpload,
-}: {
-    query: string;
-    onImageUpload?: (editor: Editor) => void;
-}): SlashCommandItem[] => {
-    const items: SlashCommandItem[] = [
-        {
-            title: 'Heading 1',
-            description: 'Large section heading',
-            keywords: ['h1', 'heading', 'title'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setHeading({ level: 1 })
-                    .run();
-            },
-        },
-        {
-            title: 'Heading 2',
-            description: 'Medium section heading',
-            keywords: ['h2', 'heading', 'subtitle'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setHeading({ level: 2 })
-                    .run();
-            },
-        },
-        {
-            title: 'Heading 3',
-            description: 'Small section heading',
-            keywords: ['h3', 'heading'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setHeading({ level: 3 })
-                    .run();
-            },
-        },
-        {
-            title: 'Image',
-            description: 'Upload and insert an image',
-            keywords: ['image', 'picture', 'photo', 'upload', 'media'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .run();
-
-                onImageUpload?.(editor);
-            },
-        },
-        {
-            title: 'Bullet List',
-            description: 'Create a bulleted list',
-            keywords: ['bullet', 'list', 'ul'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .toggleBulletList()
-                    .run();
-            },
-        },
-        {
-            title: 'Numbered List',
-            description: 'Create a numbered list',
-            keywords: ['numbered', 'ordered', 'list', 'ol'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .toggleOrderedList()
-                    .run();
-            },
-        },
-        {
-            title: 'Quote',
-            description: 'Add a blockquote',
-            keywords: ['quote', 'blockquote'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .toggleBlockquote()
-                    .run();
-            },
-        },
-        {
-            title: 'Code Block',
-            description: 'Add a block of code',
-            keywords: ['code', 'codeblock', 'programming'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .toggleCodeBlock()
-                    .run();
-            },
-        },
-        {
-            title: 'Divider',
-            description: 'Insert a horizontal divider',
-            keywords: ['divider', 'hr', 'line', 'separator'],
-            command: ({ editor, range }) => {
-                editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setHorizontalRule()
-                    .run();
-            },
-        },
-    ];
-
-    const normalizedQuery = query.toLowerCase();
-
-    return items.filter((item) => {
-        return (
-            item.title.toLowerCase().includes(normalizedQuery) ||
-            item.description.toLowerCase().includes(normalizedQuery) ||
-            item.keywords.some((keyword) =>
-                keyword.includes(normalizedQuery)
-            )
-        );
-    });
-};
-
-export const SlashCommand = Extension.create<SlashCommandOptions>({
-    name: 'slashCommand',
-
-    addOptions() {
-        return {
-            onImageUpload: undefined,
-        };
-    },
-
-    addProseMirrorPlugins() {
-        return [
-            Suggestion<SlashCommandItem>({
-                editor: this.editor,
-
-                char: '/',
-                startOfLine: false,
-
-                items: ({ query }) =>
-                    getItems({
-                        query,
-                        onImageUpload: this.options.onImageUpload,
-                    }),
-
-                command: ({
-                    editor,
-                    range,
-                    props,
-                }: {
-                    editor: Editor;
-                    range: CommandProps['range'];
-                    props: SlashCommandItem;
-                }) => {
-                    props.command({
-                        editor,
-                        range,
-                    });
-                },
-
-                render: () => {
-                    let component: ReactRenderer<SlashCommandMenuRef> | null =
-                        null;
-
-                    let popup: TippyInstance | null = null;
-
-                    return {
-                        onStart: (props) => {
-                            component = new ReactRenderer(
-                                SlashCommandMenu,
-                                {
-                                    props,
-                                    editor: props.editor,
-                                }
-                            );
-
-                            if (!props.clientRect) return;
-
-                            popup = tippy(document.body, {
-                                getReferenceClientRect:
-                                    getReferenceClientRect(
-                                        props.clientRect
-                                    ),
-                                appendTo: () => document.body,
-                                content: component.element,
-                                showOnCreate: true,
-                                interactive: true,
-                                trigger: 'manual',
-                                placement: 'bottom-start',
-                            });
-                        },
-
-                        onUpdate: (props) => {
-                            component?.updateProps(props);
-
-                            if (!props.clientRect) return;
-
-                            popup?.setProps({
-                                getReferenceClientRect:
-                                    getReferenceClientRect(
-                                        props.clientRect
-                                    ),
-                            });
-                        },
-
-                        onKeyDown: (props) => {
-                            if (props.event.key === 'Escape') {
-                                popup?.hide();
-                                return true;
-                            }
-
-                            return (
-                                component?.ref?.onKeyDown(props) ?? false
-                            );
-                        },
-
-                        onExit: () => {
-                            popup?.destroy();
-                            component?.destroy();
-
-                            popup = null;
-                            component = null;
-                        },
-                    };
-                },
-            } satisfies Partial<SuggestionOptions<SlashCommandItem>>),
-        ];
-    },
-});
 </file>
 
 <file path="src/components/layout/Footer.tsx">
@@ -3913,192 +4070,6 @@ export function PublicationPage() {
 }
 </file>
 
-<file path="src/services/adminService.ts">
-import { supabase } from '@/lib/supabase';
-import type { Profile } from '@/types';
-import { deleteArticleMedia } from '@/services/storageService';
-import { FunctionsHttpError } from '@supabase/supabase-js';
-
-export type AdminProfile = Profile & {
-  last_sign_in_at: string | null;
-};
-
-export type AdminComment = {
-  id: string;
-  article_id: string;
-  author_id: string;
-  content: string;
-  created_at: string;
-  parent_id: string | null;
-  author_name: string;
-  author_avatar: string | null;
-  article_title: string;
-};
-
-export type AdminArticle = {
-  id: string;
-  title: string;
-  slug: string;
-  status: 'draft' | 'published';
-  created_at: string;
-  published_at: string | null;
-  author_name: string;
-  author_id: string;
-  category_name: string;
-};
-
-// ─── Users ───────────────────────────────────────────────────
-export async function getAllProfiles(): Promise<AdminProfile[]> {
-  const { data, error } = await supabase.functions.invoke('get-users-admin');
-  if (error) {
-    let message = 'Failed to fetch users.';
-    if (error instanceof FunctionsHttpError) {
-      try {
-        const body = await error.context.json();
-        if (body?.error) message = body.error;
-      } catch {
-        console.error('Failed to parse error response from get-users-admin function:', error);
-      }
-    }
-    throw new Error(message);
-  }
-  return (data?.users ?? []) as AdminProfile[];
-}
-
-export async function updateUserAdminStatus(
-  userId: string,
-  isAdmin: boolean
-): Promise<void> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ is_admin: isAdmin })
-    .eq('id', userId);
-
-  if (error) throw error;
-}
-// ─── Comments ────────────────────────────────────────────────
-export async function getAllComments(): Promise<AdminComment[]> {
-  const { data, error } = await supabase
-    .from('comments')
-    .select(`
-      id,
-      article_id,
-      author_id,
-      content,
-      created_at,
-      parent_id,
-      profiles!comments_author_id_fkey (
-        display_name,
-        avatar_url
-      ),
-      articles!comments_article_id_fkey (
-        title
-      )
-    `)
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (error) throw error;
-
-  return data.map((row: any) => ({
-    id: row.id,
-    article_id: row.article_id,
-    author_id: row.author_id,
-    content: row.content,
-    created_at: row.created_at,
-    parent_id: row.parent_id,
-    author_name: row.profiles?.display_name ?? 'Unknown',
-    author_avatar: row.profiles?.avatar_url ?? null,
-    article_title: row.articles?.title ?? 'Unknown Article',
-  }));
-}
-
-export async function adminDeleteComment(commentId: string): Promise<void> {
-  const { error } = await supabase
-    .from('comments')
-    .delete()
-    .eq('id', commentId);
-
-  if (error) throw error;
-}
-
-// ─── Articles ────────────────────────────────────────────────
-export async function getAllArticlesAdmin(): Promise<AdminArticle[]> {
-  const { data, error } = await supabase
-    .from('articles')
-    .select(`
-      id,
-      title,
-      slug,
-      status,
-      created_at,
-      published_at,
-      author_id,
-      profiles!articles_author_id_fkey (
-        display_name
-      ),
-      categories (
-        name
-      )
-    `)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  return data.map((row: any) => ({
-    id: row.id,
-    title: row.title,
-    slug: row.slug,
-    status: row.status,
-    created_at: row.created_at,
-    published_at: row.published_at,
-    author_id: row.author_id,
-    author_name: row.profiles?.display_name ?? 'Unknown',
-    category_name: row.categories?.name ?? 'Uncategorized',
-  }));
-}
-
-export async function adminDeleteArticle(articleId: string): Promise<void> {
-  const { data: article, error: fetchError } = await supabase
-    .from('articles')
-    .select('content, cover_image')
-    .eq('id', articleId)
-    .single();
-  if (fetchError) throw fetchError;
-
-  try {
-    await deleteArticleMedia(article.content, article.cover_image);
-  } catch (error) {
-    console.error('Failed to clean up article media:', error);
-  }
-
-  const { error } = await supabase
-    .from('articles')
-    .delete()
-    .eq('id', articleId);
-
-  if (error) throw error;
-}
-// ─── Delete User ─────────────────────────────────────────
-export async function adminDeleteUser(userId: string): Promise<void> {
-  const { error } = await supabase.functions.invoke('delete-user', {
-    body: { userId },
-  });
-  if (error) {
-    let message = 'Failed to delete user.';
-    if (error instanceof FunctionsHttpError) {
-      try {
-        const body = await error.context.json();
-        if (body?.error) message = body.error;
-      } catch {
-        console.error('Failed to parse error response from delete-user function:', error);
-      }
-    }
-    throw new Error(message);
-  }
-}
-</file>
-
 <file path="src/services/categoryService.ts">
 import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types";
@@ -4222,6 +4193,311 @@ export function slugifyHeading(text: string, usedIds: Set<string>): string {
   usedIds.add(id);
   return id;
 }
+</file>
+
+<file path="src/components/editor/SlashCommand.tsx">
+import { Extension } from '@tiptap/core';
+import type { Editor } from '@tiptap/core';
+import Suggestion, {
+    type SuggestionOptions,
+} from '@tiptap/suggestion';
+import { ReactRenderer } from '@tiptap/react';
+import tippy from 'tippy.js';
+import type { Instance as TippyInstance } from 'tippy.js';
+
+import {
+    SlashCommandMenu,
+    type SlashCommandMenuRef,
+} from './SlashCommandMenu';
+
+const getReferenceClientRect = (
+    clientRect: (() => DOMRect | null) | null
+) => {
+    return () =>
+        clientRect?.() ??
+        new DOMRect(0, 0, 0, 0);
+};
+
+type SlashCommandOptions = {
+    onImageUpload?: (editor: Editor) => void;
+};
+
+type CommandProps = {
+    editor: Editor;
+    range: {
+        from: number;
+        to: number;
+    };
+};
+
+export type SlashCommandItem = {
+    title: string;
+    description: string;
+    keywords: string[];
+    command: (props: CommandProps) => void;
+};
+
+const getItems = ({
+    query,
+    onImageUpload,
+}: {
+    query: string;
+    onImageUpload?: (editor: Editor) => void;
+}): SlashCommandItem[] => {
+    const items: SlashCommandItem[] = [
+        {
+            title: 'Heading 1',
+            description: 'Large section heading',
+            keywords: ['h1', 'heading', 'title'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .setHeading({ level: 1 })
+                    .run();
+            },
+        },
+        {
+            title: 'Heading 2',
+            description: 'Medium section heading',
+            keywords: ['h2', 'heading', 'subtitle'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .setHeading({ level: 2 })
+                    .run();
+            },
+        },
+        {
+            title: 'Heading 3',
+            description: 'Small section heading',
+            keywords: ['h3', 'heading'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .setHeading({ level: 3 })
+                    .run();
+            },
+        },
+        {
+            title: 'Image',
+            description: 'Upload and insert an image',
+            keywords: ['image', 'picture', 'photo', 'upload', 'media'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .run();
+
+                onImageUpload?.(editor);
+            },
+        },
+        {
+            title: 'YouTube Video',
+            description: 'Embed a YouTube video',
+            keywords: ['youtube', 'video', 'embed', 'watch'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .insertContent({ type: 'youtube' })
+                    .run();
+            },
+        },
+        {
+            title: 'Bullet List',
+            description: 'Create a bulleted list',
+            keywords: ['bullet', 'list', 'ul'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .toggleBulletList()
+                    .run();
+            },
+        },
+        {
+            title: 'Numbered List',
+            description: 'Create a numbered list',
+            keywords: ['numbered', 'ordered', 'list', 'ol'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .toggleOrderedList()
+                    .run();
+            },
+        },
+        {
+            title: 'Quote',
+            description: 'Add a blockquote',
+            keywords: ['quote', 'blockquote'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .toggleBlockquote()
+                    .run();
+            },
+        },
+        {
+            title: 'Code Block',
+            description: 'Add a block of code',
+            keywords: ['code', 'codeblock', 'programming'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .toggleCodeBlock()
+                    .run();
+            },
+        },
+        {
+            title: 'Divider',
+            description: 'Insert a horizontal divider',
+            keywords: ['divider', 'hr', 'line', 'separator'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .setHorizontalRule()
+                    .run();
+            },
+        },
+    ];
+
+    const normalizedQuery = query.toLowerCase();
+
+    return items.filter((item) => {
+        return (
+            item.title.toLowerCase().includes(normalizedQuery) ||
+            item.description.toLowerCase().includes(normalizedQuery) ||
+            item.keywords.some((keyword) =>
+                keyword.includes(normalizedQuery)
+            )
+        );
+    });
+};
+
+export const SlashCommand = Extension.create<SlashCommandOptions>({
+    name: 'slashCommand',
+
+    addOptions() {
+        return {
+            onImageUpload: undefined,
+        };
+    },
+
+    addProseMirrorPlugins() {
+        return [
+            Suggestion<SlashCommandItem>({
+                editor: this.editor,
+
+                char: '/',
+                startOfLine: false,
+
+                items: ({ query }) =>
+                    getItems({
+                        query,
+                        onImageUpload: this.options.onImageUpload,
+                    }),
+
+                command: ({
+                    editor,
+                    range,
+                    props,
+                }: {
+                    editor: Editor;
+                    range: CommandProps['range'];
+                    props: SlashCommandItem;
+                }) => {
+                    props.command({
+                        editor,
+                        range,
+                    });
+                },
+
+                render: () => {
+                    let component: ReactRenderer<SlashCommandMenuRef> | null =
+                        null;
+
+                    let popup: TippyInstance | null = null;
+
+                    return {
+                        onStart: (props) => {
+                            component = new ReactRenderer(
+                                SlashCommandMenu,
+                                {
+                                    props,
+                                    editor: props.editor,
+                                }
+                            );
+
+                            if (!props.clientRect) return;
+
+                            popup = tippy(document.body, {
+                                getReferenceClientRect:
+                                    getReferenceClientRect(
+                                        props.clientRect
+                                    ),
+                                appendTo: () => document.body,
+                                content: component.element,
+                                showOnCreate: true,
+                                interactive: true,
+                                trigger: 'manual',
+                                placement: 'bottom-start',
+                            });
+                        },
+
+                        onUpdate: (props) => {
+                            component?.updateProps(props);
+
+                            if (!props.clientRect) return;
+
+                            popup?.setProps({
+                                getReferenceClientRect:
+                                    getReferenceClientRect(
+                                        props.clientRect
+                                    ),
+                            });
+                        },
+
+                        onKeyDown: (props) => {
+                            if (props.event.key === 'Escape') {
+                                popup?.hide();
+                                return true;
+                            }
+
+                            return (
+                                component?.ref?.onKeyDown(props) ?? false
+                            );
+                        },
+
+                        onExit: () => {
+                            popup?.destroy();
+                            component?.destroy();
+
+                            popup = null;
+                            component = null;
+                        },
+                    };
+                },
+            } satisfies Partial<SuggestionOptions<SlashCommandItem>>),
+        ];
+    },
+});
 </file>
 
 <file path="src/components/interactions/LikeButton.tsx">
@@ -4492,6 +4768,192 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     </Dialog.Portal>
   </Dialog.Root>
 );
+</file>
+
+<file path="src/services/adminService.ts">
+import { supabase } from '@/lib/supabase';
+import type { Profile } from '@/types';
+import { deleteArticleMedia } from '@/services/storageService';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
+export type AdminProfile = Profile & {
+  last_sign_in_at: string | null;
+};
+
+export type AdminComment = {
+  id: string;
+  article_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  parent_id: string | null;
+  author_name: string;
+  author_avatar: string | null;
+  article_title: string;
+};
+
+export type AdminArticle = {
+  id: string;
+  title: string;
+  slug: string;
+  status: 'draft' | 'published';
+  created_at: string;
+  published_at: string | null;
+  author_name: string;
+  author_id: string;
+  category_name: string;
+};
+
+// ─── Users ───────────────────────────────────────────────────
+export async function getAllProfiles(): Promise<AdminProfile[]> {
+  const { data, error } = await supabase.functions.invoke('get-users-admin');
+  if (error) {
+    let message = 'Failed to fetch users.';
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch {
+        console.error('Failed to parse error response from get-users-admin function:', error);
+      }
+    }
+    throw new Error(message);
+  }
+  return (data?.users ?? []) as AdminProfile[];
+}
+
+export async function updateUserAdminStatus(
+  userId: string,
+  isAdmin: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_admin: isAdmin })
+    .eq('id', userId);
+
+  if (error) throw error;
+}
+// ─── Comments ────────────────────────────────────────────────
+export async function getAllComments(): Promise<AdminComment[]> {
+  const { data, error } = await supabase
+    .from('comments')
+    .select(`
+      id,
+      article_id,
+      author_id,
+      content,
+      created_at,
+      parent_id,
+      profiles!comments_author_id_fkey (
+        display_name,
+        avatar_url
+      ),
+      articles!comments_article_id_fkey (
+        title
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    article_id: row.article_id,
+    author_id: row.author_id,
+    content: row.content,
+    created_at: row.created_at,
+    parent_id: row.parent_id,
+    author_name: row.profiles?.display_name ?? 'Unknown',
+    author_avatar: row.profiles?.avatar_url ?? null,
+    article_title: row.articles?.title ?? 'Unknown Article',
+  }));
+}
+
+export async function adminDeleteComment(commentId: string): Promise<void> {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId);
+
+  if (error) throw error;
+}
+
+// ─── Articles ────────────────────────────────────────────────
+export async function getAllArticlesAdmin(): Promise<AdminArticle[]> {
+  const { data, error } = await supabase
+    .from('articles')
+    .select(`
+      id,
+      title,
+      slug,
+      status,
+      created_at,
+      published_at,
+      author_id,
+      profiles!articles_author_id_fkey (
+        display_name
+      ),
+      categories (
+        name
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    status: row.status,
+    created_at: row.created_at,
+    published_at: row.published_at,
+    author_id: row.author_id,
+    author_name: row.profiles?.display_name ?? 'Unknown',
+    category_name: row.categories?.name ?? 'Uncategorized',
+  }));
+}
+
+export async function adminDeleteArticle(articleId: string): Promise<void> {
+  const { data: article, error: fetchError } = await supabase
+    .from('articles')
+    .select('content, cover_image')
+    .eq('id', articleId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  try {
+    await deleteArticleMedia(article.content, article.cover_image);
+  } catch (error) {
+    console.error('Failed to clean up article media:', error);
+  }
+
+  const { error } = await supabase
+    .from('articles')
+    .delete()
+    .eq('id', articleId);
+
+  if (error) throw error;
+}
+// ─── Delete User ─────────────────────────────────────────
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-user', {
+    body: { userId },
+  });
+  if (error) {
+    let message = 'Failed to delete user.';
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch {
+        console.error('Failed to parse error response from delete-user function:', error);
+      }
+    }
+    throw new Error(message);
+  }
+}
 </file>
 
 <file path="src/types/database.ts">
@@ -5082,6 +5544,110 @@ const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 export const supabase = createClient<Database>(supabaseUrl,supabasePublishableKey);
 </file>
 
+<file path="vite.config.ts">
+/// <reference types="node" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  server: {
+    host: true,
+    allowedHosts: [
+      'quakier-ascensive-melodie.ngrok-free.dev',
+    ],
+  },
+  optimizeDeps: {
+    include: ['lucide-react'],
+  },
+});
+</file>
+
+<file path="src/components/articles/TableOfContents.tsx">
+import { useEffect, useState } from 'react';
+import { slugifyHeading } from '@/utils/slugify';
+import { observe } from 'react-intersection-observer';
+
+type Heading = {
+  id: string;
+  text: string;
+  level: number;
+};
+export function extractHeadings(html: string): Heading[] {
+  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
+  const headings = Array.from(parsedDoc.querySelectorAll('h1, h2, h3'));
+  const usedIds = new Set<string>();
+  return headings
+    .map((heading) => {
+      const text = heading.textContent?.trim() ?? '';
+      return {
+        id: text ? slugifyHeading(text, usedIds) : '',
+        text,
+        level: Number(heading.tagName.substring(1)),
+      };
+    })
+    .filter((heading) => heading.id !== '');
+}
+
+type TableOfContentsProps = {
+  headings: Heading[];
+};
+
+export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
+  const [activeId, setActiveId] = useState<string>('');
+
+
+  useEffect(() => {
+    const unobserveAll = headings
+      .map((h) => document.getElementById(h.id))
+      .filter((el): el is HTMLElement => el !== null)
+      .map((el) =>
+        observe(
+          el,
+          (inView) => {
+            if (inView) setActiveId(el.id);
+          },
+          { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+        )
+      );
+    return () => unobserveAll.forEach((unobserve) => unobserve());
+  }, [headings]);
+
+  if (headings.length < 3) return null;
+
+  return (
+    <nav className="hidden lg:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <h4 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
+        On this page
+      </h4>
+      <ul className="space-y-1.5 border-l border-border-subtle">
+        {headings.map((h) => (
+          <li key={h.id}>
+            <a
+              href={`#${h.id}`}
+              className={`block py-1 text-sm transition-colors duration-200 ${h.level === 3 ? 'pl-6' : 'pl-3'
+                } ${activeId === h.id
+                  ? 'text-accent border-l-2 border-accent -ml-px'
+                  : 'text-text-muted hover:text-text-secondary'
+                }`}
+            >
+              {h.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+</file>
+
 <file path="src/pages/AdminPage.tsx">
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -5489,6 +6055,76 @@ function LoadingSkeleton({ rows }: Readonly<{ rows: number }>) {
 }
 </file>
 
+<file path="src/pages/CategoryPage.tsx">
+import { useParams } from 'react-router-dom';
+import { getArticlesByCategory } from '@/services/articleService';
+import { getCategoryBySlug } from '@/services/categoryService';
+
+import { PageContainer } from '@/components/layout/Navbar';
+import { ArticleGrid } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
+
+export function CategoryPage() {
+  const { category } = useParams<{ category: string }>();
+
+  const { data: articles = [], isLoading: articlesLoading } = useQuery({
+    queryKey: ['articles', 'category', category],
+    queryFn: () => getArticlesByCategory(category!),
+    enabled: Boolean(category),
+  });
+
+  const { data: cat, isLoading: catLoading } = useQuery({
+    queryKey: ['category', category],
+    queryFn: () => getCategoryBySlug(category!),
+    enabled: Boolean(category),
+    retry: false,
+  });
+
+  if (articlesLoading || catLoading) {
+    return (
+      <PageContainer className="py-8 md:py-12">
+        <div className="mb-8">
+          <Skeleton className="h-9 w-40" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (!cat) {
+    return (
+      <PageContainer className="py-20 text-center">
+        <h1 className="font-serif text-2xl text-text-primary mb-2">Category not found</h1>
+        <p className="text-text-muted">This category does not exist.</p>
+      </PageContainer>
+    );
+  }
+
+  const renderArticles = () => {
+    if (articles.length === 0) {
+      return <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
+    }
+
+    return <ArticleGrid articles={articles} />;
+  };
+
+  return (
+    <PageContainer className="py-8 md:py-12">
+      <div className="mb-8">
+        <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight capitalize">
+          {cat.name}
+        </h1>
+      </div>
+
+      {renderArticles()}
+    </PageContainer>
+  );
+}
+</file>
+
 <file path="src/pages/CreatorPage.tsx">
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
@@ -5594,180 +6230,6 @@ export function CreatorPage() {
         </div>
       </PageContainer>
     </div>
-  );
-}
-</file>
-
-<file path="vite.config.ts">
-/// <reference types="node" />
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { fileURLToPath, URL } from 'node:url';
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
-  server: {
-    host: true,
-    allowedHosts: [
-      'quakier-ascensive-melodie.ngrok-free.dev',
-    ],
-  },
-  optimizeDeps: {
-    include: ['lucide-react'],
-  },
-});
-</file>
-
-<file path="src/components/articles/TableOfContents.tsx">
-import { useEffect, useState } from 'react';
-import { slugifyHeading } from '@/utils/slugify';
-import { observe } from 'react-intersection-observer';
-
-type Heading = {
-  id: string;
-  text: string;
-  level: number;
-};
-export function extractHeadings(html: string): Heading[] {
-  const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
-  const headings = Array.from(parsedDoc.querySelectorAll('h1, h2, h3'));
-  const usedIds = new Set<string>();
-  return headings
-    .map((heading) => {
-      const text = heading.textContent?.trim() ?? '';
-      return {
-        id: text ? slugifyHeading(text, usedIds) : '',
-        text,
-        level: Number(heading.tagName.substring(1)),
-      };
-    })
-    .filter((heading) => heading.id !== '');
-}
-
-type TableOfContentsProps = {
-  headings: Heading[];
-};
-
-export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
-  const [activeId, setActiveId] = useState<string>('');
-
-
-  useEffect(() => {
-    const unobserveAll = headings
-      .map((h) => document.getElementById(h.id))
-      .filter((el): el is HTMLElement => el !== null)
-      .map((el) =>
-        observe(
-          el,
-          (inView) => {
-            if (inView) setActiveId(el.id);
-          },
-          { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
-        )
-      );
-    return () => unobserveAll.forEach((unobserve) => unobserve());
-  }, [headings]);
-
-  if (headings.length < 3) return null;
-
-  return (
-    <nav className="hidden lg:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-      <h4 className="font-mono text-xs uppercase tracking-wider text-text-muted mb-3">
-        On this page
-      </h4>
-      <ul className="space-y-1.5 border-l border-border-subtle">
-        {headings.map((h) => (
-          <li key={h.id}>
-            <a
-              href={`#${h.id}`}
-              className={`block py-1 text-sm transition-colors duration-200 ${h.level === 3 ? 'pl-6' : 'pl-3'
-                } ${activeId === h.id
-                  ? 'text-accent border-l-2 border-accent -ml-px'
-                  : 'text-text-muted hover:text-text-secondary'
-                }`}
-            >
-              {h.text}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-</file>
-
-<file path="src/pages/CategoryPage.tsx">
-import { useParams } from 'react-router-dom';
-import { getArticlesByCategory } from '@/services/articleService';
-import { getCategoryBySlug } from '@/services/categoryService';
-
-import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleGrid } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton, Skeleton } from '@/components/ui/Skeleton';
-import { useQuery } from '@tanstack/react-query';
-
-export function CategoryPage() {
-  const { category } = useParams<{ category: string }>();
-
-  const { data: articles = [], isLoading: articlesLoading } = useQuery({
-    queryKey: ['articles', 'category', category],
-    queryFn: () => getArticlesByCategory(category!),
-    enabled: Boolean(category),
-  });
-
-  const { data: cat, isLoading: catLoading } = useQuery({
-    queryKey: ['category', category],
-    queryFn: () => getCategoryBySlug(category!),
-    enabled: Boolean(category),
-    retry: false,
-  });
-
-  if (articlesLoading || catLoading) {
-    return (
-      <PageContainer className="py-8 md:py-12">
-        <div className="mb-8">
-          <Skeleton className="h-9 w-40" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-        </div>
-      </PageContainer>
-    );
-  }
-
-  if (!cat) {
-    return (
-      <PageContainer className="py-20 text-center">
-        <h1 className="font-serif text-2xl text-text-primary mb-2">Category not found</h1>
-        <p className="text-text-muted">This category does not exist.</p>
-      </PageContainer>
-    );
-  }
-
-  const renderArticles = () => {
-    if (articles.length === 0) {
-      return <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
-    }
-
-    return <ArticleGrid articles={articles} />;
-  };
-
-  return (
-    <PageContainer className="py-8 md:py-12">
-      <div className="mb-8">
-        <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight capitalize">
-          {cat.name}
-        </h1>
-      </div>
-
-      {renderArticles()}
-    </PageContainer>
   );
 }
 </file>
@@ -6178,6 +6640,230 @@ export function PasswordSettingsPage() {
       </section>
 
     </form>
+  );
+}
+</file>
+
+<file path="src/pages/ArticlesPage.tsx">
+import { useState } from 'react';
+import { getArticles } from '@/services/articleService';
+import { getCategories } from '@/services/categoryService';
+import { CategoryButton } from '@/components/ui/CategoryButton';
+import { PageContainer } from '@/components/layout/Navbar';
+import { ArticleCard } from '@/components/articles/ArticleCard';
+import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
+
+export function ArticlesPage() {
+  const [activeCategory, setActiveCategory] = useState('all');
+  const { data: articles = [], isLoading: loading } = useQuery({
+    queryKey: ['articles'],
+    queryFn: getArticles,
+  });
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
+
+  const filtered = activeCategory === 'all'
+    ? articles
+    : articles.filter((a) => a.category === activeCategory);
+
+  let articleContent;
+
+  if (loading) {
+    articleContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 9 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
+      </div>
+    );
+  } else if (filtered.length === 0) {
+    articleContent = (
+      <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
+    );
+  } else {
+    articleContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <PageContainer className="py-8 md:py-12">
+      <div className="mb-8">
+        <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight">
+          Articles
+        </h1>
+        <p className="mt-2 text-text-secondary">
+          All published writing, sorted by recency.
+        </p>
+      </div>
+
+      <div className="-mx-4 mb-8 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">        <CategoryButton
+        label="All"
+        active={activeCategory === 'all'}
+        onClick={() => setActiveCategory('all')}
+      />
+        {categories.map((cat) => (
+          <CategoryButton
+            key={cat.slug}
+            label={cat.name}
+            active={activeCategory === cat.slug}
+            onClick={() => setActiveCategory(cat.slug)}
+          />
+        ))}
+      </div>
+
+      {articleContent}
+    </PageContainer>
+  );
+}
+</file>
+
+<file path="src/components/layout/Navbar.tsx">
+import { type ReactNode, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, X, Sun, Moon } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserMenu } from '@/components/layout/UserMenu';
+import { NavbarSearch } from '@/components/layout/NavbarSearch';
+
+const navLinks = [
+  { label: 'Articles', to: '/articles' },
+  { label: 'About', to: '/about' },
+  { label: 'Creator', to: '/creator' },
+];
+
+export function Navbar() {
+  const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  const isActive = (path: string) => {
+    if (path === '/articles') return location.pathname.startsWith('/articles');
+    if (path === '/about') return location.pathname === '/about';
+    if (path === '/creator') return location.pathname === '/creator';
+    return false;
+  };
+
+  return (
+    <header className="sticky top-0 z-50 bg-bg/80 backdrop-blur-md border-b border-border-subtle">
+      <nav className="max-w-content mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <Link
+          to="/"
+          className="font-serif text-lg font-semibold text-text-primary hover:text-accent transition-colors duration-200 tracking-tight"
+          onClick={() => setMobileOpen(false)}
+        >
+          Lallu Syndrome
+        </Link>
+
+        {/* Desktop nav */}
+        <div className="hidden md:flex items-center gap-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${isActive(link.to)
+                ? 'text-text-primary'
+                : 'text-text-secondary hover:text-text-primary'
+                }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+          <NavbarSearch />
+
+          {user ? (
+            <UserMenu onNavigate={() => setMobileOpen(false)} />
+          ) : (
+            <Link
+              to="/login"
+              className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors duration-200"
+            >
+              Sign in
+            </Link>
+          )}
+
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="ml-2 p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
+
+        {/* Mobile controls */}
+        <div className="flex md:hidden items-center gap-2">
+          {user && <UserMenu onNavigate={() => setMobileOpen(false)} />}
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
+            aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-border-subtle bg-bg animate-fade-in">
+          <div className="px-4 py-4 space-y-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="block px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <NavbarSearch />
+            {!user && (
+              <Link
+                to="/login"
+                className="block px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
+                onClick={() => setMobileOpen(false)}
+              >
+                Sign in
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
+
+export function PageContainer({
+  children,
+  className,
+}: Readonly<{ children: ReactNode; className?: string }>) {
+  return (
+    <div className={`max-w-content mx-auto px-4 sm:px-6 ${className ?? ''}`}>
+      {children}
+    </div>
   );
 }
 </file>
@@ -6603,484 +7289,6 @@ export function ProfileSettingsPage() {
 }
 </file>
 
-<file path="src/pages/ArticlesPage.tsx">
-import { useState } from 'react';
-import { getArticles } from '@/services/articleService';
-import { getCategories } from '@/services/categoryService';
-import { CategoryButton } from '@/components/ui/CategoryButton';
-import { PageContainer } from '@/components/layout/Navbar';
-import { ArticleCard } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
-import { useQuery } from '@tanstack/react-query';
-
-export function ArticlesPage() {
-  const [activeCategory, setActiveCategory] = useState('all');
-  const { data: articles = [], isLoading: loading } = useQuery({
-    queryKey: ['articles'],
-    queryFn: getArticles,
-  });
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: getCategories,
-  });
-
-  const filtered = activeCategory === 'all'
-    ? articles
-    : articles.filter((a) => a.category === activeCategory);
-
-  let articleContent;
-
-  if (loading) {
-    articleContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 9 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-      </div>
-    );
-  } else if (filtered.length === 0) {
-    articleContent = (
-      <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>
-    );
-  } else {
-    articleContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <PageContainer className="py-8 md:py-12">
-      <div className="mb-8">
-        <h1 className="font-serif text-3xl md:text-4xl font-semibold text-text-primary tracking-tight">
-          Articles
-        </h1>
-        <p className="mt-2 text-text-secondary">
-          All published writing, sorted by recency.
-        </p>
-      </div>
-
-      <div className="-mx-4 mb-8 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">        <CategoryButton
-        label="All"
-        active={activeCategory === 'all'}
-        onClick={() => setActiveCategory('all')}
-      />
-        {categories.map((cat) => (
-          <CategoryButton
-            key={cat.slug}
-            label={cat.name}
-            active={activeCategory === cat.slug}
-            onClick={() => setActiveCategory(cat.slug)}
-          />
-        ))}
-      </div>
-
-      {articleContent}
-    </PageContainer>
-  );
-}
-</file>
-
-<file path="src/services/authService.ts">
-import { supabase } from '@/lib/supabase';
-import type { AuthState } from '@/types';
-import { FunctionsHttpError } from '@supabase/supabase-js';
-
-type AuthCallback = (state: AuthState) => void;
-
-export function onAuthChange(cb: AuthCallback): () => void {
-
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    cb({
-      user: session?.user ?? null,
-      isLoading: false
-    })
-  })
-  return () => subscription.unsubscribe();
-}
-
-export async function getAuthState(): Promise<AuthState> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return {
-    user: session?.user ?? null,
-    isLoading: false,
-  };
-}
-
-export async function login(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) { throw new Error(error.message); }
-
-  return data.user;
-}
-
-export async function signup(name: string, email: string, password: string) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { name },
-    },
-  });
-  if (error) { throw new Error(error.message); }
-  return data;
-}
-
-export async function forgotPassword(email: string): Promise<void> {
-  const { error } = await supabase.auth.resetPasswordForEmail(
-    email, { redirectTo: `${window.location.origin}/reset-password` }
-  );
-
-  if (error) { throw new Error(error.message); }
-}
-
-export async function resetPassword(password: string): Promise<void> {
-  const { error } = await supabase.auth.updateUser({ password });
-
-  if (error) { throw new Error(error.message); }
-}
-
-export async function logout(): Promise<void> {
-  const { error } = await supabase.auth.signOut();
-
-  if (error) { throw new Error(error.message); }
-}
-export async function deleteOwnAccount(): Promise<void> {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    throw new Error('You must be logged in to delete your account.');
-  }
-  const { error } = await supabase.functions.invoke('delete-user', {
-    body: { userId: user.id },
-  });
-  if (error) {
-    let message = 'Failed to delete account.';
-    if (error instanceof FunctionsHttpError) {
-      try {
-        const body = await error.context.json();
-        if (body?.error) message = body.error;
-      } catch {
-        // keep default message
-      }
-    }
-    throw new Error(message);
-  }
-}
-</file>
-
-<file path="src/services/storageService.ts">
-import { supabase } from '@/lib/supabase';
-
-const BUCKET = 'media';
-
-export interface StorageUploadResult {
-  path: string;
-  publicUrl: string;
-}
-export async function cleanupArticleContentMedia(
-  articleId: string,
-  content: string
-): Promise<void> {
-  const folder = `articles/${articleId}/content`;
-
-  const referencedPaths = new Set(
-    extractStorageImagePaths(content)
-  );
-
-  const { data: files, error: listError } = await supabase.storage
-    .from(BUCKET)
-    .list(folder, {
-      limit: 1000,
-      sortBy: { column: 'name', order: 'asc' },
-    });
-
-  if (listError) {
-    throw listError;
-  }
-
-  const storedPaths = (files ?? [])
-    .filter(
-      (file) =>
-        file.name &&
-        file.name !== '.emptyFolderPlaceholder'
-    )
-    .map((file) => `${folder}/${file.name}`);
-
-  const orphanedPaths = storedPaths.filter(
-    (path) => !referencedPaths.has(path)
-  );
-
-  if (orphanedPaths.length === 0) {
-    return;
-  }
-
-  const { error: deleteError } = await supabase.storage
-    .from(BUCKET)
-    .remove(orphanedPaths);
-
-  if (deleteError) {
-    throw deleteError;
-  }
-}
-export async function upload(articleId: string, file: File, type: 'cover' | 'content'): Promise<StorageUploadResult> {
-
-  const MAX_CONTENT_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
-  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
-
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error('Unsupported image type.');
-  if (file.size > MAX_CONTENT_IMAGE_SIZE) throw new Error('Image must be under 5 MB.');
-
-  let filePath = `articles/${articleId}/`;
-  const extension = file.name.split('.').pop()?.toLowerCase() || file.type.split("/").pop()?.toLowerCase();
-  if (!extension) {
-    throw new Error('Unable to determine file extension.');
-  }
-  if (type === "content") {
-    filePath += `${type}/${crypto.randomUUID()}.${extension}`
-  } else {
-    filePath += `cover.${extension}`
-  }
-  const { data, error } = await supabase.storage.from(BUCKET).upload(filePath, file)
-  if (error) {
-    throw error
-  }
-  return {
-    path: data.path,
-    publicUrl: getPublicUrl(data.path),
-  };
-}
-
-export async function deleteArticleMedia(
-  content: string,
-  coverImage: string | null,
-): Promise<void> {
-  const paths = extractStorageImagePaths(content);
-
-  if (coverImage) {
-    const prefix =
-      `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
-
-    if (coverImage.startsWith(prefix)) {
-      paths.push(coverImage.slice(prefix.length));
-    }
-  }
-
-  const uniquePaths = [...new Set(paths)];
-
-  if (uniquePaths.length === 0) {
-    return;
-  }
-
-  for (let i = 0; i < uniquePaths.length; i += 1000) {
-    const batch = uniquePaths.slice(i, i + 1000);
-
-    const { error } = await supabase
-      .storage
-      .from(BUCKET)
-      .remove(batch);
-
-    if (error) {
-      throw error;
-    }
-  }
-}
-export async function deleteCoverImage(path: string): Promise<void> {
-  const prefix =
-    `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
-
-  if (!path.startsWith(prefix)) {
-    return;
-  }
-
-  const storagePath = path.slice(prefix.length);
-
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .remove([storagePath]);
-
-  if (error) {
-    throw error;
-  }
-}
-
-export function getPublicUrl(path: string): string {
-  const { data } = supabase
-    .storage
-    .from(BUCKET)
-    .getPublicUrl(path)
-  return data["publicUrl"]
-}
-export function extractStorageImagePaths(content: string): string[] {
-  const publicUrlPrefix =
-    `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
-
-  const parsedDoc = new DOMParser().parseFromString(content,'text/html');
-
-  const paths: string[] = [];
-
-  parsedDoc.querySelectorAll('img[src]').forEach((image) => {
-    const src = image.getAttribute('src');
-
-    if (!src) {
-      return;
-    }
-
-    if (src.startsWith(publicUrlPrefix)) {
-      paths.push(src.slice(publicUrlPrefix.length));
-    }
-  });
-
-  return [...new Set(paths)];
-}
-</file>
-
-<file path="src/components/layout/Navbar.tsx">
-import { type ReactNode, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sun, Moon } from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { UserMenu } from '@/components/layout/UserMenu';
-import { NavbarSearch } from '@/components/layout/NavbarSearch';
-
-const navLinks = [
-  { label: 'Articles', to: '/articles' },
-  { label: 'About', to: '/about' },
-  { label: 'Creator', to: '/creator' },
-];
-
-export function Navbar() {
-  const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
-
-  const isActive = (path: string) => {
-    if (path === '/articles') return location.pathname.startsWith('/articles');
-    if (path === '/about') return location.pathname === '/about';
-    if (path === '/creator') return location.pathname === '/creator';
-    return false;
-  };
-
-  return (
-    <header className="sticky top-0 z-50 bg-bg/80 backdrop-blur-md border-b border-border-subtle">
-      <nav className="max-w-content mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link
-          to="/"
-          className="font-serif text-lg font-semibold text-text-primary hover:text-accent transition-colors duration-200 tracking-tight"
-          onClick={() => setMobileOpen(false)}
-        >
-          Lallu Syndrome
-        </Link>
-
-        {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-200 ${isActive(link.to)
-                ? 'text-text-primary'
-                : 'text-text-secondary hover:text-text-primary'
-                }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <NavbarSearch />
-
-          {user ? (
-            <UserMenu onNavigate={() => setMobileOpen(false)} />
-          ) : (
-            <Link
-              to="/login"
-              className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors duration-200"
-            >
-              Sign in
-            </Link>
-          )}
-
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="ml-2 p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </div>
-
-        {/* Mobile controls */}
-        <div className="flex md:hidden items-center gap-2">
-          {user && <UserMenu onNavigate={() => setMobileOpen(false)} />}
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            className="p-2 rounded text-text-secondary hover:text-text-primary hover:bg-elevated transition-colors duration-200"
-            aria-label="Toggle menu"
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-border-subtle bg-bg animate-fade-in">
-          <div className="px-4 py-4 space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="block px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <NavbarSearch />
-            {!user && (
-              <Link
-                to="/login"
-                className="block px-3 py-2.5 text-base font-medium text-text-secondary hover:text-text-primary hover:bg-elevated rounded transition-colors"
-                onClick={() => setMobileOpen(false)}
-              >
-                Sign in
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </header>
-  );
-}
-
-export function PageContainer({
-  children,
-  className,
-}: Readonly<{ children: ReactNode; className?: string }>) {
-  return (
-    <div className={`max-w-content mx-auto px-4 sm:px-6 ${className ?? ''}`}>
-      {children}
-    </div>
-  );
-}
-</file>
-
 <file path="src/pages/WriterProfilePage.tsx">
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -7324,6 +7532,260 @@ function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
 }
 </file>
 
+<file path="src/services/authService.ts">
+import { supabase } from '@/lib/supabase';
+import type { AuthState } from '@/types';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
+type AuthCallback = (state: AuthState) => void;
+
+export function onAuthChange(cb: AuthCallback): () => void {
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    cb({
+      user: session?.user ?? null,
+      isLoading: false
+    })
+  })
+  return () => subscription.unsubscribe();
+}
+
+export async function getAuthState(): Promise<AuthState> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return {
+    user: session?.user ?? null,
+    isLoading: false,
+  };
+}
+
+export async function login(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) { throw new Error(error.message); }
+
+  return data.user;
+}
+
+export async function signup(name: string, email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name },
+    },
+  });
+  if (error) { throw new Error(error.message); }
+  return data;
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email, { redirectTo: `${window.location.origin}/reset-password` }
+  );
+
+  if (error) { throw new Error(error.message); }
+}
+
+export async function resetPassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) { throw new Error(error.message); }
+}
+
+export async function logout(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) { throw new Error(error.message); }
+}
+export async function deleteOwnAccount(): Promise<void> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    throw new Error('You must be logged in to delete your account.');
+  }
+  const { error } = await supabase.functions.invoke('delete-user', {
+    body: { userId: user.id },
+  });
+  if (error) {
+    let message = 'Failed to delete account.';
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      } catch {
+        // keep default message
+      }
+    }
+    throw new Error(message);
+  }
+}
+</file>
+
+<file path="src/services/storageService.ts">
+import { supabase } from '@/lib/supabase';
+import {optimizeForUpload} from '@/utils/compression';
+const BUCKET = 'media';
+
+export interface StorageUploadResult {
+  path: string;
+  publicUrl: string;
+}
+export async function cleanupArticleContentMedia(
+  articleId: string,
+  content: string
+): Promise<void> {
+  const folder = `articles/${articleId}/content`;
+
+  const referencedPaths = new Set(
+    extractStorageImagePaths(content)
+  );
+
+  const { data: files, error: listError } = await supabase.storage
+    .from(BUCKET)
+    .list(folder, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+
+  if (listError) {
+    throw listError;
+  }
+
+  const storedPaths = (files ?? [])
+    .filter(
+      (file) =>
+        file.name &&
+        file.name !== '.emptyFolderPlaceholder'
+    )
+    .map((file) => `${folder}/${file.name}`);
+
+  const orphanedPaths = storedPaths.filter(
+    (path) => !referencedPaths.has(path)
+  );
+
+  if (orphanedPaths.length === 0) {
+    return;
+  }
+
+  const { error: deleteError } = await supabase.storage
+    .from(BUCKET)
+    .remove(orphanedPaths);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+}
+export async function upload(articleId: string, file: File, type: 'cover' | 'content'): Promise<StorageUploadResult> {
+  file = await optimizeForUpload(file); 
+  const MAX_CONTENT_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error('Unsupported image type.');
+  if (file.size > MAX_CONTENT_IMAGE_SIZE) throw new Error('Image must be under 5 MB.');
+
+  let filePath = `articles/${articleId}/`;
+  const extension = file.name.split('.').pop()?.toLowerCase() || file.type.split("/").pop()?.toLowerCase();
+  if (!extension) {
+    throw new Error('Unable to determine file extension.');
+  }
+  if (type === "content") {
+    filePath += `${type}/${crypto.randomUUID()}.${extension}`
+  } else {
+    filePath += `cover.${extension}`
+  }
+  const { data, error } = await supabase.storage.from(BUCKET).upload(filePath, file)
+  if (error) {
+    throw error
+  }
+  return {
+    path: data.path,
+    publicUrl: getPublicUrl(data.path),
+  };
+}
+
+export async function deleteArticleMedia(
+  content: string,
+  coverImage: string | null,
+): Promise<void> {
+  const paths = extractStorageImagePaths(content);
+
+  if (coverImage) {
+    const prefix =
+      `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+
+    if (coverImage.startsWith(prefix)) {
+      paths.push(coverImage.slice(prefix.length));
+    }
+  }
+
+  const uniquePaths = [...new Set(paths)];
+
+  if (uniquePaths.length === 0) {
+    return;
+  }
+
+  for (let i = 0; i < uniquePaths.length; i += 1000) {
+    const batch = uniquePaths.slice(i, i + 1000);
+
+    const { error } = await supabase
+      .storage
+      .from(BUCKET)
+      .remove(batch);
+
+    if (error) {
+      throw error;
+    }
+  }
+}
+export async function deleteCoverImage(path: string): Promise<void> {
+  const prefix =
+    `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+
+  if (!path.startsWith(prefix)) {
+    return;
+  }
+
+  const storagePath = path.slice(prefix.length);
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .remove([storagePath]);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export function getPublicUrl(path: string): string {
+  const { data } = supabase
+    .storage
+    .from(BUCKET)
+    .getPublicUrl(path)
+  return data["publicUrl"]
+}
+export function extractStorageImagePaths(content: string): string[] {
+  const publicUrlPrefix =
+    `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+
+  const parsedDoc = new DOMParser().parseFromString(content,'text/html');
+
+  const paths: string[] = [];
+
+  parsedDoc.querySelectorAll('img[src]').forEach((image) => {
+    const src = image.getAttribute('src');
+
+    if (!src) {
+      return;
+    }
+
+    if (src.startsWith(publicUrlPrefix)) {
+      paths.push(src.slice(publicUrlPrefix.length));
+    }
+  });
+
+  return [...new Set(paths)];
+}
+</file>
+
 <file path="src/components/articles/ArticleCard.tsx">
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -7406,18 +7868,30 @@ import { slugifyHeading } from '@/utils/slugify';
 type ArticleContentProps = {
   content: string;
 };
-DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
-   if (data.attrName === 'style' && node.nodeName !== 'IMG') {
-     data.keepAttr = false;
-   }
- });
+
 export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
   const finalHtml = useMemo(() => {
     if (!content) return '';
 
     const sanitized = DOMPurify.sanitize(content, {
       USE_PROFILES: { html: true },
-      ADD_ATTR: ['target', 'rel', 'class', 'style', 'data-width', 'data-alignment'],
+      ADD_TAGS: ['iframe'],
+      ADD_ATTR: [
+        'target', 'rel', 'class', 'style', 'data-width', 'data-alignment',
+        'src', 'frameborder', 'allow', 'allowfullscreen', 'title', 'loading', 'referrerpolicy',
+      ],
+    });  
+
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+      if (node.tagName === 'IFRAME') {
+        const src = node.getAttribute('src') || '';
+        const isYouTube = /^https:\/\/(www\.)?(youtube\.com|youtube-nocookie\.com)\/embed\/[a-zA-Z0-9_-]+/.test(src);
+        if (!isYouTube) {
+          node.remove();
+        } else {
+          node.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        }
+      }
     });
 
     const parsedDoc = new DOMParser().parseFromString(sanitized, 'text/html');
@@ -7445,9 +7919,9 @@ export function ArticleContent({ content }: Readonly<ArticleContentProps>) {
       heading.id = slugifyHeading(text, usedIds);
       heading.classList.add('scroll-mt-20');
     });
-   
+
     return parsedDoc.body.innerHTML;
-  }, [content]); 
+  }, [content]);
 
   return (
     <div
@@ -7639,431 +8113,6 @@ export function AboutPage() {
       </PageContainer>
     </div>
   );
-}
-</file>
-
-<file path="src/index.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    /* Dark theme (default) */
-    --color-bg: #090909;
-    --color-surface: #111111;
-    --color-elevated: #171717;
-    --color-border: #292929;
-    --color-border-subtle: #1e1e1e;
-    --color-text-primary: #F4F4F4;
-    --color-text-secondary: #A0A0A0;
-    --color-text-muted: #707070;
-    --color-accent: #B00000;
-    --color-accent-hover: #C20A0A;
-  }
-
-  .light {
-    --color-bg: #F7F7F5;
-    /* Main page: soft warm off-white */
-    --color-surface: #F0F0ED;
-    /* Cards/sections: subtle contrast */
-    --color-elevated: #FFFFFF;
-    /* Only elevated elements needing separation */
-
-    --color-border: #D9D9D5;
-    --color-border-subtle: #E8E8E4;
-
-    --color-text-primary: #181818;
-    /* Nearly black, less harsh */
-    --color-text-secondary: #626262;
-    --color-text-muted: #8A8A8A;
-
-    --color-accent: #9E0000;
-    --color-accent-hover: #B00000;
-  }
-
-  * {
-    border-color: var(--color-border);
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    background-color: var(--color-bg);
-    color: var(--color-text-primary);
-    font-family: 'Inter', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    transition: background-color 200ms ease, color 200ms ease;
-  }
-
-  ::selection {
-    background-color: var(--color-accent);
-    color: #ffffff;
-  }
-
-  /* Focus visible */
-  *:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: var(--color-bg);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted);
-  }
-}
-
-@layer components {
-
-  .article-prose {
-    @apply text-text-secondary leading-[1.7] text-base sm:leading-[1.75] sm:text-[1.125rem];
-  }
-
-  .article-prose p {
-    @apply my-4 sm:my-5;
-  }
-
-  .article-prose h1 {
-    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-medium text-text-primary mt-8 sm:mt-12 mb-4 leading-[1.2] tracking-tight;
-  }
-
-  .article-prose h2 {
-    @apply font-serif text-xl sm:text-2xl md:text-3xl font-medium text-text-primary mt-8 sm:mt-10 mb-3 leading-[1.25] tracking-tight;
-  }
-
-  .article-prose h3 {
-    @apply font-serif text-lg sm:text-xl md:text-2xl font-medium text-text-primary mt-6 sm:mt-8 mb-2 leading-[1.3] tracking-tight;
-  }
-
-  .article-prose blockquote {
-    @apply my-5 sm:my-6 pl-4 sm:pl-5 border-l-2 border-accent text-text-primary italic font-serif text-base sm:text-lg leading-relaxed;
-  }
-
-  .article-prose .ProseMirror p {
-    position: relative;
-  }
-
-  .article-prose a {
-    @apply text-text-primary underline decoration-accent decoration-2 underline-offset-2 hover:text-accent transition-colors duration-200;
-  }
-
-  .article-prose strong {
-    @apply font-semibold text-text-primary;
-  }
-
-  .article-prose em {
-    @apply italic;
-  }
-
-  .article-prose del {
-    @apply text-text-muted;
-  }
-
-  .article-prose ul {
-    @apply my-5 pl-6 list-disc space-y-2;
-  }
-
-  .article-prose ol {
-    @apply my-5 pl-6 list-decimal space-y-2;
-  }
-
-  .article-prose li {
-    @apply text-text-secondary;
-  }
-
-  .article-prose code {
-    @apply font-mono text-[0.875em] px-1.5 py-0.5 rounded bg-elevated text-text-primary;
-  }
-
-  .article-prose pre {
-    @apply my-6 rounded-card overflow-hidden;
-  }
-
-  .article-prose pre code {
-    @apply bg-transparent p-0 text-sm;
-  }
-
-  .article-prose img {
-    @apply block rounded-card my-6 max-w-full h-auto;
-  }
-
-  .article-prose table {
-    @apply my-6 w-full border-collapse text-sm;
-  }
-
-  .article-prose th {
-    @apply text-left font-semibold text-text-primary border border-border px-4 py-2.5 bg-surface;
-  }
-
-  .article-prose td {
-    @apply text-text-secondary border border-border px-4 py-2.5;
-  }
-
-  .article-prose hr {
-    @apply my-10 border-border;
-  }
-
-  .tiptap-code-block {
-    @apply my-6 overflow-hidden rounded-card border border-border bg-elevated;
-  }
-
-  .tiptap-code-block__header {
-    @apply flex items-center justify-between border-b border-border bg-surface px-3 py-2;
-  }
-
-  .tiptap-code-block__language {
-    @apply bg-transparent text-xs font-mono text-text-secondary outline-none;
-  }
-
-  .tiptap-code-block__actions {
-    @apply flex items-center gap-1;
-  }
-
-  .tiptap-code-block__action {
-    @apply inline-flex items-center justify-center rounded p-1.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
-  }
-
-  .tiptap-code-block__action--danger {
-    @apply hover:text-accent;
-  }
-
-  .tiptap-code-block__content {
-    @apply overflow-x-auto p-4 font-mono text-sm leading-relaxed text-text-primary;
-  }
-
-  .tiptap-code-block__content .ProseMirror {
-    @apply m-0 min-h-0 bg-transparent p-0 outline-none font-mono text-sm text-text-primary;
-  }
-
-}
-.tiptap-code-block__action {
-  @apply inline-flex items-center justify-center rounded p-2.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
-}
-
-/* ── AboutPage animations ─────────────────────────────── */
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.anim-fade-up {
-  opacity: 0;
-  animation: fadeUp 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-}
-
-@keyframes blink {
-
-  0%,
-  50% {
-    opacity: 1;
-  }
-
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.anim-blink {
-  animation: blink 1.1s steps(1) infinite;
-}
-
-@keyframes rotateGradient {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.avatar-ring::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background: conic-gradient(from 0deg,
-      transparent 0deg,
-      rgba(220, 38, 38, 0.9) 40deg,
-      transparent 90deg,
-      transparent 360deg);
-  animation: rotateGradient 6s linear infinite;
-  z-index: 0;
-}
-
-.avatar-ring>img {
-  position: relative;
-  z-index: 1;
-}
-
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.anim-marquee {
-  animation: marquee 35s linear infinite;
-}
-
-.marquee-mask {
-  mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
-}
-
-.link-underline {
-  position: relative;
-}
-
-.link-underline::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -2px;
-  height: 1px;
-  width: 100%;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: right center;
-  transition: transform 450ms cubic-bezier(0.7, 0, 0.2, 1);
-}
-
-.link-underline:hover::after {
-  transform: scaleX(1);
-  transform-origin: left center;
-}
-
-@keyframes wipe {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
-.anim-wipe {
-  animation: wipe 1.2s cubic-bezier(0.7, 0, 0.2, 1) both;
-}
-
-.grain::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.035;
-  z-index: 1;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
-.anim-arrow {
-  transition: transform 350ms ease;
-}
-
-.link-underline:hover .anim-arrow {
-  transform: translate(2px, -2px);
-}
-
-.avatar-hover {
-  transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 500ms ease;
-}
-
-.avatar-hover:hover {
-  transform: scale(1.03);
-  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4), 0 20px 40px -10px rgba(220, 38, 38, 0.15);
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .text-pretty {
-    text-wrap: pretty;
-  }
-}
-.group:hover .link-underline::after {
-  transform: scaleX(1);
-  transform-origin: left center;
-}
-/* Oval portrait — the house avatar shape (4:5, egg-framed) */
-.avatar {
-  aspect-ratio: 4 / 5;
-  border-radius: 9999px;
-  object-fit: cover;
-  object-position: center;
-}
-
-/* Tiptap borderless, page-flush */
-.ProseMirror {
-  outline: none;
-}
-
-.ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-  color: var(--color-text-muted);
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-/* Algolia InstantSearch overrides */
-.ais-Hits-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.ais-Highlight-highlighted {
-  background-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-  color: inherit;
-  padding: 0 1px;
-  border-radius: 2px;
 }
 </file>
 
@@ -8454,204 +8503,431 @@ function CommentItem({
 }
 </file>
 
-<file path="src/pages/DashboardPage.tsx">
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import type { Article } from '@/types';
-import { getMyArticles, deleteArticle } from '@/services/articleService';
-import { useAuth } from '@/contexts/AuthContext';
-import { PageContainer } from '@/components/layout/Navbar';
-import { formatDate } from '@/utils/date';
-import { Badge } from '@/components/ui/Badge';
-import { Plus, Trash2, FileText, EyeIcon } from 'lucide-react';
-import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+<file path="src/index.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-export function DashboardPage() {
-  const { user, profile } = useAuth();
-  const [tab, setTab] = useState<'published' | 'drafts'>('published');
+@layer base {
+  :root {
+    /* Dark theme (default) */
+    --color-bg: #090909;
+    --color-surface: #111111;
+    --color-elevated: #171717;
+    --color-border: #292929;
+    --color-border-subtle: #1e1e1e;
+    --color-text-primary: #F4F4F4;
+    --color-text-secondary: #A0A0A0;
+    --color-text-muted: #707070;
+    --color-accent: #B00000;
+    --color-accent-hover: #C20A0A;
+  }
 
-  // Modal State
-  const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
+  .light {
+    --color-bg: #F7F7F5;
+    /* Main page: soft warm off-white */
+    --color-surface: #F0F0ED;
+    /* Cards/sections: subtle contrast */
+    --color-elevated: #FFFFFF;
+    /* Only elevated elements needing separation */
 
-  const queryClient = useQueryClient();
-  const { data: articles = [], isLoading: loading } = useQuery({
-    queryKey: ['my-articles', user?.id],
-    queryFn: () => getMyArticles(user!.id),
-    enabled: Boolean(user),
-  });
+    --color-border: #D9D9D5;
+    --color-border-subtle: #E8E8E4;
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteArticle,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
-      setArticleToDelete(null);
-    },
-    onError: (error) => console.error('Failed to delete article:', error),
-  });
+    --color-text-primary: #181818;
+    /* Nearly black, less harsh */
+    --color-text-secondary: #626262;
+    --color-text-muted: #8A8A8A;
 
-  const published = articles.filter((a) => a.status === 'published');
-  const drafts = articles.filter((a) => a.status === 'draft');
-  const displayed = tab === 'published' ? published : drafts;
+    --color-accent: #9E0000;
+    --color-accent-hover: #B00000;
+  }
 
-  const articleListContent = (() => {
-    if (loading) {
-      return (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded border border-border-subtle bg-surface animate-pulse" />
-          ))}
-        </div>
-      );
-    }
+  * {
+    border-color: var(--color-border);
+  }
 
-    if (displayed.length === 0) {
-      return (
-        <div className="py-16 text-center">
-          <FileText size={32} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary">
-            {tab === 'drafts' ? 'No drafts. Go write something.' : 'No published articles yet.'}
-          </p>
-        </div>
-      );
-    }
+  html {
+    scroll-behavior: smooth;
+  }
 
-    return (
-      <div className="space-y-2">
-        {displayed.map((article) => (
-          <div
-            key={article.id}
-            className="flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface hover:border-border transition-colors duration-200 group"
-          >
-            <div className="flex-1 min-w-0">
-              <Link
-                to={`/dashboard/articles/${article.id}`}
-                className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1"
-              >
-                {article.title}
-              </Link>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Badge variant="muted">{article.category}</Badge>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted truncate max-w-[120px]" title={article.publication.name}>
-                  {article.publication.name}
-                </span>
-                <span className="font-mono text-xs text-text-muted">
-                  {article.publishedAt && formatDate(article.publishedAt)}
-                </span>
-                <span className="font-mono text-xs text-text-muted">
-                  {article.readingTime} min
-                </span>
-              </div>
-            </div>
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
 
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Link
+  ::selection {
+    background-color: var(--color-accent);
+    color: #ffffff;
+  }
 
-                to={`/articles/${article.slug}`}
-                className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
-                aria-label="Preview article"
-              >
-                <EyeIcon size={16} />
-              </Link>
-              <button
-                type="button"
-                onClick={() => setArticleToDelete(article)}
-                className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
-                aria-label="Delete article"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  })();
+  /* Focus visible */
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 
-  return (
-    <PageContainer className="py-8 md:py-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="font-serif text-3xl font-semibold text-text-primary tracking-tight">
-            Dashboard
-          </h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            {user ? `Signed in as ${user.user_metadata.name}` : 'Manage your writing.'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/dashboard/publications"
-            className="inline-flex items-center gap-1.5 rounded border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary"
-          >
-            Publications
-          </Link>
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-          <Link
-            to="/dashboard/articles/new"
-            className="inline-flex items-center gap-1.5 rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-          >
-            <Plus size={16} />
-            New Article
-          </Link>
-        </div>
-      </div>
-      {!profile?.username && (
-        <div className="mb-6 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-text-secondary">
-          <span className="font-medium text-text-primary">No username set.</span>{' '}
-          Readers won’t be able to find more articles by you without one.{' '}
-          <Link to="/settings/profile" className="text-accent hover:text-accent-hover underline underline-offset-2">
-            Set your username
-          </Link>
-        </div>
-      )}
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border mb-6">
-        <TabButton
-          label="Published"
-          count={published.length}
-          active={tab === 'published'}
-          onClick={() => setTab('published')}
-        />
-        <TabButton
-          label="Drafts"
-          count={drafts.length}
-          active={tab === 'drafts'}
-          onClick={() => setTab('drafts')}
-        />
-      </div>
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
 
-      {/* Article List */}
-      {articleListContent}
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={Boolean(articleToDelete)}
-        isLoading={deleteMutation.isPending}
-        onClose={() => setArticleToDelete(null)}
-        onConfirm={() => articleToDelete && deleteMutation.mutate(articleToDelete.id)}
-        title="Delete Article"
-        message={`Are you sure you want to delete "${articleToDelete?.title}"? This action cannot be undone.`}
-      />
-    </PageContainer>
-  );
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+  }
 }
 
-function TabButton({ label, count, active, onClick }: Readonly<{ label: string; count: number; active: boolean; onClick: () => void }>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
-        ? 'border-accent text-text-primary'
-        : 'border-transparent text-text-muted hover:text-text-secondary'
-        }`}
-    >
-      {label}
-      <span className="ml-1.5 font-mono text-xs text-text-muted">{count}</span>
-    </button>
-  );
+@layer components {
+
+  .article-prose {
+    @apply text-text-secondary leading-[1.7] text-base sm:leading-[1.75] sm:text-[1.125rem];
+  }
+
+  .article-prose p {
+    @apply my-4 sm:my-5;
+  }
+
+  .article-prose h1 {
+    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-medium text-text-primary mt-8 sm:mt-12 mb-4 leading-[1.2] tracking-tight;
+  }
+
+  .article-prose h2 {
+    @apply font-serif text-xl sm:text-2xl md:text-3xl font-medium text-text-primary mt-8 sm:mt-10 mb-3 leading-[1.25] tracking-tight;
+  }
+
+  .article-prose h3 {
+    @apply font-serif text-lg sm:text-xl md:text-2xl font-medium text-text-primary mt-6 sm:mt-8 mb-2 leading-[1.3] tracking-tight;
+  }
+
+  .article-prose blockquote {
+    @apply my-5 sm:my-6 pl-4 sm:pl-5 border-l-2 border-accent text-text-primary italic font-serif text-base sm:text-lg leading-relaxed;
+  }
+
+  .article-prose .ProseMirror p {
+    position: relative;
+  }
+
+  .article-prose a {
+    @apply text-text-primary underline decoration-accent decoration-2 underline-offset-2 hover:text-accent transition-colors duration-200;
+  }
+
+  .article-prose strong {
+    @apply font-semibold text-text-primary;
+  }
+
+  .article-prose em {
+    @apply italic;
+  }
+
+  .article-prose del {
+    @apply text-text-muted;
+  }
+
+  .article-prose ul {
+    @apply my-5 pl-6 list-disc space-y-2;
+  }
+
+  .article-prose ol {
+    @apply my-5 pl-6 list-decimal space-y-2;
+  }
+
+  .article-prose li {
+    @apply text-text-secondary;
+  }
+
+  .article-prose code {
+    @apply font-mono text-[0.875em] px-1.5 py-0.5 rounded bg-elevated text-text-primary;
+  }
+
+  .article-prose pre {
+    @apply my-6 rounded-card overflow-hidden;
+  }
+
+  .article-prose pre code {
+    @apply bg-transparent p-0 text-sm;
+  }
+
+  .article-prose img {
+    @apply block rounded-card my-6 max-w-full h-auto;
+  }
+
+  .article-prose table {
+    @apply my-6 w-full border-collapse text-sm;
+  }
+
+  .article-prose th {
+    @apply text-left font-semibold text-text-primary border border-border px-4 py-2.5 bg-surface;
+  }
+
+  .article-prose td {
+    @apply text-text-secondary border border-border px-4 py-2.5;
+  }
+
+  .article-prose hr {
+    @apply my-10 border-border;
+  }
+
+  .tiptap-code-block {
+    @apply my-6 overflow-hidden rounded-card border border-border bg-elevated;
+  }
+
+  .tiptap-code-block__header {
+    @apply flex items-center justify-between border-b border-border bg-surface px-3 py-2;
+  }
+
+  .tiptap-code-block__language {
+    @apply bg-transparent text-xs font-mono text-text-secondary outline-none;
+  }
+
+  .tiptap-code-block__actions {
+    @apply flex items-center gap-1;
+  }
+
+  .tiptap-code-block__action {
+    @apply inline-flex items-center justify-center rounded p-1.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
+  }
+
+  .tiptap-code-block__action--danger {
+    @apply hover:text-accent;
+  }
+
+  .tiptap-code-block__content {
+    @apply overflow-x-auto p-4 font-mono text-sm leading-relaxed text-text-primary;
+  }
+
+  .tiptap-code-block__content .ProseMirror {
+    @apply m-0 min-h-0 bg-transparent p-0 outline-none font-mono text-sm text-text-primary;
+  }
+
+}
+.tiptap-code-block__action {
+  @apply inline-flex items-center justify-center rounded p-2.5 text-text-muted transition-colors duration-200 hover:bg-elevated hover:text-text-primary;
+}
+
+/* ── AboutPage animations ─────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anim-fade-up {
+  opacity: 0;
+  animation: fadeUp 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+.article-prose iframe.youtube-embed {
+  @apply my-6 block w-full aspect-video rounded-card border border-border-subtle;
+}
+
+.anim-blink {
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes rotateGradient {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.avatar-ring::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg,
+      transparent 0deg,
+      rgba(220, 38, 38, 0.9) 40deg,
+      transparent 90deg,
+      transparent 360deg);
+  animation: rotateGradient 6s linear infinite;
+  z-index: 0;
+}
+
+.avatar-ring>img {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.anim-marquee {
+  animation: marquee 35s linear infinite;
+}
+
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 80px, black calc(100% - 80px), transparent 100%);
+}
+
+.link-underline {
+  position: relative;
+}
+
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 450ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+
+.link-underline:hover::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+@keyframes wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.anim-wipe {
+  animation: wipe 1.2s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.anim-arrow {
+  transition: transform 350ms ease;
+}
+
+.link-underline:hover .anim-arrow {
+  transform: translate(2px, -2px);
+}
+
+.avatar-hover {
+  transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 500ms ease;
+}
+
+.avatar-hover:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.4), 0 20px 40px -10px rgba(220, 38, 38, 0.15);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+.group:hover .link-underline::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+/* Oval portrait — the house avatar shape (4:5, egg-framed) */
+.avatar {
+  aspect-ratio: 4 / 5;
+  border-radius: 9999px;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Tiptap borderless, page-flush */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Algolia InstantSearch overrides */
+.ais-Hits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ais-Highlight-highlighted {
+  background-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
 }
 </file>
 
@@ -8821,6 +9097,207 @@ export type ProfileSaveValues = {
 }
 </file>
 
+<file path="src/pages/DashboardPage.tsx">
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import type { Article } from '@/types';
+import { getMyArticles, deleteArticle } from '@/services/articleService';
+import { useAuth } from '@/contexts/AuthContext';
+import { PageContainer } from '@/components/layout/Navbar';
+import { formatDate } from '@/utils/date';
+import { Badge } from '@/components/ui/Badge';
+import { Plus, Trash2, FileText, EyeIcon } from 'lucide-react';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+export function DashboardPage() {
+  const { user, profile } = useAuth();
+  const [tab, setTab] = useState<'published' | 'drafts'>('published');
+
+  // Modal State
+  const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
+
+  const queryClient = useQueryClient();
+  const { data: articles = [], isLoading: loading } = useQuery({
+    queryKey: ['my-articles', user?.id],
+    queryFn: () => getMyArticles(user!.id),
+    enabled: Boolean(user),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteArticle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+      setArticleToDelete(null);
+    },
+    onError: (error) => console.error('Failed to delete article:', error),
+  });
+
+  const published = articles.filter((a) => a.status === 'published');
+  const drafts = articles.filter((a) => a.status === 'draft');
+  const displayed = tab === 'published' ? published : drafts;
+
+  const articleListContent = (() => {
+    if (loading) {
+      return (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded border border-border-subtle bg-surface animate-pulse" />
+          ))}
+        </div>
+      );
+    }
+
+    if (displayed.length === 0) {
+      return (
+        <div className="py-16 text-center">
+          <FileText size={32} className="mx-auto text-text-muted mb-3" />
+          <p className="text-text-secondary">
+            {tab === 'drafts' ? 'No drafts. Go write something.' : 'No published articles yet.'}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {displayed.map((article) => (
+          <div
+            key={article.id}
+            className="relative flex items-center gap-4 p-4 rounded border border-border-subtle bg-surface hover:border-border transition-colors duration-200 group"
+          >
+            <div className="flex-1 min-w-0">
+              <Link
+                to={`/dashboard/articles/${article.id}`}
+                className="font-serif text-base font-medium text-text-primary hover:text-accent transition-colors line-clamp-1 before:absolute before:inset-0"
+              >
+                {article.title}
+              </Link>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Badge variant="muted">{article.category}</Badge>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted truncate max-w-[120px]" title={article.publication.name}>
+                  {article.publication.name}
+                </span>
+                <span className="font-mono text-xs text-text-muted">
+                  {article.publishedAt && formatDate(article.publishedAt)}
+                </span>
+                <span className="font-mono text-xs text-text-muted">
+                  {article.readingTime} min
+                </span>
+              </div>
+            </div>
+
+            {/* ADDED: `relative z-10` so buttons stay clickable on top of the stretched link */}
+            <div className="relative z-10 flex items-center gap-2 flex-shrink-0">
+              <Link
+                to={`/articles/${article.slug}`}
+                className="p-2 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
+                aria-label="Preview article"
+              >
+                <EyeIcon size={16} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setArticleToDelete(article)}
+                className="p-2 rounded text-text-muted hover:text-accent hover:bg-elevated transition-colors"
+                aria-label="Delete article"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  })();
+
+  return (
+    <PageContainer className="py-8 md:py-12">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-serif text-3xl font-semibold text-text-primary tracking-tight">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            {user ? `Signed in as ${user.user_metadata.name}` : 'Manage your writing.'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/dashboard/publications"
+            className="inline-flex items-center gap-1.5 rounded border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary"
+          >
+            Publications
+          </Link>
+
+          <Link
+            to="/dashboard/articles/new"
+            className="inline-flex items-center gap-1.5 rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          >
+            <Plus size={16} />
+            New Article
+          </Link>
+        </div>
+      </div>
+      {!profile?.username && (
+        <div className="mb-6 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-text-secondary">
+          <span className="font-medium text-text-primary">No username set.</span>{' '}
+          Readers won’t be able to find more articles by you without one.{' '}
+          <Link to="/settings/profile" className="text-accent hover:text-accent-hover underline underline-offset-2">
+            Set your username
+          </Link>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-border mb-6">
+        <TabButton
+          label="Published"
+          count={published.length}
+          active={tab === 'published'}
+          onClick={() => setTab('published')}
+        />
+        <TabButton
+          label="Drafts"
+          count={drafts.length}
+          active={tab === 'drafts'}
+          onClick={() => setTab('drafts')}
+        />
+      </div>
+
+      {/* Article List */}
+      {articleListContent}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(articleToDelete)}
+        isLoading={deleteMutation.isPending}
+        onClose={() => setArticleToDelete(null)}
+        onConfirm={() => articleToDelete && deleteMutation.mutate(articleToDelete.id)}
+        title="Delete Article"
+        message={`Are you sure you want to delete "${articleToDelete?.title}"? This action cannot be undone.`}
+      />
+    </PageContainer>
+  );
+}
+
+function TabButton({ label, count, active, onClick }: Readonly<{ label: string; count: number; active: boolean; onClick: () => void }>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-200 ${active
+        ? 'border-accent text-text-primary'
+        : 'border-transparent text-text-muted hover:text-text-secondary'
+        }`}
+    >
+      {label}
+      <span className="ml-1.5 font-mono text-xs text-text-muted">{count}</span>
+    </button>
+  );
+}
+</file>
+
 <file path="src/pages/HomePage.tsx">
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -8912,7 +9389,7 @@ export function HomePage() {
         ) : (
           <Suspense fallback={null}>
             <ParticleText
-              text="Lallu Syndrome DEV MODE"
+              text="Lallu Syndrome"
               particleSize={isMobile ? 1 : 2.3}
               density={isMobile ? 2 : 4}
               scatter={isMobile ? 100 : 190}
@@ -9839,6 +10316,79 @@ export async function getArticlesByPublication(publicationSlug: string): Promise
 }
 </file>
 
+<file path="src/pages/ArticlePage.tsx">
+import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
+import { ArticleProgress } from '@/components/articles/ArticleProgress';
+import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { ArticleView } from '@/components/articles/ArticleView';
+
+export function ArticlePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const { user } = useAuth();
+
+  const { data: article, isLoading: loading } = useQuery({
+    queryKey: ['article', slug],
+    queryFn: () => getArticleBySlug(slug!),
+    enabled: Boolean(slug),
+  });
+
+  const { data: related = [] } = useQuery({
+    queryKey: ['articles', 'related', article?.id],
+    queryFn: () => getRelatedArticles(article!, 3),
+    enabled: Boolean(article),
+  });
+
+  const { data: liked = false } = useQuery({
+    queryKey: ['liked', article?.id, user?.id],
+    queryFn: () => isLiked(article!.id, user!.id),
+    enabled: Boolean(article) && Boolean(user),
+  });
+
+  if (loading) {
+    return (
+      <>
+        <ArticleProgress />
+        <ArticlePageSkeleton />
+      </>
+    );
+  }
+
+  if (!article) {
+    return (
+      <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
+        <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />
+        <h1 className="font-serif text-2xl text-text-primary mb-2">
+          Something went wrong while loading this article.
+        </h1>
+        <p className="text-text-muted mb-6">The article may have been moved or deleted.</p>
+        <Link
+          to="/articles"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to articles
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ArticleProgress />
+      <ArticleView 
+        article={article} 
+        related={related} 
+        liked={liked} 
+      />
+    </>
+  );
+}
+</file>
+
 <file path="src/components/editor/TiptapEditor.tsx">
 import { useEditor, EditorContent } from '@tiptap/react';
 import { useRef, useEffect } from 'react';
@@ -9853,6 +10403,7 @@ import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
 import { toast } from 'sonner';
+import { YouTube } from './YouTube';
 
 import {
   Bold,
@@ -9931,9 +10482,9 @@ export function TiptapEditor({
             alt: file.name,
           })
           .run();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to upload image:', error);
-        toast.error('Failed to upload image. Please try again.');
+        toast.error(error.message || 'Failed to upload image. Please try again.');
       } finally {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -9977,6 +10528,7 @@ export function TiptapEditor({
       }),
       AlignedImage,
       CodeBlock,
+      YouTube,
     ],
 
 
@@ -10032,9 +10584,9 @@ export function TiptapEditor({
                   },
                 })
                 .run();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Failed to upload pasted image:', error);
-              toast.error('Failed to upload image. Please try again.');
+              toast.error(error.message || 'Failed to upload pasted image. Please try again.'); // ✅ FIXED
             }
           })();
 
@@ -10199,8 +10751,8 @@ export function TiptapEditor({
         options={{ placement: 'top', offset: 8 }}
       >
         <div
-          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg" 
-          onMouseDown={(e) => e.preventDefault()}> 
+          className="flex items-center gap-1 rounded-lg bg-elevated border border-border px-1.5 py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}>
 
           {textToolbarButtons.map(({ key, icon: Icon, title, isActive, run }) => (
             <button
@@ -10302,254 +10854,6 @@ export function TiptapEditor({
 }
 </file>
 
-<file path="src/pages/ArticlePage.tsx">
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import type { Article } from '@/types';
-import { getArticleBySlug, getRelatedArticles, isLiked } from '@/services/articleService';
-import { formatDateLong } from '@/utils/date';
-import { ArticleContent } from '@/components/articles/ArticleContent';
-import { ArticleProgress } from '@/components/articles/ArticleProgress';
-import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
-import { RelatedArticles } from '@/components/articles/RelatedArticles';
-import { LikeButton } from '@/components/interactions/LikeButton';
-import { ShareButton } from '@/components/interactions/ShareButton';
-import { CommentSection } from '@/components/interactions/CommentSection';
-import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
-import { Badge } from '@/components/ui/Badge';
-import { Avatar } from '@/components/ui/Avatar';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { getFallbackImage } from '@/utils/image';
-
-function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
-  const cardClass =
-    'block rounded-card border border-border-subtle border-l-2 border-l-accent bg-surface p-5';
-  const inner = (
-    <>
-      <div className="flex flex-col items-center gap-3">
-        <Avatar
-          src={author.avatar ?? undefined}
-          name={author.name}
-          className="h-16 w-16 border border-border-subtle bg-elevated"
-          fallbackClassName="text-xs font-semibold text-text-primary"
-        />
-        <span
-          className={`text-center text-sm font-medium text-text-primary transition-colors ${author.username ? 'link-underline group-hover:text-accent' : ''
-            }`}
-        >
-          {author.name}
-        </span>
-      </div>
-      {author.bio && (
-        <p className="mt-3 text-center text-sm leading-relaxed text-text-secondary">
-          {author.bio}
-        </p>
-      )}
-    </>
-  );
-  if (!author.username) {
-    return <div className={cardClass}>{inner}</div>;
-  }
-
-  return (
-    <Link
-      to={`/writers/${author.username}`}
-      className={`${cardClass} group transition-transform duration-200 hover:-translate-y-0.5`}
-      aria-label={`View profile of ${author.name}`}
-    >
-      {inner}
-    </Link>
-  );
-}
-
-export function ArticlePage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { user } = useAuth();
-
-  const [coverImgError, setCoverImgError] = useState(false);
-
-  // 1. Data Fetching Queries
-  const { data: article, isLoading: loading } = useQuery({
-    queryKey: ['article', slug],
-    queryFn: () => getArticleBySlug(slug!),
-    enabled: Boolean(slug),
-  });
-
-  const { data: related = [] } = useQuery({
-    queryKey: ['articles', 'related', article?.id],
-    queryFn: () => getRelatedArticles(article!, 3),
-    enabled: Boolean(article),
-  });
-
-  const { data: liked = false } = useQuery({
-    queryKey: ['liked', article?.id, user?.id],
-    queryFn: () => isLiked(article!.id, user!.id),
-    enabled: Boolean(article) && Boolean(user),
-  });
-
-  useEffect(() => {
-    setCoverImgError(false);
-  }, [slug]);
-
-  // 3. Memoized Headings (MUST be before conditional returns)
-  const headings = useMemo(
-    () => extractHeadings(article?.content ?? ''),
-    [article?.content]
-  );
-
-  // Helper to bypass React Router hijacking anchor links on the mobile TOC
-  const handleMobileTocClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    e.preventDefault();
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.history.pushState(null, '', `#${id}`);
-    }
-  };
-
-  // --- Conditional Returns (Early Exits) ---
-  if (loading) {
-    return (
-      <>
-        <ArticleProgress />
-        <ArticlePageSkeleton />
-      </>
-    );
-  }
-
-  if (!article) {
-    return (
-      <div className="max-w-article mx-auto px-4 sm:px-6 py-20 text-center">
-        <AlertCircle size={32} className="mx-auto text-text-muted mb-4" />
-        <h1 className="font-serif text-2xl text-text-primary mb-2">
-          Something went wrong while loading this article.
-        </h1>
-        <p className="text-text-muted mb-6">The article may have been moved or deleted.</p>
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to articles
-        </Link>
-      </div>
-    );
-  }
-
-  // --- Safe to use `article` here, it is guaranteed to be non-null ---
-  const coverFallback = getFallbackImage(article.id);
-  const coverSrc = coverImgError || !article.coverImage ? coverFallback : article.coverImage;
-  const articleUrl = window.location.href;
-
-  return (
-    <>
-      <ArticleProgress />
-
-      <article className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
-        {/* Header */}
-        <header className="mb-6">
-          {article.publication && (
-            <div className="mb-3 flex justify-center">
-              <Link
-                to={`/p/${article.publication.slug}`}
-                className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
-              >
-                {article.publication.name}
-              </Link>
-            </div>
-          )}
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
-            {article.title}
-          </h1>
-
-          <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono">
-            <span>
-              <Badge variant="accent">{article.category}</Badge>
-            </span>
-            <span>•</span>
-            {formatDateLong(article.publishedAt ?? article.createdAt)}
-            <span>•</span>
-            <span>{article.readingTime} min read</span>
-          </div>
-        </header>
-
-        {/* Cover Image */}
-        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
-          <img
-            src={coverSrc}
-            alt=""
-            onError={() => setCoverImgError(true)}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        </div>
-      </article>
-
-      {/* Content + TOC */}
-      <div className="max-w-content mx-auto px-4 sm:px-6 mt-10 grid grid-cols-1 gap-8 lg:mt-12 lg:grid-cols-[1fr_220px] lg:gap-12">
-        <div className="max-w-article lg:col-start-1 lg:row-start-1 lg:max-w-none">
-          {headings.length >= 3 && (
-            <details className="mb-8 rounded-card border border-border-subtle bg-surface lg:hidden">
-              <summary className="cursor-pointer list-none px-4 py-3 font-mono text-xs uppercase tracking-wider text-text-muted">
-                On this page
-              </summary>
-              <ul className="space-y-1 border-t border-border-subtle px-4 py-3">
-                {headings.map((h) => (
-                  <li key={h.id}>
-                    <a
-                      href={`#${h.id}`}
-                      onClick={(e) => handleMobileTocClick(e, h.id)}
-                      className={`block py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary ${h.level === 3 ? 'pl-4' : ''}`}
-                    >
-                      {h.text}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-          <ArticleContent content={article.content} />
-
-          {/* Author card — visible on mobile, hidden here on desktop (it moves to sidebar) */}
-          <div className="mt-10 lg:hidden">
-            <AuthorCard author={article.author} />
-          </div>
-
-          <div className="mt-10 flex items-center gap-3 border-t border-border-subtle pt-8">
-            <LikeButton articleId={article.id} initialLikes={article.likes} initiallyLiked={liked} />
-            <ShareButton url={articleUrl} title={article.title} />
-          </div>
-
-          <CommentSection articleId={article.id} />
-          <RelatedArticles articles={related} />
-        </div>
-
-        {/* Desktop sidebar: author + sticky TOC */}
-        <div className="hidden lg:col-start-2 lg:row-start-1 lg:block">
-          <div className="mb-8">
-            <AuthorCard author={article.author} />
-          </div>
-          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            <TableOfContents headings={headings} />
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-article mx-auto px-4 sm:px-6 mt-16 pb-8">
-        <Link
-          to="/articles"
-          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
-        >
-          <ArrowLeft size={16} />
-          All articles
-        </Link>
-      </div>
-    </>
-  );
-}
-</file>
-
 <file path="src/pages/ArticleEditorPage.tsx">
 import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense, Component } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -10560,18 +10864,17 @@ import { getCategories } from '@/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import { ArticleContent } from '@/components/articles/ArticleContent';
 import { upload, cleanupArticleContentMedia, deleteCoverImage } from '@/services/storageService';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   X, Check, ImagePlus,
 } from 'lucide-react';
-import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArticleView } from '@/components/articles/ArticleView'; // ⬅️ NEW IMPORT
+
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -10678,9 +10981,6 @@ export function ArticleEditorPage() {
     }
   }, [publications, publicationId]);
   const readingTime = useMemo(() => calculateReadingTime(formData.content), [formData.content]);
-  const headings = useMemo(
-    () => extractHeadings(formData.content), [formData.content]
-  );
 
   const buildArticleData = useCallback((): Partial<Article> => ({
     ...formData,
@@ -10900,9 +11200,10 @@ export function ArticleEditorPage() {
       }
       const result = await upload(articleId, file, 'cover');
       handleChange('coverImage', result.publicUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upload cover image:', error);
-      toast.error('Failed to upload cover image. Please try again.');
+      toast.error(error.message || 'Failed to upload cover image. Please try again.');
+
     } finally {
       setSaveState('idle');
     }
@@ -10923,8 +11224,6 @@ export function ArticleEditorPage() {
       return result.publicUrl;
     } catch (error: any) {
       console.error('Content image upload failed:', error);
-      // If your service throws "Image must be under 5 MB.", it will be printed right here!
-      toast.error(error.message || 'Failed to upload image. Please try again.');
       throw error;
     }
   };
@@ -10937,6 +11236,29 @@ export function ArticleEditorPage() {
   if (loading || (initialId && !isHydrated)) {
     return <PageSpinner />;
   }
+  const previewArticle = {
+    id: articleId || 'preview',
+    title: formData.title || 'Untitled',
+    content: formData.content || '',
+    category: formData.category,
+    coverImage: formData.coverImage,
+    readingTime,
+    publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    author: {
+      id: user?.id || '',
+      name: profile?.display_name || 'Author',
+      username: profile?.username || '',
+      avatar: profile?.avatar_url || '',
+      bio: profile?.bio || ''
+    },
+    publication: publications.find(p => p.id === publicationId) || undefined,
+    likes: 0,
+    comments: 0,
+    status: formData.status,
+    slug: formData.slug,
+    publicationId: publicationId || undefined
+  } as unknown as Article;
 
   return (
     <div>
@@ -11125,48 +11447,13 @@ export function ArticleEditorPage() {
 
       {/* Main Content */}
       {preview ? (
-        <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
-          <div className="flex items-center gap-3 mb-4">
-            <Badge variant="accent">{formData.category}</Badge>
-            <span className="font-mono text-xs text-text-muted">
-              {readingTime} min read
-            </span>
-          </div>
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
-            {formData.title || 'Untitled'}
-          </h1>
-          <div className="flex items-center gap-3 mb-8">
-            {profile?.avatar_url && (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name ?? 'Author'}
-                className="w-9 h-9 rounded-full"
-              />
-            )}
-            <span className="text-sm font-medium text-text-primary">
-              {profile?.display_name ?? 'Author'}
-            </span>
-          </div>
-          {formData.coverImage && (
-            <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
-              <img
-                src={formData.coverImage}
-                alt={formData.title}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            </div>
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px] gap-12">
-            <article className="min-w-0">
-              <ArticleContent
-                content={formData.content || 'Nothing written yet.'}
-              />
-            </article>
-            <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-              <TableOfContents headings={headings} />
-            </div>
-          </div>
-        </div>
+        // ⬇️ REPLACED PREVIEW BLOCK WITH SHARED COMPONENT
+        <ArticleView
+          article={previewArticle}
+          showInteractions={false}
+          showRelated={false}
+          showBackLink={false}
+        />
       ) : (
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">

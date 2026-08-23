@@ -1,6 +1,82 @@
 import { supabase } from '@/lib/supabase';
-import {optimizeForUpload} from '@/utils/compression';
+import { optimizeForUpload } from '@/utils/compression';
 const BUCKET = 'media';
+const PAGE_SIZE = 1000;
+
+async function listAllMediaPaths(prefix: string): Promise<string[]> {
+  const paths: string[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .list(prefix, {
+        limit: PAGE_SIZE,
+        offset,
+        sortBy: { column: 'name', order: 'asc' },
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const page = (data ?? []).filter(
+      (entry) =>
+        entry.name &&
+        entry.name !== '.emptyFolderPlaceholder' &&
+        entry.name.includes('.')
+    );
+
+    paths.push(...page.map((entry) => `${prefix}/${entry.name}`));
+
+    if (page.length < PAGE_SIZE) {
+      break;
+    }
+
+    offset += PAGE_SIZE;
+  }
+
+  return [...new Set(paths)];
+}
+
+async function removeMediaPaths(paths: string[]): Promise<void> {
+  const uniquePaths = [...new Set(paths.filter(Boolean))];
+
+  for (let i = 0; i < uniquePaths.length; i += PAGE_SIZE) {
+    const batch = uniquePaths.slice(i, i + PAGE_SIZE);
+
+    const { error } = await supabase.storage.from(BUCKET).remove(batch);
+
+    if (!error) {
+      continue;
+    }
+
+    const message = error.message?.toLowerCase() ?? '';
+    const isMissingObject =
+      message.includes('not found') || message.includes('does not exist');
+
+    if (!isMissingObject) {
+      throw error;
+    }
+
+    for (const path of batch) {
+      const { error: singleError } = await supabase.storage
+        .from(BUCKET)
+        .remove([path]);
+
+      if (singleError) {
+        const singleMessage = singleError.message?.toLowerCase() ?? '';
+        const singleMissing =
+          singleMessage.includes('not found') ||
+          singleMessage.includes('does not exist');
+
+        if (!singleMissing) {
+          throw singleError;
+        }
+      }
+    }
+  }
+}
 
 export interface StorageUploadResult {
   path: string;
@@ -12,47 +88,16 @@ export async function cleanupArticleContentMedia(
 ): Promise<void> {
   const folder = `articles/${articleId}/content`;
 
-  const referencedPaths = new Set(
-    extractStorageImagePaths(content)
-  );
-
-  const { data: files, error: listError } = await supabase.storage
-    .from(BUCKET)
-    .list(folder, {
-      limit: 1000,
-      sortBy: { column: 'name', order: 'asc' },
-    });
-
-  if (listError) {
-    throw listError;
-  }
-
-  const storedPaths = (files ?? [])
-    .filter(
-      (file) =>
-        file.name &&
-        file.name !== '.emptyFolderPlaceholder'
-    )
-    .map((file) => `${folder}/${file.name}`);
-
+  const referencedPaths = new Set(extractStorageImagePaths(content));
+  const storedPaths = await listAllMediaPaths(folder);
   const orphanedPaths = storedPaths.filter(
     (path) => !referencedPaths.has(path)
   );
 
-  if (orphanedPaths.length === 0) {
-    return;
-  }
-
-  const { error: deleteError } = await supabase.storage
-    .from(BUCKET)
-    .remove(orphanedPaths);
-
-  if (deleteError) {
-    throw deleteError;
-  }
+  await removeMediaPaths(orphanedPaths);
 }
 export async function upload(articleId: string, file: File, type: 'cover' | 'content'): Promise<StorageUploadResult> {
-  file = await optimizeForUpload(file); 
+  file = await optimizeForUpload(file);
   const MAX_CONTENT_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 
@@ -79,40 +124,6 @@ export async function upload(articleId: string, file: File, type: 'cover' | 'con
   };
 }
 
-export async function deleteArticleMedia(
-  content: string,
-  coverImage: string | null,
-): Promise<void> {
-  const paths = extractStorageImagePaths(content);
-
-  if (coverImage) {
-    const prefix =
-      `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
-
-    if (coverImage.startsWith(prefix)) {
-      paths.push(coverImage.slice(prefix.length));
-    }
-  }
-
-  const uniquePaths = [...new Set(paths)];
-
-  if (uniquePaths.length === 0) {
-    return;
-  }
-
-  for (let i = 0; i < uniquePaths.length; i += 1000) {
-    const batch = uniquePaths.slice(i, i + 1000);
-
-    const { error } = await supabase
-      .storage
-      .from(BUCKET)
-      .remove(batch);
-
-    if (error) {
-      throw error;
-    }
-  }
-}
 export async function deleteCoverImage(path: string): Promise<void> {
   const prefix =
     `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
@@ -123,13 +134,11 @@ export async function deleteCoverImage(path: string): Promise<void> {
 
   const storagePath = path.slice(prefix.length);
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .remove([storagePath]);
-
-  if (error) {
-    throw error;
+  if (!storagePath) {
+    return;
   }
+
+  await removeMediaPaths([storagePath]);
 }
 
 export function getPublicUrl(path: string): string {
@@ -143,7 +152,7 @@ export function extractStorageImagePaths(content: string): string[] {
   const publicUrlPrefix =
     `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
 
-  const parsedDoc = new DOMParser().parseFromString(content,'text/html');
+  const parsedDoc = new DOMParser().parseFromString(content, 'text/html');
 
   const paths: string[] = [];
 
