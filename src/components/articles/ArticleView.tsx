@@ -101,6 +101,18 @@ export function ArticleView({
       <article className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
+          {article.publication && (
+            <div className="mb-3 flex justify-center">
+              <Link
+                to={`/p/${article.publication.slug}`}
+                className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
+              >
+                {article.publication.name}
+                <LinkIcon size={12} className="ml-1 inline-block" />
+              </Link>
+            </div>
+          )}
+         
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>
@@ -110,16 +122,6 @@ export function ArticleView({
               <Badge variant="accent">{article.category}</Badge>
             </span>
             <span>•</span>
-            <Link
-              to={`/p/${article.publication.slug}`}
-              className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
-
-            >
-              {article.publication.name}
-
-              <LinkIcon size={12} />
-            </Link>
-            <span>•</span>
             {formatDateLong(article.publishedAt ?? article.createdAt)}
             <span>•</span>
             <span>{article.readingTime} min read</span>
@@ -127,12 +129,12 @@ export function ArticleView({
         </header>
 
         {/* Cover Image */}
-        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
+        <div className="relative mx-8 aspect-video overflow-hidden rounded-card border border-border-subtle mb-20 bg-elevated">
           <img
             src={coverSrc}
             alt=""
             onError={() => setCoverImgError(true)}
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute h-full w-full object-cover"
           />
         </div>
       </article>

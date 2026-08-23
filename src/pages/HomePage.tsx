@@ -7,9 +7,6 @@ import { ArticleCard } from '@/components/articles/ArticleCard';
 import { FeaturedArticleSkeleton, ArticleCardSkeleton } from '@/components/ui/Skeleton';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { getCategories } from '@/services/categoryService';
-import { CategoryButton } from '@/components/ui/CategoryButton';
-
 const ParticleText = lazy(() => import('@/components/ui/ParticleText'));
 
 function useMediaQuery(query: string): boolean {
@@ -25,7 +22,6 @@ function useMediaQuery(query: string): boolean {
 }
 
 export function HomePage() {
-  const [activeCategory, setActiveCategory] = useState<string>('all');
   const isMobile = useMediaQuery('(max-width: 767px)');
   const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
@@ -34,37 +30,8 @@ export function HomePage() {
     queryFn: getArticles,
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: getCategories,
-  });
-
   const featured = all[0] ?? null;
   const latest = all.slice(1, 4);
-
-  const filtered = activeCategory === 'all'
-    ? all
-    : all.filter((a) => a.category === activeCategory);
-
-  let articleGridContent: JSX.Element;
-
-  if (loading) {
-    articleGridContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => <ArticleCardSkeleton key={i} />)}
-      </div>
-    );
-  } else if (filtered.length === 0) {
-    articleGridContent = <p className="text-text-muted py-12 text-center">No articles in this category yet.</p>;
-  } else {
-    articleGridContent = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-    );
-  }
 
   let featuredContent: JSX.Element;
 
@@ -139,30 +106,6 @@ export function HomePage() {
           </div>
         </section>
       )}
-
-      {/* Category Filters */}
-      <section className="mb-8">
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-          <CategoryButton
-            label="All"
-            active={activeCategory === 'all'}
-            onClick={() => setActiveCategory('all')}
-          />
-          {categories.map((cat) => (
-            <CategoryButton
-              key={cat.slug}
-              label={cat.name}
-              active={activeCategory === cat.slug}
-              onClick={() => setActiveCategory(cat.slug)}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* Article Grid */}
-      <section className="mb-12">
-        {articleGridContent}
-      </section>
     </PageContainer>
   );
 }
