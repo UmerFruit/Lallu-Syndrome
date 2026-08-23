@@ -22,7 +22,7 @@ function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
         <Avatar
           src={author.avatar ?? undefined}
           name={author.name}
-          className="border border-border-subtle bg-elevated"
+          className="w-48  h-64 border border-border-subtle bg-elevated"
           fallbackClassName="text-xs font-semibold text-text-primary"
         />
         <span

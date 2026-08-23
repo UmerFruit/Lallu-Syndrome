@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { deleteOwnAccount } from '@/services/authService';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { CropModal } from '@/components/ui/CropModal';
 
 const optionalUrl = z.string().refine(
     (value) => {
@@ -83,7 +84,7 @@ export function ProfileSettingsPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showFinalDeleteModal, setShowFinalDeleteModal] = useState(false);
     const [deleting, setDeleting] = useState(false);
-
+    const [cropModalState, setCropModalState] = useState<{ isOpen: boolean; src: string | null }>({ isOpen: false, src: null });
     const handleDeleteAccount = async () => {
         setDeleting(true);
         try {
@@ -159,29 +160,45 @@ export function ProfileSettingsPage() {
         return <PageSpinner />;
     }
 
-    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !user) return;
 
         if (!file.type.startsWith('image/')) {
             setError('avatar_url', { message: 'Please select an image file.' });
+            e.target.value = '';
             return;
         }
 
         if (file.size > 2 * 1024 * 1024) {
             setError('avatar_url', { message: 'Image must be smaller than 2MB.' });
+            e.target.value = '';
             return;
         }
+        e.target.value = '';
+        const objectUrl = URL.createObjectURL(file);
+        setCropModalState({ isOpen: true, src: objectUrl });
+    };
+
+    const handleCropModalClose = () => {
+        if (cropModalState.src) URL.revokeObjectURL(cropModalState.src);
+        setCropModalState({ isOpen: false, src: null });
+    };
+
+    const handleAvatarCropSave = async (croppedFile: File) => {
+        if (cropModalState.src) URL.revokeObjectURL(cropModalState.src);
+        setCropModalState({ isOpen: false, src: null });
+
+        if (!user) return;
 
         setUploading(true);
         try {
-            const publicUrl = await uploadAvatar(user.id, file);
+            const publicUrl = await uploadAvatar(user.id, croppedFile);
             setValue('avatar_url', publicUrl, { shouldValidate: true });
         } catch {
             setError('avatar_url', { message: 'Failed to upload image.' });
         } finally {
             setUploading(false);
-            e.target.value = '';
         }
     };
 
@@ -412,6 +429,13 @@ export function ProfileSettingsPage() {
                 isLoading={deleting}
                 onConfirm={handleDeleteAccount}
                 onClose={() => !deleting && setShowFinalDeleteModal(false)}
+            />
+            <CropModal
+                isOpen={cropModalState.isOpen}
+                onClose={handleCropModalClose}
+                imageSrc={cropModalState.src || ''}
+                onSave={handleAvatarCropSave}
+                title="Crop profile picture"
             />
         </>
     );
