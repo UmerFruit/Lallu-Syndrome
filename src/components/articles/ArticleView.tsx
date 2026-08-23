@@ -10,7 +10,7 @@ import { ShareButton } from '@/components/interactions/ShareButton';
 import { CommentSection } from '@/components/interactions/CommentSection';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Link as LinkIcon } from 'lucide-react';
 import { getFallbackImage } from '@/utils/image';
 
 function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
@@ -63,10 +63,10 @@ export interface ArticleViewProps {
   showBackLink?: boolean;
 }
 
-export function ArticleView({ 
-  article, 
-  related = [], 
-  liked = false, 
+export function ArticleView({
+  article,
+  related = [],
+  liked = false,
   showInteractions = true,
   showRelated = true,
   showBackLink = true
@@ -101,16 +101,6 @@ export function ArticleView({
       <article className="max-w-content mx-auto px-4 sm:px-6 pt-6 md:pt-10">
         {/* Header */}
         <header className="mb-6">
-          {article.publication && (
-            <div className="mb-3 flex justify-center">
-              <Link
-                to={`/p/${article.publication.slug}`}
-                className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
-              >
-                {article.publication.name}
-              </Link>
-            </div>
-          )}
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>
@@ -119,6 +109,16 @@ export function ArticleView({
             <span>
               <Badge variant="accent">{article.category}</Badge>
             </span>
+            <span>•</span>
+            <Link
+              to={`/p/${article.publication.slug}`}
+              className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
+
+            >
+              {article.publication.name}
+
+              <LinkIcon size={12} />
+            </Link>
             <span>•</span>
             {formatDateLong(article.publishedAt ?? article.createdAt)}
             <span>•</span>
@@ -160,7 +160,7 @@ export function ArticleView({
               </ul>
             </details>
           )}
-          
+
           <ArticleContent content={article.content} />
 
           <div className="mt-10 lg:hidden">
