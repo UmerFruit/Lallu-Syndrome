@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { upload, cleanupArticleContentMedia, deleteCoverImage } from '@/services/storageService';
+import { CropModal } from '@/components/ui/CropModal';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   X, Check, ImagePlus,
@@ -17,7 +18,6 @@ import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArticleView } from '@/components/articles/ArticleView'; // ⬅️ NEW IMPORT
-
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -53,6 +53,7 @@ export function ArticleEditorPage() {
   const [savedTime, setSavedTime] = useState<string>('');
   const [publishing, setPublishing] = useState(false);
   const publishingRef = useRef(false);
+  const [cropModalState, setCropModalState] = useState<{ isOpen: boolean; src: string | null }>({ isOpen: false, src: null });
 
   type FormField = keyof typeof formData;
   const handleChange = (field: FormField, value: string) => {
@@ -402,21 +403,33 @@ export function ArticleEditorPage() {
     }
   };
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    let articleId = articleRef.current?.id ?? id;
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
-    }
+    const objectUrl = URL.createObjectURL(file);
+    setCropModalState({ isOpen: true, src: objectUrl });
+  };
+
+  const handleCropModalClose = () => {
+    if (cropModalState.src) URL.revokeObjectURL(cropModalState.src);
+    setCropModalState({ isOpen: false, src: null });
+  };
+
+  const handleCoverCropSave = async (croppedFile: File) => {
+    if (cropModalState.src) URL.revokeObjectURL(cropModalState.src);
+    setCropModalState({ isOpen: false, src: null });
+
+    let currentArticleId = articleRef.current?.id ?? id;
+    if (savePromiseRef.current) await savePromiseRef.current;
+
     if (isNew && !articleRef.current?.id) {
       try {
         const data = buildArticleData();
         const created = await createArticle(data);
         articleRef.current = created;
         setArticleId(created.id);
-        articleId = created.id;
+        currentArticleId = created.id;
         navigate(`/dashboard/articles/${created.id}`, { replace: true });
         queryClient.setQueryData(['article', created.id], created);
         queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
@@ -426,18 +439,19 @@ export function ArticleEditorPage() {
         return;
       }
     }
-    if (!articleId) return;
+
+    if (!currentArticleId) return;
+
     try {
       setSaveState('saving');
       if (formData.coverImage) {
         await deleteCoverImage(formData.coverImage);
       }
-      const result = await upload(articleId, file, 'cover');
+      const result = await upload(currentArticleId, croppedFile, 'cover');
       handleChange('coverImage', result.publicUrl);
     } catch (error: any) {
       console.error('Failed to upload cover image:', error);
       toast.error(error.message || 'Failed to upload cover image. Please try again.');
-
     } finally {
       setSaveState('idle');
     }
@@ -744,6 +758,14 @@ export function ArticleEditorPage() {
           />
         </div>
       )}
+      <CropModal
+        isOpen={cropModalState.isOpen}
+        onClose={handleCropModalClose}
+        imageSrc={cropModalState.src || ''}
+        aspect={16 / 9}
+        onSave={handleCoverCropSave}
+        title="Crop cover image"
+      />
     </div>
   );
 }
