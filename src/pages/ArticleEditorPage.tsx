@@ -57,6 +57,7 @@ export function ArticleEditorPage() {
   type FormField = keyof typeof formData;
   const handleChange = (field: FormField, value: string) => {
     isDirtyRef.current = true;
+    formDataVersionRef.current += 1;
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -67,6 +68,8 @@ export function ArticleEditorPage() {
   const exitRequestedRef = useRef(false);
   const hydratedIdRef = useRef<string | null>(null);
   const isDirtyRef = useRef(false);
+  const formDataVersionRef = useRef(0);
+  const saveArticleRef = useRef<(() => Promise<void>) | null>(null);
   const [isHydrated, setIsHydrated] = useState(!initialId);
 
   const { data: categories = [] } = useQuery({
@@ -100,6 +103,8 @@ export function ArticleEditorPage() {
         });
         setPublicationId(article.publicationId);
         setIsHydrated(true);
+        isDirtyRef.current = false;
+        formDataVersionRef.current = 0;
       } else if (!isDirtyRef.current) {
         if (article.content !== formData.content || article.title !== formData.title) {
           articleRef.current = article;
@@ -113,6 +118,8 @@ export function ArticleEditorPage() {
             publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString().slice(0, 16) : ''
           });
           setPublicationId(article.publicationId);
+          isDirtyRef.current = false;
+          formDataVersionRef.current = 0;
         }
       }
     }
@@ -137,6 +144,7 @@ export function ArticleEditorPage() {
     if (savePromiseRef.current) return savePromiseRef.current;
 
     const run = (async () => {
+      const startVersion = formDataVersionRef.current;
       const data = buildArticleData();
       const isEmpty = !data.title?.trim() && !data.content?.trim();
       if (isNew && isEmpty) {
@@ -162,15 +170,19 @@ export function ArticleEditorPage() {
             if (updated) {
               articleRef.current = updated;
               queryClient.setQueryData(['article', currentId], updated);
-              queryClient.invalidateQueries({ queryKey: ['article', currentId] });
             }
           }
         }
-        isDirtyRef.current = false;
-        setSavedTime(
-          new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-        );
-        setSaveState('saved');
+        if (formDataVersionRef.current === startVersion) {
+          isDirtyRef.current = false;
+
+          setSavedTime(
+            new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+          );
+          setSaveState('saved');
+        } else {
+          setSaveState('idle');
+        }
       } catch (error) {
         console.error('Failed to save article:', error);
         setSaveState('idle');
@@ -182,8 +194,36 @@ export function ArticleEditorPage() {
       await run;
     } finally {
       savePromiseRef.current = null;
+      if (!exitRequestedRef.current && isDirtyRef.current) {
+        if (saveTimer.current) {
+          clearTimeout(saveTimer.current);
+        }
+        saveTimer.current = setTimeout(() => {
+          void saveArticleRef.current?.();
+        }, 500);
+      }
     }
   }, [buildArticleData, isNew, id, navigate]);
+  useEffect(() => {
+    saveArticleRef.current = saveArticle;
+  }, [saveArticle]);
+
+  const flushPendingSaves = useCallback(async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (savePromiseRef.current) {
+        await savePromiseRef.current;
+        continue;
+      }
+
+      if (!isDirtyRef.current) {
+        return true;
+      }
+
+      await saveArticle();
+    }
+
+    return !isDirtyRef.current && !savePromiseRef.current;
+  }, [saveArticle]);
 
   useEffect(() => {
     if (loading || exitRequestedRef.current) return;
@@ -195,7 +235,7 @@ export function ArticleEditorPage() {
         clearTimeout(saveTimer.current);
       }
     };
-  }, [formData, saveArticle, loading]);
+  }, [formData, publicationId, saveArticle, loading]);
   // Add this new useEffect right after the autosave useEffect
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -226,8 +266,13 @@ export function ArticleEditorPage() {
       saveTimer.current = null;
     }
 
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
+    const saved = await flushPendingSaves();
+    if (!saved) {
+      toast.error('Failed to save article before publishing.');
+      exitRequestedRef.current = false;
+      publishingRef.current = false;
+      setPublishing(false);
+      return;
     }
     const data = {
       ...buildArticleData(),
@@ -296,7 +341,12 @@ export function ArticleEditorPage() {
       saveTimer.current = null;
     }
     try {
-      await saveArticle();
+      const saved = await flushPendingSaves();
+      if (!saved) {
+        toast.error('Could not save the article. Please try again.');
+        exitRequestedRef.current = false;
+        return;
+      }
       const targetId = articleRef.current?.id ?? articleId;
       if (targetId) {
         queryClient.invalidateQueries({ queryKey: ['article', targetId] });
