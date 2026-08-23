@@ -1,10 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
+import {
+  deleteArticleMedia,
+  deleteUserAvatarMedia,
+} from "../_shared/mediaStorage.ts";
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
-
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -17,23 +21,6 @@ function jsonResponse(body: unknown, status: number): Response {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-async function deleteArticleMedia(articleId: string): Promise<void> {
-  const { data: contentFiles } = await supabaseAdmin.storage
-    .from("media")
-    .list(`articles/${articleId}/content`, { limit: 1000 });
-
-  if (contentFiles && contentFiles.length > 0) {
-    await supabaseAdmin.storage.from("media").remove(
-      contentFiles.map((f) => `articles/${articleId}/content/${f.name}`)
-    );
-  }
-
-  const coverExtensions = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
-  await supabaseAdmin.storage.from("media").remove(
-    coverExtensions.map((ext) => `articles/${articleId}/cover.${ext}`)
-  );
 }
 
 Deno.serve(async (req: Request) => {
@@ -56,7 +43,11 @@ Deno.serve(async (req: Request) => {
 
     // 2. Parse the target user
     const { userId } = await req.json().catch(() => ({ userId: null }));
-    if (!userId || typeof userId !== "string") {
+    if (
+      !userId ||
+      typeof userId !== "string" ||
+      !UUID_REGEX.test(userId)
+    ) {
       return jsonResponse({ error: "userId is required" }, 400);
     }
 
@@ -94,14 +85,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 5. Delete their avatar folder
-    const { data: avatarFiles } = await supabaseAdmin.storage
-      .from("avatars")
-      .list(userId, { limit: 100 });
-    if (avatarFiles && avatarFiles.length > 0) {
-      await supabaseAdmin.storage
-        .from("avatars")
-        .remove(avatarFiles.map((f) => `${userId}/${f.name}`));
-    }
+    await deleteUserAvatarMedia(supabaseAdmin, userId);
 
     // 6. Delete the auth user — profile, publications, comments and likes cascade
     const { error: deleteUserError } =

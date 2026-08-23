@@ -7,18 +7,17 @@ import { getCategories } from '@/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import { ArticleContent } from '@/components/articles/ArticleContent';
 import { upload, cleanupArticleContentMedia, deleteCoverImage } from '@/services/storageService';
+import { CropModal } from '@/components/ui/CropModal';
 import {
   ArrowLeft, Eye, Settings as SettingsIcon,
   X, Check, ImagePlus,
 } from 'lucide-react';
-import { TableOfContents, extractHeadings } from '@/components/articles/TableOfContents';
 import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArticleView } from '@/components/articles/ArticleView'; // ⬅️ NEW IMPORT
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
@@ -54,10 +53,12 @@ export function ArticleEditorPage() {
   const [savedTime, setSavedTime] = useState<string>('');
   const [publishing, setPublishing] = useState(false);
   const publishingRef = useRef(false);
+  const [cropModalState, setCropModalState] = useState<{ isOpen: boolean; src: string | null }>({ isOpen: false, src: null });
 
   type FormField = keyof typeof formData;
   const handleChange = (field: FormField, value: string) => {
     isDirtyRef.current = true;
+    formDataVersionRef.current += 1;
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -68,6 +69,9 @@ export function ArticleEditorPage() {
   const exitRequestedRef = useRef(false);
   const hydratedIdRef = useRef<string | null>(null);
   const isDirtyRef = useRef(false);
+  const ensureArticlePromiseRef = useRef<Promise<string> | null>(null);
+  const formDataVersionRef = useRef(0);
+  const saveArticleRef = useRef<(() => Promise<void>) | null>(null);
   const [isHydrated, setIsHydrated] = useState(!initialId);
 
   const { data: categories = [] } = useQuery({
@@ -101,6 +105,8 @@ export function ArticleEditorPage() {
         });
         setPublicationId(article.publicationId);
         setIsHydrated(true);
+        isDirtyRef.current = false;
+        formDataVersionRef.current = 0;
       } else if (!isDirtyRef.current) {
         if (article.content !== formData.content || article.title !== formData.title) {
           articleRef.current = article;
@@ -114,6 +120,8 @@ export function ArticleEditorPage() {
             publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString().slice(0, 16) : ''
           });
           setPublicationId(article.publicationId);
+          isDirtyRef.current = false;
+          formDataVersionRef.current = 0;
         }
       }
     }
@@ -125,9 +133,6 @@ export function ArticleEditorPage() {
     }
   }, [publications, publicationId]);
   const readingTime = useMemo(() => calculateReadingTime(formData.content), [formData.content]);
-  const headings = useMemo(
-    () => extractHeadings(formData.content), [formData.content]
-  );
 
   const buildArticleData = useCallback((): Partial<Article> => ({
     ...formData,
@@ -136,11 +141,60 @@ export function ArticleEditorPage() {
     publicationId: publicationId || undefined,
     publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
   }), [formData, readingTime, publicationId]);
+  const ensureArticleId = useCallback(async (): Promise<string> => {
+    const existing = articleRef.current?.id ?? (articleId && articleId !== 'new' ? articleId : null);
 
+    if (existing) {
+      return existing;
+    }
+
+    if (ensureArticlePromiseRef.current) {
+      return ensureArticlePromiseRef.current;
+    }
+
+    const promise = (async () => {
+      if (savePromiseRef.current) {
+        await savePromiseRef.current.catch(() => { });
+      }
+
+      const recheck = articleRef.current?.id ?? (articleId && articleId !== 'new' ? articleId : null);
+
+      if (recheck) {
+        return recheck;
+      }
+
+      const data = buildArticleData();
+      const created = await createArticle(data);
+
+      articleRef.current = created;
+      hydratedIdRef.current = created.id;
+
+      setArticleId(created.id);
+      navigate(`/dashboard/articles/${created.id}`, { replace: true });
+
+      queryClient.setQueryData(['article', created.id], created);
+      queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
+
+      if (!publicationId) {
+        setPublicationId(created.publicationId);
+      }
+
+      return created.id;
+    })();
+
+    ensureArticlePromiseRef.current = promise;
+
+    try {
+      return await promise;
+    } finally {
+      ensureArticlePromiseRef.current = null;
+    }
+  }, [articleId, buildArticleData, navigate, publicationId, queryClient, user?.id]);
   const saveArticle = useCallback(async () => {
     if (savePromiseRef.current) return savePromiseRef.current;
 
     const run = (async () => {
+      const startVersion = formDataVersionRef.current;
       const data = buildArticleData();
       const isEmpty = !data.title?.trim() && !data.content?.trim();
       if (isNew && isEmpty) {
@@ -166,15 +220,19 @@ export function ArticleEditorPage() {
             if (updated) {
               articleRef.current = updated;
               queryClient.setQueryData(['article', currentId], updated);
-              queryClient.invalidateQueries({ queryKey: ['article', currentId] });
             }
           }
         }
-        isDirtyRef.current = false;
-        setSavedTime(
-          new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-        );
-        setSaveState('saved');
+        if (formDataVersionRef.current === startVersion) {
+          isDirtyRef.current = false;
+
+          setSavedTime(
+            new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+          );
+          setSaveState('saved');
+        } else {
+          setSaveState('idle');
+        }
       } catch (error) {
         console.error('Failed to save article:', error);
         setSaveState('idle');
@@ -188,6 +246,26 @@ export function ArticleEditorPage() {
       savePromiseRef.current = null;
     }
   }, [buildArticleData, isNew, id, navigate]);
+  useEffect(() => {
+    saveArticleRef.current = saveArticle;
+  }, [saveArticle]);
+
+  const flushPendingSaves = useCallback(async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (savePromiseRef.current) {
+        await savePromiseRef.current;
+        continue;
+      }
+
+      if (!isDirtyRef.current) {
+        return true;
+      }
+
+      await saveArticle();
+    }
+
+    return !isDirtyRef.current && !savePromiseRef.current;
+  }, [saveArticle]);
 
   useEffect(() => {
     if (loading || exitRequestedRef.current) return;
@@ -199,7 +277,7 @@ export function ArticleEditorPage() {
         clearTimeout(saveTimer.current);
       }
     };
-  }, [formData, saveArticle, loading]);
+  }, [formData, publicationId, saveArticle, loading]);
   // Add this new useEffect right after the autosave useEffect
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -230,8 +308,13 @@ export function ArticleEditorPage() {
       saveTimer.current = null;
     }
 
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
+    const saved = await flushPendingSaves();
+    if (!saved) {
+      toast.error('Failed to save article before publishing.');
+      exitRequestedRef.current = false;
+      publishingRef.current = false;
+      setPublishing(false);
+      return;
     }
     const data = {
       ...buildArticleData(),
@@ -300,7 +383,12 @@ export function ArticleEditorPage() {
       saveTimer.current = null;
     }
     try {
-      await saveArticle();
+      const saved = await flushPendingSaves();
+      if (!saved) {
+        toast.error('Could not save the article. Please try again.');
+        exitRequestedRef.current = false;
+        return;
+      }
       const targetId = articleRef.current?.id ?? articleId;
       if (targetId) {
         queryClient.invalidateQueries({ queryKey: ['article', targetId] });
@@ -315,21 +403,33 @@ export function ArticleEditorPage() {
     }
   };
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    let articleId = articleRef.current?.id ?? id;
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
-    }
+    const objectUrl = URL.createObjectURL(file);
+    setCropModalState({ isOpen: true, src: objectUrl });
+  };
+
+  const handleCropModalClose = () => {
+    if (cropModalState.src) URL.revokeObjectURL(cropModalState.src);
+    setCropModalState({ isOpen: false, src: null });
+  };
+
+  const handleCoverCropSave = async (croppedFile: File) => {
+    if (cropModalState.src) URL.revokeObjectURL(cropModalState.src);
+    setCropModalState({ isOpen: false, src: null });
+
+    let currentArticleId = articleRef.current?.id ?? id;
+    if (savePromiseRef.current) await savePromiseRef.current;
+
     if (isNew && !articleRef.current?.id) {
       try {
         const data = buildArticleData();
         const created = await createArticle(data);
         articleRef.current = created;
         setArticleId(created.id);
-        articleId = created.id;
+        currentArticleId = created.id;
         navigate(`/dashboard/articles/${created.id}`, { replace: true });
         queryClient.setQueryData(['article', created.id], created);
         queryClient.invalidateQueries({ queryKey: ['my-articles', user?.id] });
@@ -339,39 +439,32 @@ export function ArticleEditorPage() {
         return;
       }
     }
-    if (!articleId) return;
+
+    if (!currentArticleId) return;
+
     try {
       setSaveState('saving');
       if (formData.coverImage) {
         await deleteCoverImage(formData.coverImage);
       }
-      const result = await upload(articleId, file, 'cover');
+      const result = await upload(currentArticleId, croppedFile, 'cover');
       handleChange('coverImage', result.publicUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upload cover image:', error);
-      toast.error('Failed to upload cover image. Please try again.');
+      toast.error(error.message || 'Failed to upload cover image. Please try again.');
     } finally {
       setSaveState('idle');
     }
   };
 
   const uploadContentImage = async (file: File): Promise<string> => {
-    const articleId = articleRef.current?.id ?? id;
-
-    if (!articleId || articleId === 'new') {
-      const errorMsg = 'Please type something to auto-save the article before inserting an image.';
-      toast.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
+    const targetArticleId = await ensureArticleId();
     try {
       // The service handles the size/type checks and the actual upload
-      const result = await upload(articleId, file, 'content');
+      const result = await upload(targetArticleId, file, 'content');
       return result.publicUrl;
     } catch (error: any) {
       console.error('Content image upload failed:', error);
-      // If your service throws "Image must be under 5 MB.", it will be printed right here!
-      toast.error(error.message || 'Failed to upload image. Please try again.');
       throw error;
     }
   };
@@ -384,6 +477,29 @@ export function ArticleEditorPage() {
   if (loading || (initialId && !isHydrated)) {
     return <PageSpinner />;
   }
+  const previewArticle = {
+    id: articleId || 'preview',
+    title: formData.title || 'Untitled',
+    content: formData.content || '',
+    category: formData.category,
+    coverImage: formData.coverImage,
+    readingTime,
+    publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    author: {
+      id: user?.id || '',
+      name: profile?.display_name || 'Author',
+      username: profile?.username || '',
+      avatar: profile?.avatar_url || '',
+      bio: profile?.bio || ''
+    },
+    publication: publications.find(p => p.id === publicationId) || undefined,
+    likes: 0,
+    comments: 0,
+    status: formData.status,
+    slug: formData.slug,
+    publicationId: publicationId || undefined
+  } as unknown as Article;
 
   return (
     <div>
@@ -572,48 +688,13 @@ export function ArticleEditorPage() {
 
       {/* Main Content */}
       {preview ? (
-        <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
-          <div className="flex items-center gap-3 mb-4">
-            <Badge variant="accent">{formData.category}</Badge>
-            <span className="font-mono text-xs text-text-muted">
-              {readingTime} min read
-            </span>
-          </div>
-          <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary leading-[1.1] tracking-tight text-balance mb-4">
-            {formData.title || 'Untitled'}
-          </h1>
-          <div className="flex items-center gap-3 mb-8">
-            {profile?.avatar_url && (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name ?? 'Author'}
-                className="w-9 h-9 rounded-full"
-              />
-            )}
-            <span className="text-sm font-medium text-text-primary">
-              {profile?.display_name ?? 'Author'}
-            </span>
-          </div>
-          {formData.coverImage && (
-            <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-10 bg-elevated">
-              <img
-                src={formData.coverImage}
-                alt={formData.title}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            </div>
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px] gap-12">
-            <article className="min-w-0">
-              <ArticleContent
-                content={formData.content || 'Nothing written yet.'}
-              />
-            </article>
-            <div className="hidden lg:block lg:col-start-2 lg:row-start-1">
-              <TableOfContents headings={headings} />
-            </div>
-          </div>
-        </div>
+        // ⬇️ REPLACED PREVIEW BLOCK WITH SHARED COMPONENT
+        <ArticleView
+          article={previewArticle}
+          showInteractions={false}
+          showRelated={false}
+          showBackLink={false}
+        />
       ) : (
         <div className="relative mx-auto max-w-3xl px-4 sm:px-6 py-8">
           <div className="flex items-center gap-4 mb-5">
@@ -673,9 +754,18 @@ export function ArticleEditorPage() {
               handleChange('content', val);
             }}
             onImageUpload={uploadContentImage}
+            articleId={articleId}
           />
         </div>
       )}
+      <CropModal
+        isOpen={cropModalState.isOpen}
+        onClose={handleCropModalClose}
+        imageSrc={cropModalState.src || ''}
+        aspect={16 / 9}
+        onSave={handleCoverCropSave}
+        title="Crop cover image"
+      />
     </div>
   );
 }

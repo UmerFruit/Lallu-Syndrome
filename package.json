@@ -32,6 +32,7 @@
     "lucide-react": "^0.446.0",
     "ogl": "^1.0.11",
     "react": "^18.3.1",
+    "react-advanced-cropper": "^0.20.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.85.0",
     "react-instantsearch": "^7.45.0",

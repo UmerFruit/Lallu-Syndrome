@@ -22,3 +22,6 @@ dist-ssr
 *.sw?
 .env
 package-lock.json
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md

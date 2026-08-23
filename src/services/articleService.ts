@@ -2,7 +2,7 @@ import type { Article, Comment, ArticleInput } from '@/types';
 import type { Database } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { getCategoryBySlug } from '@/services/categoryService';
-import { deleteArticleMedia } from './storageService';
+import { deleteArticleById } from '@/services/articleDeletionService';
 import type { QueryData } from '@supabase/supabase-js';
 import { slugify } from '@/utils/slugify';
 import { getDefaultPublication } from '@/services/publicationService';
@@ -303,7 +303,7 @@ export async function createArticle(data: Partial<ArticleInput>): Promise<Articl
     publicationId = defaultPublication.id;
   }
 
-  const title = data.title ?? 'Untitled';
+  const title = data.title?.trim() || 'Untitled';
   const content = data.content ?? '';
 
   const { data: article, error } = await supabase
@@ -343,7 +343,7 @@ export async function updateArticle(id: string, data: Partial<ArticleInput>): Pr
   const updateData: Database['public']['Tables']['articles']['Update'] = {};
 
   if (data.title !== undefined) {
-    updateData.title = data.title;
+    updateData.title = data.title.trim() || 'Untitled';
   }
 
   if (data.slug !== undefined) {
@@ -404,28 +404,7 @@ export async function deleteArticle(id: string): Promise<boolean> {
   if (!user) {
     throw new Error('You must be logged in to delete an article.');
   }
-
-  const { data: article, error: articleError } = await supabase
-    .from('articles')
-    .select('content, cover_image')
-    .eq('id', id)
-    .eq('author_id', user.id)
-    .single();
-
-  if (articleError) throw articleError;
-
-  await deleteArticleMedia(
-    article.content,
-    article.cover_image
-  );
-
-  const { error } = await supabase
-    .from('articles')
-    .delete()
-    .eq('id', id)
-    .eq('author_id', user.id);
-
-  if (error) throw error;
+  await deleteArticleById(id);
 
   return true;
 }
