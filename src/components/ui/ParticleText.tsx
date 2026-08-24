@@ -402,7 +402,6 @@ const ParticleText = ({
         ensureRenderLoop();
       }
     };
-
     const handlePointerLeave = (): void => {
       pointer.active = false;
       pointerSettleUntil = performance.now() + 500;
