@@ -21,12 +21,6 @@ import { ArticleView } from '@/components/articles/ArticleView'; // ⬅️ NEW I
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 
-class StrandsErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  render() { return this.state.hasError ? null : this.props.children; }
-}
-
 type SaveState = 'idle' | 'saving' | 'saved';
 
 export function ArticleEditorPage() {
@@ -71,6 +65,8 @@ export function ArticleEditorPage() {
   const isDirtyRef = useRef(false);
   const ensureArticlePromiseRef = useRef<Promise<string> | null>(null);
   const formDataVersionRef = useRef(0);
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
   const saveArticleRef = useRef<(() => Promise<void>) | null>(null);
   const [isHydrated, setIsHydrated] = useState(!initialId);
 
@@ -108,7 +104,8 @@ export function ArticleEditorPage() {
         isDirtyRef.current = false;
         formDataVersionRef.current = 0;
       } else if (!isDirtyRef.current) {
-        if (article.content !== formData.content || article.title !== formData.title) {
+        const current = formDataRef.current;
+        if (article.content !== current.content || article.title !== current.title) {
           articleRef.current = article;
           setFormData({
             title: article.title,
@@ -270,14 +267,14 @@ export function ArticleEditorPage() {
   useEffect(() => {
     if (loading || exitRequestedRef.current) return;
     saveTimer.current = setTimeout(() => {
-      saveArticle();
-    }, 2000);
+      saveArticleRef.current?.();
+    }, 1000);
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
       }
     };
-  }, [formData, publicationId, saveArticle, loading]);
+  }, [formData, publicationId, loading]);
   // Add this new useEffect right after the autosave useEffect
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -470,71 +467,75 @@ export function ArticleEditorPage() {
   };
 
   // Inline local datetime for the max attribute
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  const maxDateTime = now.toISOString().slice(0, 16);
+  const maxDateTime = useMemo(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  }, []);
 
+  const previewArticle = useMemo(() => {
+    if (!preview) return null;
+    return {
+      id: articleId || 'preview',
+      title: formData.title || 'Untitled',
+      content: formData.content || '',
+      category: formData.category,
+      coverImage: formData.coverImage,
+      readingTime,
+      publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      author: {
+        id: user?.id || '',
+        name: profile?.display_name || 'Author',
+        username: profile?.username || '',
+        avatar: profile?.avatar_url || '',
+        bio: profile?.bio || ''
+      },
+      publication: publications.find(p => p.id === publicationId) || undefined,
+      likes: 0,
+      comments: 0,
+      status: formData.status,
+      slug: formData.slug,
+      publicationId: publicationId || undefined
+    } as unknown as Article;
+  }, [preview, articleId, formData, readingTime, user, profile, publications, publicationId]);
+  const STRANDS_COLORS = ['#ff0000', '#000000', '#4500ff'];
+  
   if (loading || (initialId && !isHydrated)) {
     return <PageSpinner />;
   }
-  const previewArticle = {
-    id: articleId || 'preview',
-    title: formData.title || 'Untitled',
-    content: formData.content || '',
-    category: formData.category,
-    coverImage: formData.coverImage,
-    readingTime,
-    publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    author: {
-      id: user?.id || '',
-      name: profile?.display_name || 'Author',
-      username: profile?.username || '',
-      avatar: profile?.avatar_url || '',
-      bio: profile?.bio || ''
-    },
-    publication: publications.find(p => p.id === publicationId) || undefined,
-    likes: 0,
-    comments: 0,
-    status: formData.status,
-    slug: formData.slug,
-    publicationId: publicationId || undefined
-  } as unknown as Article;
-
   return (
     <div>
       {/* Top Bar */}
       <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border-subtle overflow-hidden">
         <div
           className={`absolute inset-0 z-0 hidden pointer-events-none items-center transition-opacity duration-300 md:flex 
-            ${saveState === 'saving' ? 'opacity-100' : 'opacity-20'
+            ${saveState === 'saving' ? 'opacity-80' : 'opacity-20'
             }`}
           aria-hidden="true"
         >
-          <div className="relative w-full h-[600px]">
+          <div className="relative w-full h-full">
             <Suspense fallback={null}>
-              <StrandsErrorBoundary>
                 <Strands
-                  colors={["#ff0000", "#000000", "#4500ff"]}
+                  colors={STRANDS_COLORS}
                   count={3}
                   speed={0.7}
-                  amplitude={0.5}
-                  waviness={1.6}
-                  thickness={3}
+                  amplitude={1.2}
+                  waviness={1.4}
+                  thickness={2}
                   glow={0.8}
-                  taper={4.4}
-                  spread={1}
-                  intensity={0.1}
+                  taper={40}
+                  spread={0}
+                  intensity={0.5}
                   saturation={1.75}
                   opacity={1}
-                  scale={0.6}
+                  scale={2}
                   glass={false}
                   refraction={1}
                   dispersion={1}
                   glassSize={1}
                   hueShift={0}
                 />
-              </StrandsErrorBoundary>
             </Suspense>
           </div>
         </div>
@@ -688,9 +689,8 @@ export function ArticleEditorPage() {
 
       {/* Main Content */}
       {preview ? (
-        // ⬇️ REPLACED PREVIEW BLOCK WITH SHARED COMPONENT
         <ArticleView
-          article={previewArticle}
+          article={previewArticle!}
           showInteractions={false}
           showRelated={false}
           showBackLink={false}
