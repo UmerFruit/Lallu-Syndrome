@@ -2,7 +2,7 @@ import { getPublicUrl } from '@/services/storageService';
 const FALLBACK_COUNT = 8;
 
 export function getFallbackImage(articleId: string): string {
-  if (!articleId) return getPublicUrl('defaults/sample-1.jpg');
+  if (!articleId) return getPublicUrl('defaults/sample-1.webp');
 
   let hash = 0;
 
@@ -13,5 +13,5 @@ export function getFallbackImage(articleId: string): string {
 
   const index = (Math.abs(hash) % FALLBACK_COUNT) + 1;
 
-  return getPublicUrl(`defaults/sample-${index}.jpg`);
+  return getPublicUrl(`defaults/sample-${index}.webp`);
 }
