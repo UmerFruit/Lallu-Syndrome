@@ -10,7 +10,12 @@ import { ArrowRight } from 'lucide-react';
 const ParticleText = lazy(() => import('@/components/ui/ParticleText'));
 
 function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
+  const [matches, setMatches] = useState(
+    () =>
+      typeof window === 'undefined'
+        ? false
+        : window.matchMedia?.(query).matches ?? false
+  );
   useEffect(() => {
     const mq = window.matchMedia(query);
     setMatches(mq.matches);
@@ -45,7 +50,7 @@ export function HomePage() {
 
   return (
     <PageContainer className="py-8 md:py-12">
-      <div className="w-full h-[220px] sm:h-[300px] md:h-[360px] bg-bg">
+      <div className="w-full h-[13.75rem] sm:h-[18.75rem] md:h-[22.5rem] bg-bg">
         {prefersReducedMotion ? (
           <div className="flex h-full items-center justify-center px-4">
             <h1 className="text-center font-serif text-4xl font-extrabold tracking-tight text-text-primary sm:text-6xl md:text-7xl">
@@ -57,7 +62,7 @@ export function HomePage() {
             <ParticleText
               text="Lallu Syndrome"
               particleSize={isMobile ? 1 : 2.3}
-              density={isMobile ? 2 : 4}
+              density={4}
               scatter={isMobile ? 100 : 190}
               gatherDuration={isMobile ? 1500 : 2000}
               stagger={isMobile ? 250 : 420}
@@ -73,7 +78,7 @@ export function HomePage() {
               fontWeight={400}
               fontFamily="inherit"
               widthScale={1.05}
-              glow={isMobile}
+              glow={false}
             />
           </Suspense>
         )}

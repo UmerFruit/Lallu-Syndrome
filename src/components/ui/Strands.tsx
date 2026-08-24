@@ -1,7 +1,7 @@
 import { Renderer, Program, Mesh, Color, Triangle, RenderTarget } from 'ogl';
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { memo, useEffect, useRef, type CSSProperties } from 'react';
 
-const MAX_STRANDS = 12;
+const MAX_STRANDS = 8; 
 const MAX_COLORS = 8;
 
 const VERT = `#version 300 es
@@ -74,8 +74,10 @@ void main() {
     float spd = 1.4 + fi * 1.2;
 
     float tt = uTime * uSpeed;
-    float w = sin(uv.x * freq + tt * spd + ph) * 0.60
-            + sin(uv.x * freq * 1.1 - tt * spd * 0.7 + ph * 1.7) * 0.40;
+    
+    // Optimized: Combined into a single, slightly cheaper wave approximation 
+    float w = sin(uv.x * freq + tt * spd + ph) * 0.75
+            + sin(uv.x * freq * 1.15 - tt * spd * 0.6 + ph * 1.5) * 0.25;
 
     float amp = (0.1 + 0.02 * e) * env * uAmplitude;
     float y = w * amp;
@@ -129,11 +131,9 @@ void main() {
     return;
   }
 
-  // sphere height: 0 at the rim, 1 at the center
   float z = sqrt(max(r * r - d * d, 0.0)) / r;
-  float nd = d / r; // 0 at the center, 1 at the rim
+  float nd = d / r;
 
-  // refraction is confined to a narrow band near the rim; the rest stays undistorted
   vec2 dir = d > 0.0 ? p / d : vec2(0.0);
   float lens = smoothstep(0.85, 1.0, nd) * pow(nd, 6.0);
   vec2 offset = -dir * lens * uRefraction * 0.15;
@@ -144,22 +144,17 @@ void main() {
   light.g = texture(uScene, toUv(p + offset)).g;
   light.b = texture(uScene, toUv(p + offset + disp)).b;
 
-  // neutral fresnel rim (no color tint so the glass stays clear)
   float fres = pow(1.0 - z, 3.0);
   vec3 rim = vec3(1.0) * fres * 0.18;
 
-  // specular highlight from the upper-left
   vec2 lightDir = normalize(vec2(-0.55, 0.6));
   float spec = pow(max(dot(p / max(r, 1e-4), lightDir), 0.0), 6.0);
   spec *= smoothstep(r, r * 0.55, d);
 
   vec3 emissive = light + rim + vec3(spec) * 0.4;
   float emissiveA = clamp(max(max(emissive.r, emissive.g), emissive.b), 0.0, 1.0);
-
-  // almost clear glass body: only a faint neutral darkening, mostly near the rim
   float bodyA = 0.05 + fres * 0.05;
 
-  // composite emissive light over the clear body (premultiplied)
   float outA = emissiveA + bodyA * (1.0 - emissiveA);
   vec3 outRGB = emissive;
 
@@ -204,7 +199,7 @@ const buildPalette = (colors: string[]): number[][] => {
   return padded;
 };
 
-export default function Strands({
+function Strands({
   colors = ['#FF4242', '#7C3AED', '#06B6D4', '#EAB308'],
   count = 3,
   speed = 0.5,
@@ -227,44 +222,13 @@ export default function Strands({
   style
 }: Readonly<StrandsProps>) {
   const propsRef = useRef<Required<Omit<StrandsProps, 'className' | 'style'>>>({
-    colors,
-    count,
-    speed,
-    amplitude,
-    waviness,
-    thickness,
-    glow,
-    taper,
-    spread,
-    hueShift,
-    intensity,
-    saturation,
-    opacity,
-    scale,
-    glass,
-    refraction,
-    dispersion,
-    glassSize
+    colors, count, speed, amplitude, waviness, thickness, glow, taper, spread,
+    hueShift, intensity, saturation, opacity, scale, glass, refraction, dispersion, glassSize
   });
+  
   propsRef.current = {
-    colors,
-    count,
-    speed,
-    amplitude,
-    waviness,
-    thickness,
-    glow,
-    taper,
-    spread,
-    hueShift,
-    intensity,
-    saturation,
-    opacity,
-    scale,
-    glass,
-    refraction,
-    dispersion,
-    glassSize
+    colors, count, speed, amplitude, waviness, thickness, glow, taper, spread,
+    hueShift, intensity, saturation, opacity, scale, glass, refraction, dispersion, glassSize
   };
 
   const ctnDom = useRef<HTMLDivElement>(null);
@@ -276,7 +240,8 @@ export default function Strands({
     const renderer = new Renderer({
       alpha: true,
       premultipliedAlpha: true,
-      antialias: true
+      antialias: true,
+      powerPreference: 'high-performance' 
     });
     const gl = renderer.gl;
     gl.clearColor(0, 0, 0, 0);
@@ -315,16 +280,15 @@ export default function Strands({
 
     const mesh = new Mesh(gl, { geometry, program });
 
-    const renderTarget = new RenderTarget(gl, {
-      width: ctn.offsetWidth,
-      height: ctn.offsetHeight
-    });
+    const renderTarget = propsRef.current.glass 
+      ? new RenderTarget(gl, { width: ctn.offsetWidth, height: ctn.offsetHeight }) 
+      : null;
 
     const glassProgram = new Program(gl, {
       vertex: VERT,
       fragment: GLASS_FRAG,
       uniforms: {
-        uScene: { value: renderTarget.texture },
+        uScene: { value: renderTarget?.texture || null },
         uResolution: { value: [ctn.offsetWidth, ctn.offsetHeight] },
         uRadius: { value: 0.46 * glassSize },
         uRefraction: { value: refraction },
@@ -341,19 +305,39 @@ export default function Strands({
       const height = ctn.offsetHeight;
       renderer.setSize(width, height);
       program.uniforms.uResolution.value = [width, height];
-      renderTarget.setSize(width, height);
+      if (renderTarget) renderTarget.setSize(width, height);
       glassProgram.uniforms.uResolution.value = [width, height];
     }
     window.addEventListener('resize', resize);
     resize();
 
+    let lastColorsKey = propsRef.current.colors.join(',');
+    let isPaused = document.hidden;
+    const handleVisibilityChange = () => { isPaused = document.hidden; };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const observer = new IntersectionObserver(
+      ([entry]) => { isPaused = !entry.isIntersecting; },
+      { threshold: 0.05 } 
+    );
+    observer.observe(ctn);
+
     let animateId = 0;
     const update = (t: number) => {
       animateId = requestAnimationFrame(update);
+      
+      if (isPaused) return; 
+
       const current = propsRef.current;
       program.uniforms.uTime.value = t * 0.001;
-      program.uniforms.uColors.value = buildPalette(current.colors);
-      program.uniforms.uColorCount.value = Math.min(current.colors.length, MAX_COLORS);
+
+      const currentColorsKey = current.colors.join(',');
+      if (currentColorsKey !== lastColorsKey) {
+        lastColorsKey = currentColorsKey;
+        program.uniforms.uColors.value = buildPalette(current.colors);
+        program.uniforms.uColorCount.value = Math.min(current.colors.length, MAX_COLORS);
+      }
+
       program.uniforms.uStrandCount.value = Math.min(Math.max(Math.round(current.count), 1), MAX_STRANDS);
       program.uniforms.uSpeed.value = current.speed;
       program.uniforms.uAmplitude.value = current.amplitude;
@@ -368,7 +352,7 @@ export default function Strands({
       program.uniforms.uScale.value = current.scale;
       program.uniforms.uSaturation.value = current.saturation;
 
-      if (current.glass) {
+      if (current.glass && renderTarget) {
         renderer.render({ scene: mesh, target: renderTarget });
         glassProgram.uniforms.uScene.value = renderTarget.texture;
         glassProgram.uniforms.uRefraction.value = current.refraction;
@@ -384,13 +368,18 @@ export default function Strands({
     return () => {
       cancelAnimationFrame(animateId);
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      observer.disconnect();
+      
       if (ctn && gl.canvas.parentNode === ctn) {
         gl.canvas.remove();
       }
+      
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); 
 
   return <div ref={ctnDom} className={`relative w-full h-full bg-transparent ${className}`} style={style} />;
 }
+export default memo(Strands);
