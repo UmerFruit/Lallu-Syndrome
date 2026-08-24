@@ -30,6 +30,8 @@ import { Toaster } from "sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { UsernameSetupPage, USERNAME_SETUP_SKIP_KEY } from '@/pages/auth/UsernameSetupPage';
+import { SpeedInsights } from '@vercel/speed-insights/react';
+
 function AppToaster() {
   const { theme } = useTheme();
   return <Toaster theme={theme} position="bottom-right" richColors closeButton />;
@@ -184,6 +186,7 @@ function App() {
           <BrowserRouter>
             <ErrorBoundary>
               <AppRoutes />
+              <SpeedInsights />
             </ErrorBoundary>
           </BrowserRouter>
         </QueryClientProvider>
