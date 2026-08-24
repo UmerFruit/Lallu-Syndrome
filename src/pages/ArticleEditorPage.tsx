@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense, Component } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import type { Article, ArticleStatus } from '@/types';
@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { getMyPublications } from '@/services/publicationService';
 import { PageSpinner } from '@/components/ui/Skeleton';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArticleView } from '@/components/articles/ArticleView'; // ⬅️ NEW IMPORT
+import { ArticleView } from '@/components/articles/ArticleView';
 
 const Strands = lazy(() => import('@/components/ui/Strands'));
 

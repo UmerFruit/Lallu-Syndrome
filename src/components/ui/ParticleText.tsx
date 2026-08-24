@@ -146,6 +146,15 @@ const ParticleText = ({
       smoothX: 0,
       smoothY: 0
     };
+    const needsAnimation = (): boolean => {
+      if (gathering) return true;
+      if (reducedMotion) return false;
+
+      return (
+        idleDrift > 0 ||
+        (pointerRepel > 0 && repelRadius > 0 && performance.now() < pointerSettleUntil)
+      );
+    };
 
     const startGather = (fromScatter = true): void => {
       if (!particles.length) return;
@@ -174,7 +183,7 @@ const ParticleText = ({
       const size = particle.size;
       ctx.fillStyle = particle.color;
 
-      if (size <= 2.1) {
+      if (size <= 3.5) {
         ctx.fillRect(particle.x - size / 2, particle.y - size / 2, size, size);
         return;
       }
@@ -243,7 +252,7 @@ const ParticleText = ({
         gathering = false;
       }
 
-      animationFrame = window.requestAnimationFrame(render);
+      animationFrame = needsAnimation() ? window.requestAnimationFrame(render) : null;
     };
 
     const ensureRenderLoop = (): void => {
@@ -325,7 +334,7 @@ const ParticleText = ({
         }
       }
 
-      const maxParticles = Math.max(900, Math.min(5200, Math.floor((width * height) / 90)));
+      const maxParticles = Math.max(700, Math.min(2400, Math.floor((width * height) / 120)));
       const stride = Math.max(1, Math.ceil(targets.length / maxParticles));
       const baseRgb = hexToRgb(resolvedColor);
       const highlightRgb = hexToRgb(resolvedHighlightColor);
@@ -381,25 +390,34 @@ const ParticleText = ({
       if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
       resizeFrame = window.requestAnimationFrame(sampleText);
     };
+    let pointerSettleUntil = 0;
 
     const handlePointerMove = (event: PointerEvent): void => {
-      const rect = canvas.getBoundingClientRect();
-      pointer.x = event.clientX - rect.left;
-      pointer.y = event.clientY - rect.top;
+      pointer.x = event.offsetX;
+      pointer.y = event.offsetY;
       pointer.active = true;
+      pointerSettleUntil = performance.now() + 400;
+
+      if (pointerRepel > 0 && repelRadius > 0) {
+        ensureRenderLoop();
+      }
     };
 
     const handlePointerLeave = (): void => {
       pointer.active = false;
+      pointerSettleUntil = performance.now() + 500;
+
+      if (pointerRepel > 0 && repelRadius > 0) {
+        ensureRenderLoop();
+      }
     };
 
     const handlePointerEnter = (event: PointerEvent): void => {
       handlePointerMove(event);
-      if (trigger === 'hover') startGather(true);
-    };
-
-    const handleClick = (): void => {
-      if (trigger === 'click') startGather(true);
+      if (trigger === 'hover') {
+        startGather(true);
+        ensureRenderLoop();
+      }
     };
 
     const reduceMotionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -412,7 +430,6 @@ const ParticleText = ({
     canvas.addEventListener('pointerenter', handlePointerEnter);
     canvas.addEventListener('pointermove', handlePointerMove);
     canvas.addEventListener('pointerleave', handlePointerLeave);
-    canvas.addEventListener('click', handleClick);
 
     const resizeObserver = new ResizeObserver(queueSample);
     resizeObserver.observe(container);
@@ -425,7 +442,6 @@ const ParticleText = ({
       canvas.removeEventListener('pointerenter', handlePointerEnter);
       canvas.removeEventListener('pointermove', handlePointerMove);
       canvas.removeEventListener('pointerleave', handlePointerLeave);
-      canvas.removeEventListener('click', handleClick);
 
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
@@ -452,7 +468,7 @@ const ParticleText = ({
   return (
     <div
       ref={containerRef}
-      className={`relative block h-full min-h-[240px] w-full overflow-hidden touch-none ${className}`}
+      className={`relative block h-full w-full overflow-hidden ${className}`}
       style={style}
       aria-label={text}
     >
