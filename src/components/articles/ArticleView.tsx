@@ -10,7 +10,7 @@ import { ShareButton } from '@/components/interactions/ShareButton';
 import { CommentSection } from '@/components/interactions/CommentSection';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Link as LinkIcon } from 'lucide-react';
 import { getFallbackImage } from '@/utils/image';
 
 function AuthorCard({ author }: Readonly<{ author: Article['author'] }>) {
@@ -63,10 +63,10 @@ export interface ArticleViewProps {
   showBackLink?: boolean;
 }
 
-export function ArticleView({ 
-  article, 
-  related = [], 
-  liked = false, 
+export function ArticleView({
+  article,
+  related = [],
+  liked = false,
   showInteractions = true,
   showRelated = true,
   showBackLink = true
@@ -108,9 +108,11 @@ export function ArticleView({
                 className="font-mono text-xs uppercase tracking-wider text-text-muted transition-colors hover:text-accent"
               >
                 {article.publication.name}
+                <LinkIcon size={12} className="ml-1 inline-block" />
               </Link>
             </div>
           )}
+         
           <h1 className="font-serif text-3xl md:text-5xl font-medium text-text-primary text-center leading-[1.1] tracking-tight text-balance mb-3">
             {article.title}
           </h1>
@@ -127,12 +129,12 @@ export function ArticleView({
         </header>
 
         {/* Cover Image */}
-        <div className="relative aspect-video overflow-hidden rounded-card border border-border-subtle mb-6 bg-elevated">
+        <div className="relative mx-8 aspect-video overflow-hidden rounded-card border border-border-subtle mb-20 bg-elevated">
           <img
             src={coverSrc}
             alt=""
             onError={() => setCoverImgError(true)}
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute h-full w-full object-cover"
           />
         </div>
       </article>
@@ -160,7 +162,7 @@ export function ArticleView({
               </ul>
             </details>
           )}
-          
+
           <ArticleContent content={article.content} />
 
           <div className="mt-10 lg:hidden">
