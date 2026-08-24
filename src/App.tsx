@@ -31,6 +31,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { UsernameSetupPage, USERNAME_SETUP_SKIP_KEY } from '@/pages/auth/UsernameSetupPage';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { Analytics } from "@vercel/analytics/react"
 
 function AppToaster() {
   const { theme } = useTheme();
@@ -187,6 +188,7 @@ function App() {
             <ErrorBoundary>
               <AppRoutes />
               <SpeedInsights />
+              <Analytics />
             </ErrorBoundary>
           </BrowserRouter>
         </QueryClientProvider>
