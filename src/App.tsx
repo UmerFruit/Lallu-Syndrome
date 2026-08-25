@@ -51,7 +51,7 @@ function ProtectedRoute({ children }: Readonly<{ children: ReactNode }>) {
   const { user, profile, isLoading, isProfileLoading } = useAuth();
   const location = useLocation();
 
-  if (isLoading || isProfileLoading) {
+  if (isLoading || (isProfileLoading && !profile)) {
     return <PageSpinner />;
   }
 

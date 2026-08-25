@@ -72,7 +72,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     }
 
     void fetchProfile(user.id);
-  }, [user, fetchProfile]);
+  }, [user?.id, fetchProfile]);
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
