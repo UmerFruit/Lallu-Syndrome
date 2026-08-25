@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { slugifyHeading } from '@/utils/slugify';
-import { observe } from 'react-intersection-observer';
 
 type Heading = {
   id: string;
@@ -29,22 +28,33 @@ type TableOfContentsProps = {
 
 export function TableOfContents({ headings }: Readonly<TableOfContentsProps>) {
   const [activeId, setActiveId] = useState<string>('');
-
+  const rafId = useRef<number | null>(null);
 
   useEffect(() => {
-    const unobserveAll = headings
-      .map((h) => document.getElementById(h.id))
-      .filter((el): el is HTMLElement => el !== null)
-      .map((el) =>
-        observe(
-          el,
-          (inView) => {
-            if (inView) setActiveId(el.id);
-          },
-          { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
-        )
-      );
-    return () => unobserveAll.forEach((unobserve) => unobserve());
+    const updateActiveHeading = () => {
+      let currentId = '';
+      for (const h of headings) {
+        const el = document.getElementById(h.id);
+        if (el && el.getBoundingClientRect().top <= 120) {
+          currentId = h.id;
+        } else { break; }
+      }
+      if (!currentId && headings.length > 0) currentId = headings[0].id;
+      setActiveId(currentId);
+      rafId.current = null;
+    };
+
+    const handleScroll = () => {
+      rafId.current ??= window.requestAnimationFrame(updateActiveHeading);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    updateActiveHeading();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+    };
   }, [headings]);
 
   if (headings.length < 3) return null;
