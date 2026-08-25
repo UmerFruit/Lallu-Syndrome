@@ -26,6 +26,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Link as LinkIcon,
   type LucideIcon,
 } from 'lucide-react';
 type ToolbarButton = {
@@ -46,6 +47,28 @@ const textToolbarButtons: ToolbarButton[] = [
   { key: 'justify', icon: AlignJustify, title: 'Justify text', isActive: (e) => e.isActive({ textAlign: 'justify' }), run: (e) => e.chain().focus().setTextAlign(e.isActive({ textAlign: 'justify' }) ? 'left' : 'justify').run() },
   { key: 'quote', icon: Quote, title: 'Quote', isActive: (e) => e.isActive('blockquote'), run: (e) => e.chain().focus().toggleBlockquote().run() },
   { key: 'code', icon: Code, title: 'Inline code', isActive: (e) => e.isActive('code'), run: (e) => e.chain().focus().toggleCode().run() },
+  {
+    key: 'link',
+    icon: LinkIcon,
+    title: 'Insert Link',
+    isActive: (e) => e.isActive('link'),
+    run: (e) => {
+      const previousUrl = e.getAttributes('link').href;
+      const url = window.prompt('Enter URL', previousUrl);
+
+      // Cancelled
+      if (url === null) return;
+
+      // Empty string = remove link
+      if (url === '') {
+        e.chain().focus().extendMarkRange('link').unsetLink().run();
+        return;
+      }
+
+      // Set/Update link
+      e.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    }
+  },
 ];
 
 
@@ -125,6 +148,7 @@ export function TiptapEditor({
       }),
       Link.configure({
         openOnClick: false,
+        autolink: true,
       }),
       TextAlign.extend({
         addKeyboardShortcuts() {
