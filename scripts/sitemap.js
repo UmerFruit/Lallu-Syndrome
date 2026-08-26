@@ -15,7 +15,7 @@ const supabase = createClient(url, key)
 const { data: articles } = await supabase.from('articles').select('slug, updated_at').eq('status', 'published')
 const { data: writers } = await supabase.from('profiles').select('username').not('username', 'is', null)
 
-const siteUrl = 'https://lallusyndrome.com' // Update with your domain
+const siteUrl = 'https://syndrome.umerfruit.dev' // Update with your domain
 
 const urls = [
   { loc: '/', priority: '1.0' },
