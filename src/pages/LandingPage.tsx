@@ -1,7 +1,13 @@
-// src/pages/LandingPage.tsx
+// src/pages/LandingPage.tsx  (full replacement)
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  FlaskConical,
+  HeartHandshake,
+  PenLine,
+} from 'lucide-react';
 import { PageContainer } from '@/components/layout/Navbar';
 import { getCategories } from '@/services/categoryService';
 import { getLatestArticles } from '@/services/articleService';
@@ -9,21 +15,21 @@ import { ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
 import { siteConfig } from '@/config/site';
 
-const principles = [
+const highlights = [
   {
-    id: '01',
-    title: 'Refuse the comfort of half-measures',
-    body: 'Half-hearted effort is just an apology written in advance for a failure you chose not to prevent.',
+    icon: PenLine,
+    title: 'Honest notes',
+    body: 'Things I learn, written down while they are still fresh — mistakes, fixes, and all.',
   },
   {
-    id: '02',
-    title: 'Premature confidence is the root of all evil',
-    body: 'The moment you think you have it all figured out is the moment you will start sliding backwards.',
+    icon: FlaskConical,
+    title: 'Experiments',
+    body: 'Side projects, code tinkering, and rabbit holes that turned out to be worth sharing.',
   },
   {
-    id: '03',
-    title: 'Stay independent',
-    body: "Their progress doesn't add to you. Their failure doesn't excuse you. In the end, it's just you.",
+    icon: HeartHandshake,
+    title: 'Shared freely',
+    body: 'Take whatever is useful, leave a comment if you like. Everything here is open.',
   },
 ];
 
@@ -42,7 +48,6 @@ function Divider({ label }: Readonly<{ label: string }>) {
 export function LandingPage() {
   const { creator } = siteConfig;
 
-  // Shares the cache with AboutPage / ArticlesPage (same key)
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
@@ -64,7 +69,7 @@ export function LandingPage() {
             className="anim-fade-up text-center font-mono text-xl uppercase tracking-[0.25em] text-text-muted"
             style={{ animationDelay: '0.05s' }}
           >
-            The publication
+            Welcome to
           </p>
 
           <h1
@@ -78,8 +83,8 @@ export function LandingPage() {
             className="anim-fade-up mx-auto mt-8 max-w-md text-center text-base leading-relaxed text-text-secondary md:text-lg"
             style={{ animationDelay: '0.65s' }}
           >
-            Notes, experiments, and deep dives into technology. Everything here
-            is a lesson, even when I&apos;m the only one who learns it.
+            A cozy corner of the internet for notes, experiments, and deep
+            dives into technology — written in public, shared for free.
           </p>
 
           {/* CTAs */}
@@ -91,60 +96,63 @@ export function LandingPage() {
               to="/articles"
               className="inline-flex items-center gap-1.5 rounded bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
             >
-              Read the articles
+              Start reading
               <ArrowRight size={14} />
             </Link>
             <Link
               to="/about"
               className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
             >
-              The full story
+              What's this place?
               <ArrowRight size={13} className="anim-arrow" />
             </Link>
           </div>
 
-          {/* ══ The name — instant context ════════════════════════ */}
+          {/* ══ What you'll find here ═════════════════════════════ */}
           <div
             className="anim-fade-up mt-16 rounded-card border border-border-subtle bg-surface p-6 md:p-8"
             style={{ animationDelay: '1.05s' }}
           >
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
-              The name
+              What you'll find here
             </p>
             <p className="mt-4 font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
-              Never settle for anything less than your very best.
+              Document your learning. Share your ideas. Enjoy the ride.
             </p>
-            <p className="mt-4 text-justify text-sm leading-relaxed text-text-secondary">
-              <span className="font-medium text-text-primary">Lallu</span>:
-              someone aimless, directionless, content with just getting by.
-              Lallu Syndrome is when settling stops feeling like settling and
-              your standards quietly erode. This publication is the antidote —
-              writing everything down before comfort does the deciding.
-            </p>
-          </div>
-
-          {/* ══ Principles ════════════════════════════════════════ */}
-          <Divider label="Principles" />
-          <div className="space-y-10">
-            {principles.map((principle) => (
-              <div key={principle.id} className="flex gap-6">
-                <span className="font-mono text-sm text-accent">{principle.id}</span>
-                <div>
-                  <h2 className="font-serif text-lg font-medium text-text-primary">
-                    {principle.title}
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                    {principle.body}
-                  </p>
+            <div className="mt-6 space-y-5">
+              {highlights.map(({ icon: Icon, title, body }) => (
+                <div key={title} className="flex gap-4">
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-bg text-accent">
+                    <Icon size={15} />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-medium text-text-primary">
+                      {title}
+                    </h2>
+                    <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+                      {body}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <p className="mt-6 border-t border-border-subtle pt-5 text-xs leading-relaxed text-text-muted">
+              Curious about the name? It started as a reminder to keep growing
+              instead of coasting —{' '}
+              <Link
+                to="/about"
+                className="link-underline text-text-secondary hover:text-text-primary"
+              >
+                the full story is on the About page
+              </Link>
+              .
+            </p>
           </div>
 
           {/* ══ Topics marquee ════════════════════════════════════ */}
           {categories.length > 0 && (
             <>
-              <Divider label="Topics" />
+              <Divider label="What I write about" />
               <div className="marquee-mask overflow-hidden">
                 <div className="anim-marquee flex w-max gap-12 whitespace-nowrap py-2">
                   {marqueeItems.map((cat, i) => (
@@ -162,7 +170,7 @@ export function LandingPage() {
           )}
 
           {/* ══ Creator strip ═════════════════════════════════════ */}
-          <Divider label="The creator" />
+          <Divider label="The person behind it" />
           <div className="text-center">
             <div className="avatar-ring relative mx-auto inline-block rounded-full">
               <img
@@ -171,10 +179,14 @@ export function LandingPage() {
                 className="avatar-hover h-28 w-28 rounded-full border-4 border-bg object-cover md:h-32 md:w-32"
               />
             </div>
-            <p className="mt-6 font-serif text-xl text-text-primary">{creator.name}</p>
+            <p className="mt-6 font-serif text-xl text-text-primary">
+              Hi, I'm {creator.name.split(' ')[0]} 👋
+            </p>
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-text-secondary">
-              A generalist and a computer enthusiast. I build in public — this
-              is my personal diary as much as it is a publication.
+              A generalist and a computer enthusiast. I build in public and
+              write things down so my future self — and hopefully you — can
+              learn from them. This is my personal diary as much as it is a
+              publication, so make yourself at home.
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               {creator.links.map((link) => (
@@ -224,6 +236,11 @@ export function LandingPage() {
             <ArrowRight size={13} className="anim-arrow" />
           </Link>
         </div>
+
+        {/* ══ Warm sign-off ═════════════════════════════════════ */}
+        <p className="mt-16 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
+          Thanks for stopping by · Grab something warm to drink and enjoy your stay
+        </p>
       </PageContainer>
     </div>
   );
