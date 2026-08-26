@@ -6,16 +6,24 @@ import { ArticlePageSkeleton } from '@/components/ui/Skeleton';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArticleView } from '@/components/articles/ArticleView';
+import { useSeo } from '@/hooks/useSeo'
+
 
 export function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
+
 
   const { data: article, isLoading: loading } = useQuery({
     queryKey: ['article', slug],
     queryFn: () => getArticleBySlug(slug!),
     enabled: Boolean(slug),
   });
+
+  useSeo({ 
+      title: article?.title, 
+      image: article?.coverImage
+    })
 
   const { data: related = [] } = useQuery({
     queryKey: ['articles', 'related', article?.id],

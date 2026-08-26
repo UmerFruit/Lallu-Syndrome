@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  ArrowUpRight,
   FlaskConical,
   HeartHandshake,
   PenLine,
@@ -13,7 +12,6 @@ import { getCategories } from '@/services/categoryService';
 import { getLatestArticles } from '@/services/articleService';
 import { ArticleGrid } from '@/components/articles/ArticleCard';
 import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
-import { siteConfig } from '@/config/site';
 
 const highlights = [
   {
@@ -46,8 +44,6 @@ function Divider({ label }: Readonly<{ label: string }>) {
 }
 
 export function LandingPage() {
-  const { creator } = siteConfig;
-
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
