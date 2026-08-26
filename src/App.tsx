@@ -32,6 +32,7 @@ import { queryClient } from '@/lib/queryClient';
 import { UsernameSetupPage, USERNAME_SETUP_SKIP_KEY } from '@/pages/auth/UsernameSetupPage';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Analytics } from "@vercel/analytics/react"
+import { LandingPage } from '@/pages/LandingPage';
 
 function AppToaster() {
   const { theme } = useTheme();
@@ -129,7 +130,9 @@ function AppRoutes() {
       <ScrollToTop />
       <Routes>
         {/* Public routes */}
-        <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
+        <Route path="/" element={<AppLayout><LandingPage /></AppLayout>} />
+        <Route path="/latest" element={<AppLayout><HomePage /></AppLayout>} />
+
         <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
         <Route path="/articles/:slug" element={<AppLayout><ArticlePage /></AppLayout>} />
         <Route path="/categories/:category" element={<AppLayout><CategoryPage /></AppLayout>} />

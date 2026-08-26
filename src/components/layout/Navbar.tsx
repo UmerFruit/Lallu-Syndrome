@@ -7,6 +7,7 @@ import { UserMenu } from '@/components/layout/UserMenu';
 import { NavbarSearch } from '@/components/layout/NavbarSearch';
 
 const navLinks = [
+  { label: 'Latest', to: '/latest' },
   { label: 'Articles', to: '/articles' },
   { label: 'About', to: '/about' },
   { label: 'Creator', to: '/creator' },
@@ -19,6 +20,7 @@ export function Navbar() {
   const location = useLocation();
 
   const isActive = (path: string) => {
+    if (path === '/latest') return location.pathname === '/latest';
     if (path === '/articles') return location.pathname.startsWith('/articles');
     if (path === '/about') return location.pathname === '/about';
     if (path === '/creator') return location.pathname === '/creator';

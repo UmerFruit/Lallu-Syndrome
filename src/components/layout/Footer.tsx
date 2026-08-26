@@ -27,6 +27,7 @@ export function Footer() {
               Navigate
             </h3>
             <ul className="space-y-2 text-sm">
+              <li><Link to="/latest" className={linkClass}>Latest</Link></li>
               <li><Link to="/articles" className={linkClass}>Articles</Link></li>
               <li><Link to="/about" className={linkClass}>About</Link></li>
               <li><Link to="/creator" className={linkClass}>Creator</Link></li>
