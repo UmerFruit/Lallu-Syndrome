@@ -19,7 +19,7 @@ const highlights = [
   {
     icon: PenLine,
     title: 'Honest notes',
-    body: 'Things I learn, written down while they are still fresh — mistakes, fixes, and all.',
+    body: 'Things I learn, written down while they are still fresh, mistakes, fixes, and all.',
   },
   {
     icon: FlaskConical,
@@ -37,7 +37,7 @@ function Divider({ label }: Readonly<{ label: string }>) {
   return (
     <div className="my-14 flex items-center gap-4 md:my-20">
       <span className="h-px flex-1 bg-border-subtle" />
-      <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
+      <span className="font-mono text-sm uppercase tracking-[0.3em] text-text-muted">
         {label}
       </span>
       <span className="h-px flex-1 bg-border-subtle" />
@@ -84,7 +84,7 @@ export function LandingPage() {
             style={{ animationDelay: '0.65s' }}
           >
             A cozy corner of the internet for notes, experiments, and deep
-            dives into technology — written in public, shared for free.
+            dives into technology, written in public, shared for free. Anyone can publish, just create an account
           </p>
 
           {/* CTAs */}
@@ -113,9 +113,6 @@ export function LandingPage() {
             className="anim-fade-up mt-16 rounded-card border border-border-subtle bg-surface p-6 md:p-8"
             style={{ animationDelay: '1.05s' }}
           >
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-text-muted">
-              What you'll find here
-            </p>
             <p className="mt-4 font-serif text-xl leading-relaxed text-text-primary md:text-2xl">
               Document your learning. Share your ideas. Enjoy the ride.
             </p>
@@ -136,17 +133,6 @@ export function LandingPage() {
                 </div>
               ))}
             </div>
-            <p className="mt-6 border-t border-border-subtle pt-5 text-xs leading-relaxed text-text-muted">
-              Curious about the name? It started as a reminder to keep growing
-              instead of coasting —{' '}
-              <Link
-                to="/about"
-                className="link-underline text-text-secondary hover:text-text-primary"
-              >
-                the full story is on the About page
-              </Link>
-              .
-            </p>
           </div>
 
           {/* ══ Topics marquee ════════════════════════════════════ */}
@@ -168,48 +154,6 @@ export function LandingPage() {
               </div>
             </>
           )}
-
-          {/* ══ Creator strip ═════════════════════════════════════ */}
-          <Divider label="The person behind it" />
-          <div className="text-center">
-            <div className="avatar-ring relative mx-auto inline-block rounded-full">
-              <img
-                src={creator.avatarUrl}
-                alt={creator.name}
-                className="avatar-hover h-28 w-28 rounded-full border-4 border-bg object-cover md:h-32 md:w-32"
-              />
-            </div>
-            <p className="mt-6 font-serif text-xl text-text-primary">
-              Hi, I'm {creator.name.split(' ')[0]} 👋
-            </p>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-text-secondary">
-              A generalist and a computer enthusiast. I build in public and
-              write things down so my future self — and hopefully you — can
-              learn from them. This is my personal diary as much as it is a
-              publication, so make yourself at home.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              {creator.links.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
-                >
-                  {link.label}
-                  <ArrowUpRight size={13} className="anim-arrow" />
-                </a>
-              ))}
-              <Link
-                to="/creator"
-                className="link-underline inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
-              >
-                More about me
-                <ArrowRight size={13} className="anim-arrow" />
-              </Link>
-            </div>
-          </div>
         </div>
 
         {/* ══ Latest writing (full content width) ═══════════════ */}
@@ -238,8 +182,8 @@ export function LandingPage() {
         </div>
 
         {/* ══ Warm sign-off ═════════════════════════════════════ */}
-        <p className="mt-16 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-text-muted">
-          Thanks for stopping by · Grab something warm to drink and enjoy your stay
+        <p className="mt-16 text-center font-mono text-sm uppercase tracking-[0.2em] text-text-muted">
+          Thanks for stopping by. Grab something warm to drink and enjoy your stay
         </p>
       </PageContainer>
     </div>
