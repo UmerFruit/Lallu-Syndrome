@@ -125,7 +125,8 @@ src/
                                   # TiptapEditor, SlashCommand(+Menu), CodeBlock(+Component),
                                   # YouTube(+Component), AlignedImage, processPastedHtml
     interactions/                 # CommentSection, LikeButton, ShareButton
-    layout/                       # Navbar(+Search), Footer, AuthLayout, SettingsLayout, UserMenu
+    layout/                       # Navbar(+Search, PageContainer), Footer, AuthLayout, 
+                                  # SettingsLayout, UserMenu
     ui/                           # Avatar, Badge, Button, CategoryButton, ConfirmationModal,
                                   # CropModal, Input, Skeleton, Textarea, Strands*, ParticleText*
     ErrorBoundary.tsx
@@ -135,8 +136,10 @@ src/
   pages/
     auth/                         # Login, Signup, ForgotPassword, ResetPassword, UsernameSetup
     settings/                     # ProfileSettings, PasswordSettings
+    LandingPage                   # New primary landing page (hero, highlights, marquee, creator)
+    HomePage                      # Moved to `/latest`; displays featured/latest article grid
     About, Admin, ArticleEditor, Article, Articles, Category, Creator,
-    Dashboard, Home, NotFound, Publication, Publications, WriterProfile
+    Dashboard, NotFound, Publication, Publications, WriterProfile
   services/                       # one module per domain:
                                   # adminService, articleDeletionService, articleService,
                                   # authService, categoryService, profileService,
@@ -435,7 +438,8 @@ Invoked by Supabase **database webhooks** (`Authorization: Bearer ${ALGOLIA_SYNC
 
 ### Layouts & guards
 
-- **AppLayout**: Navbar + content + Footer.
+- **AppLayout**: Navbar + content + Footer. *Note: Navbar primary links are now: Latest (`/latest`), Articles (`/articles`), About (`/about`), Creator (`/creator`).*
+- **PageContainer**: Exported from `layout/Navbar.tsx`. A reusable max-width wrapper (`max-w-content mx-auto px-4 sm:px-6`) used to standardize page content boundaries across views.
 - **EditorLayout**: bare full-screen shell (no navbar/footer) for the editor.
 - **AuthLayoutShell**: Navbar only, for auth pages; `AuthLayout` centers a card with title/subtitle/footer.
 - **SettingsLayout**: “Settings” header + Profile/Password tabs via nested routes.
@@ -475,6 +479,8 @@ Theme is `'dark' | 'light'`, default **dark**, persisted under localStorage key 
 ### Bespoke CSS (`index.css`)
 
 - `.article-prose`: full article typography system — serif headings with tight tracking, accent-underlined links, styled lists/tables/quotes/code, `iframe.youtube-embed` responsive styling, code-block chrome classes.
+- **Landing Page Animations**: `anim-fade-up`, `anim-wipe`, `anim-marquee` (seamless infinite-scroll via doubled array), and `anim-arrow` (micro-interaction on link hover).
+- **Creator Avatar Effects**: `.avatar-ring` and `.avatar-hover` provide a conic-gradient rotating border effect and subtle scale transition on the creator's profile image.
 - About/Creator page effects: film-grain overlay (`.grain`), `fadeUp`/`wipe`/`blink`/marquee animations, conic-gradient rotating avatar ring, underline-sweep links, arrow micro-interactions.
 - `prefers-reduced-motion` disables animations globally.
 - Algolia highlight styling overrides.
@@ -502,7 +508,8 @@ Theme is `'dark' | 'light'`, default **dark**, persisted under localStorage key 
 
 | Route | Page | Guard | Purpose |
 |---|---|---|---|
-| `/` | HomePage | public | ParticleText hero (“Lallu Syndrome”, lazy, reduced-motion fallback), featured = latest published article, next 3 latest |
+| `/` | LandingPage | public | Primary landing page: animated hero, "What you'll find here" highlights, categories marquee, creator strip, and latest articles grid. |
+| `/latest` | HomePage | public | Previously the home page; now dedicated to displaying the featured/latest published articles grid. |
 | `/articles` | ArticlesPage | public | All published, category filter bar, 3-col grid |
 | `/articles/:slug` | ArticlePage | public | Full reading view (§9.3) |
 | `/categories/:category` | CategoryPage | public | Filtered grid by category slug |
@@ -526,7 +533,7 @@ Theme is `'dark' | 'light'`, default **dark**, persisted under localStorage key 
 ## 18. Data Fetching & State Patterns
 
 - **`queryClient`** defaults: `retry: 1`, `refetchOnWindowFocus: false`, `staleTime: 0`.
-- Query keys: `['articles']`, `['article', slug|id]`, `['articles', 'category', slug]`, `['articles', 'author', id]`, `['articles', 'related', id]`, `['articles', 'publication', slug]`, `['my-articles', userId]`, `['my-publications', userId]`, `['comments', articleId]`, `['liked', articleId, userId]`, `['admin-profiles']`, `['admin-comments']`, `['admin-articles']`, `['categories']`, `['category', slug]`, `['profile', username]`.
+- Query keys: `['articles']`, `['articles', 'latest']`, `['article', slug|id]`, `['articles', 'category', slug]`, `['articles', 'author', id]`, `['articles', 'related', id]`, `['articles', 'publication', slug]`, `['my-articles', userId]`, `['my-publications', userId]`, `['comments', articleId]`, `['liked', articleId, userId]`, `['admin-profiles']`, `['admin-comments']`, `['admin-articles']`, `['categories']`, `['category', slug]`, `['profile', username]`.
 - **Services own all Supabase access**; components never call `supabase` directly except `ProfileSettingsPage` (password update) and `lib/supabase.ts` setup.
 - Mutations invalidate the relevant keys; comment/like mutations also patch caches optimistically.
 - Loading UX: skeleton components everywhere; `PageSpinner` for full-page waits; toasts (`sonner`) for success/error feedback.
@@ -617,6 +624,7 @@ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   # auto-injected
 8. `20260820114326` — publications layer with default-publication backfill and article reassignment.
 
 **Observations for future work / LLM context:**
+- **Routing refactor**: The root path `/` is now a marketing/identity-focused `LandingPage`, while the actual blog feed has been cleanly separated to `/latest` (`HomePage`).
 - `Strands.tsx` and `ParticleText.tsx` (ogl effects) are intentionally excluded from the packed snapshot; they’re used on the home hero and editor header.
 - `@tiptap/extension-underline` is a dependency but isn’t registered in the editor configuration — likely removable.
 - `react-intersection-observer` is listed in dependencies (used for lazy-loading behaviors outside this snapshot’s detail).
@@ -627,4 +635,4 @@ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   # auto-injected
 
 ---
 
-*This document was generated from the complete repository snapshot (`repomix-output.xml`, XML style) and reflects the codebase as of the migrations dated 2026-08-20.*
+*This document was generated from the complete repository snapshot (`repomix-output.xml`, XML style) and reflects the codebase as of the migrations dated 2026-08-20, updated to include the latest routing and landing page architecture.*
