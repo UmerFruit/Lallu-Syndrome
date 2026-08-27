@@ -151,12 +151,12 @@ export function ProfileSettingsPage() {
                 linkedin_url: '',
             });
         }
-    }, [profile, user, reset]);
+    }, [profile, user?.id, reset]);;
 
     const bioText = watch('bio') ?? '';
     const avatarUrl = watch('avatar_url') ?? '';
 
-    if (isLoading || isProfileLoading) {
+    if (isLoading || (isProfileLoading && !profile)) {
         return <PageSpinner />;
     }
 
