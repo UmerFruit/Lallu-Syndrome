@@ -68,7 +68,7 @@ export function SignupPage() {
   return (
     <AuthLayout
       title="Create account"
-      subtitle="Start writing and publishing on Lallu Syndrome."
+      subtitle="Start writing and publishing on LS."
       footer={<>Already have an account? <AuthLink to="/login">Sign in</AuthLink></>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

@@ -1,5 +1,5 @@
 export const siteConfig = {
-  name: 'Lallu Syndrome',
+  name: 'LS',
   description: 'Notes, experiments, and deep dives into technology.',
   creator: {
     name: 'Umer Farooq',

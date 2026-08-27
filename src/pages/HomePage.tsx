@@ -54,13 +54,13 @@ export function HomePage() {
         {prefersReducedMotion ? (
           <div className="flex h-full items-center justify-center px-4">
             <h1 className="text-center font-serif text-4xl font-extrabold tracking-tight text-text-primary sm:text-6xl md:text-7xl">
-              Lallu Syndrome
+              LS
             </h1>
           </div>
         ) : (
           <Suspense fallback={null}>
             <ParticleText
-              text="Lallu Syndrome"
+              text="LS"
               particleSize={isMobile ? 1 : 2.3}
               density={4}
               scatter={isMobile ? 100 : 190}

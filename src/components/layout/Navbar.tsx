@@ -35,7 +35,7 @@ export function Navbar() {
           className="font-serif text-lg font-semibold text-text-primary hover:text-accent transition-colors duration-200 tracking-tight"
           onClick={() => setMobileOpen(false)}
         >
-          Lallu Syndrome
+          LS
         </Link>
 
         {/* Desktop nav */}

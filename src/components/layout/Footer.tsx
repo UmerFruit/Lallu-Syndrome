@@ -66,7 +66,7 @@ export function Footer() {
               to="/creator"
               className="text-text-secondary hover:text-text-primary transition-colors"
             >
-              {siteConfig.creator.name}
+              {siteConfig.creator.name + " @UmerFruit"}
             </Link>
           </p>
         </div>
