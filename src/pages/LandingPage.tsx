@@ -1,5 +1,4 @@
 // src/pages/LandingPage.tsx  (full replacement)
-import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -8,10 +7,6 @@ import {
   PenLine,
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/Navbar';
-import { getCategories } from '@/services/categoryService';
-import { getLatestArticles } from '@/services/articleService';
-import { ArticleGrid } from '@/components/articles/ArticleCard';
-import { ArticleCardSkeleton } from '@/components/ui/Skeleton';
 
 const highlights = [
   {
@@ -31,30 +26,7 @@ const highlights = [
   },
 ];
 
-function Divider({ label }: Readonly<{ label: string }>) {
-  return (
-    <div className="my-14 flex items-center gap-4 md:my-20">
-      <span className="h-px flex-1 bg-border-subtle" />
-      <span className="font-mono text-sm uppercase tracking-[0.3em] text-text-muted">
-        {label}
-      </span>
-      <span className="h-px flex-1 bg-border-subtle" />
-    </div>
-  );
-}
-
 export function LandingPage() {
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: getCategories,
-  });
-
-  const { data: latest = [], isLoading: loadingLatest } = useQuery({
-    queryKey: ['articles', 'latest'],
-    queryFn: () => getLatestArticles(3),
-  });
-
-  const marqueeItems = [...categories, ...categories];
 
   return (
     <div className="grain">

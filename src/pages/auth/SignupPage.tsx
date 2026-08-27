@@ -24,8 +24,6 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 export function SignupPage() {
   const { user, isLoading } = useAuth();
-  if (isLoading) { return null; } 
-  if (user) { return <Navigate to="/dashboard" replace />; } 
 
   const navigate = useNavigate();
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
@@ -35,6 +33,8 @@ export function SignupPage() {
     resolver: zodResolver(signupSchema),
   });
 
+  if (isLoading) { return null; } 
+  if (user) { return <Navigate to="/dashboard" replace />; } 
   const onSubmit = async (data: SignupForm) => {
     try {
       const result = await signup(data.name, data.email, data.password);
