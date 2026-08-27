@@ -20,6 +20,15 @@ export function Footer() {
             <p className="text-sm text-text-muted max-w-xs">
               {siteConfig.description}
             </p>
+            <p className="text-sm text-text-muted max-w-xs mt-3">
+              Have feedback? Drop me an email at{' '}
+              <a
+                href="mailto:umerfarooq1105@gmail.com"
+                className="text-text-secondary hover:text-text-primary underline decoration-border hover:decoration-accent transition-colors"
+              >
+                umerfarooq1105@gmail.com
+              </a>
+            </p>
           </div>
 
           <div className="space-y-3">
