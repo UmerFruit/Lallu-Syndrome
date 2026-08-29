@@ -33,6 +33,7 @@ import { UsernameSetupPage, USERNAME_SETUP_SKIP_KEY } from '@/pages/auth/Usernam
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Analytics } from "@vercel/analytics/react"
 import { LandingPage } from '@/pages/LandingPage';
+import { FloatingFeedbackButton } from '@/components/feedback/FloatingFeedbackButton';
 
 function AppToaster() {
   const { theme } = useTheme();
@@ -190,6 +191,7 @@ function App() {
           <BrowserRouter>
             <ErrorBoundary>
               <AppRoutes />
+              <FloatingFeedbackButton />
               <SpeedInsights />
               <Analytics />
             </ErrorBoundary>
