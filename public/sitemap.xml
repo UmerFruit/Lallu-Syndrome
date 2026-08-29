@@ -16,6 +16,11 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://syndrome.umerfruit.dev/articles/battery-health-on-linux-our8my</loc>
+    <lastmod>2026-08-27T09:24:30.663887+00:00</lastmod>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://syndrome.umerfruit.dev/articles/removing-efi-entries-00n761</loc>
     <lastmod>2026-08-25T08:40:12.306039+00:00</lastmod>
     <priority>0.9</priority>
@@ -26,8 +31,13 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://syndrome.umerfruit.dev/articles/testing-3tlv6i</loc>
+    <lastmod>2026-08-26T18:02:52.456887+00:00</lastmod>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://syndrome.umerfruit.dev/articles/welcome-to-my-tech-diary</loc>
-    <lastmod>2026-08-25T01:55:32.930466+00:00</lastmod>
+    <lastmod>2026-08-27T09:19:55.94899+00:00</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
@@ -41,12 +51,17 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://syndrome.umerfruit.dev/writers/test</loc>
+    <loc>https://syndrome.umerfruit.dev/writers/hsfassih</loc>
     
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://syndrome.umerfruit.dev/writers/hsfassih</loc>
+    <loc>https://syndrome.umerfruit.dev/writers/ahmed3313</loc>
+    
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://syndrome.umerfruit.dev/writers/test</loc>
     
     <priority>0.6</priority>
   </url>

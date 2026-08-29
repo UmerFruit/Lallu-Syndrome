@@ -1,11 +1,15 @@
-import { Link } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
-import { siteConfig } from '@/config/site';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowUpRight } from "lucide-react";
+import { siteConfig } from "@/config/site";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 
 const linkClass =
-  'text-text-secondary hover:text-text-primary transition-colors';
+  "text-text-secondary hover:text-text-primary transition-colors";
 
 export function Footer() {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   return (
     <footer className="border-t border-border-subtle mt-20">
       <div className="max-w-content mx-auto px-4 sm:px-6 py-12">
@@ -21,13 +25,15 @@ export function Footer() {
               {siteConfig.description}
             </p>
             <p className="text-sm text-text-muted max-w-xs mt-3">
-              Have feedback? Drop me an email at{' '}
-              <a
-                href="mailto:umerfarooq1105@gmail.com"
+              Have feedback, found a bug, or want a new feature?{" "}
+              <button
+                type="button"
+                onClick={() => setFeedbackOpen(true)}
                 className="text-text-secondary hover:text-text-primary underline decoration-border hover:decoration-accent transition-colors"
               >
-                umerfarooq1105@gmail.com
-              </a>
+                Send it here
+              </button>
+              .
             </p>
           </div>
 
@@ -36,11 +42,31 @@ export function Footer() {
               Navigate
             </h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/latest" className={linkClass}>Latest</Link></li>
-              <li><Link to="/articles" className={linkClass}>Articles</Link></li>
-              <li><Link to="/about" className={linkClass}>About</Link></li>
-              <li><Link to="/creator" className={linkClass}>Creator</Link></li>
-              <li><Link to="/dashboard" className={linkClass}>Dashboard</Link></li>
+              <li>
+                <Link to="/latest" className={linkClass}>
+                  Latest
+                </Link>
+              </li>
+              <li>
+                <Link to="/articles" className={linkClass}>
+                  Articles
+                </Link>
+              </li>
+              <li>
+                <Link to="/about" className={linkClass}>
+                  About
+                </Link>
+              </li>
+              <li>
+                <Link to="/creator" className={linkClass}>
+                  Creator
+                </Link>
+              </li>
+              <li>
+                <Link to="/dashboard" className={linkClass}>
+                  Dashboard
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -64,13 +90,13 @@ export function Footer() {
             </ul>
           </div>
         </div>
-
         <div className="mt-10 pt-6 border-t border-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-xs text-text-muted">
-            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights
+            reserved.
           </p>
           <p className="text-xs text-text-muted">
-            by{' '}
+            by{" "}
             <Link
               to="/creator"
               className="text-text-secondary hover:text-text-primary transition-colors"
@@ -80,6 +106,8 @@ export function Footer() {
           </p>
         </div>
       </div>
+
+      <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </footer>
   );
 }
