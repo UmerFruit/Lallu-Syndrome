@@ -60,7 +60,7 @@ export function HomePage() {
         ) : (
           <Suspense fallback={null}>
             <ParticleText
-              text="LS"
+                text="Welcome to LS"
               particleSize={isMobile ? 1 : 2.3}
               density={4}
               scatter={isMobile ? 100 : 190}

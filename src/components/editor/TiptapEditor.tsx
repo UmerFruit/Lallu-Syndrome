@@ -1,5 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -11,6 +11,7 @@ import { SlashCommand } from './SlashCommand';
 import TextAlign from '@tiptap/extension-text-align';
 import { processPastedHtml } from './processPastedHtml';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 import { YouTube } from './YouTube';
 
 import {
@@ -27,6 +28,7 @@ import {
   AlignCenter,
   AlignRight,
   Link as LinkIcon,
+  Mic,
   type LucideIcon,
 } from 'lucide-react';
 type ToolbarButton = {
@@ -47,6 +49,7 @@ const textToolbarButtons: ToolbarButton[] = [
   { key: 'justify', icon: AlignJustify, title: 'Justify text', isActive: (e) => e.isActive({ textAlign: 'justify' }), run: (e) => e.chain().focus().setTextAlign(e.isActive({ textAlign: 'justify' }) ? 'left' : 'justify').run() },
   { key: 'quote', icon: Quote, title: 'Quote', isActive: (e) => e.isActive('blockquote'), run: (e) => e.chain().focus().toggleBlockquote().run() },
   { key: 'code', icon: Code, title: 'Inline code', isActive: (e) => e.isActive('code'), run: (e) => e.chain().focus().toggleCode().run() },
+  { key: 'audio', icon: Mic, title: 'Record audio', isActive: () => false, run: (e) => toggleRecording(e) },
   {
     key: 'link',
     icon: LinkIcon,
@@ -95,6 +98,45 @@ export function TiptapEditor({
 }: Readonly<TiptapEditorProps>) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const toggleRecording = async (targetEditor: Editor) => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (!blob.type.startsWith('audio/')) {
+          toast.error('Only audio/* files allowed');
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const fileName = `recordings/${crypto.randomUUID()}.webm`;
+        const { data, error } = await supabase.storage.from('audio').upload(fileName, blob);
+        if (error) {
+          toast.error('Audio upload failed');
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const url = supabase.storage.from('audio').getPublicUrl(data.path).data.publicUrl;
+        targetEditor.chain().focus().insertContent(`<audio src="${url}" controls></audio>`).run();
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch {
+      toast.error('Microphone access denied');
+    }
+  };
 
   const openImagePicker = (targetEditor: Editor) => {
     fileInputRef.current?.click();
@@ -159,6 +201,7 @@ export function TiptapEditor({
       }),
       SlashCommand.configure({
         onImageUpload: openImagePicker,
+        onAudioRecord: toggleRecording,
       }),
       AlignedImage,
       CodeBlock,

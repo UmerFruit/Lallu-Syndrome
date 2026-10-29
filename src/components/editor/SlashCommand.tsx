@@ -22,6 +22,7 @@ const getReferenceClientRect = (
 
 type SlashCommandOptions = {
     onImageUpload?: (editor: Editor) => void;
+    onAudioRecord?: (editor: Editor) => void;
 };
 
 type CommandProps = {
@@ -42,9 +43,11 @@ export type SlashCommandItem = {
 const getItems = ({
     query,
     onImageUpload,
+    onAudioRecord,
 }: {
     query: string;
     onImageUpload?: (editor: Editor) => void;
+    onAudioRecord?: (editor: Editor) => void;
 }): SlashCommandItem[] => {
     const items: SlashCommandItem[] = [
         {
@@ -84,6 +87,19 @@ const getItems = ({
                     .deleteRange(range)
                     .setHeading({ level: 3 })
                     .run();
+            },
+        },
+        {
+            title: 'Audio Recording',
+            description: 'Record and embed audio',
+            keywords: ['audio', 'record', 'voice', 'sound', 'mic'],
+            command: ({ editor, range }) => {
+                editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .run();
+                onAudioRecord?.(editor);
             },
         },
         {
@@ -199,6 +215,7 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
     addOptions() {
         return {
             onImageUpload: undefined,
+            onAudioRecord: undefined,
         };
     },
 
@@ -214,6 +231,7 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
                     getItems({
                         query,
                         onImageUpload: this.options.onImageUpload,
+                        onAudioRecord: this.options.onAudioRecord,
                     }),
 
                 command: ({
